@@ -1,0 +1,154 @@
+/* ─── Overlay ────────────────────────────────────────────────────────────── */
+.levelup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(8px);
+  animation: levelup-fadeIn 0.3s ease;
+}
+
+/* ─── Modal card ─────────────────────────────────────────────────────────── */
+.levelup-modal {
+  position: relative;
+  width: 340px;
+  height: 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: levelup-scaleIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* ─── Glow ring ──────────────────────────────────────────────────────────── */
+.levelup-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #fbbf24;
+  box-shadow:
+    0 0 30px #fbbf2466,
+    0 0 80px #fbbf2433,
+    inset 0 0 40px #fbbf2422;
+  animation: levelup-pulse 1.6s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 50%, #fbbf2412 0%, transparent 70%);
+}
+
+/* ─── Particles ──────────────────────────────────────────────────────────── */
+.levelup-particles {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.levelup-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fbbf24;
+  transform-origin: 0 0;
+  animation: levelup-particle 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation-delay: calc(var(--i) * 0.04s);
+  opacity: 0;
+}
+
+/* Alternate particle colours for variety */
+.levelup-particle:nth-child(3n)   { background: #fff; width: 4px; height: 4px; }
+.levelup-particle:nth-child(3n+1) { background: #f9d05a; }
+.levelup-particle:nth-child(3n+2) { background: #fb923c; }
+
+@keyframes levelup-particle {
+  0%   { transform: rotate(calc(var(--i) * 30deg)) translateY(-20px) scale(1); opacity: 1; }
+  100% { transform: rotate(calc(var(--i) * 30deg)) translateY(-160px) scale(0); opacity: 0; }
+}
+
+/* ─── Content ────────────────────────────────────────────────────────────── */
+.levelup-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.levelup-pre {
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #fbbf24;
+  margin: 0;
+  animation: levelup-slideDown 0.5s 0.2s both;
+}
+
+.levelup-number {
+  font-size: 7rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 0;
+  line-height: 1;
+  letter-spacing: -4px;
+  text-shadow: 0 0 40px #fbbf2466, 0 0 80px #fbbf2433;
+  animation: levelup-numberPop 0.5s 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.levelup-sub {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a3a3a3;
+  margin: 0;
+  letter-spacing: 0.5px;
+  animation: levelup-slideDown 0.5s 0.3s both;
+}
+
+.levelup-btn {
+  margin-top: 1rem;
+  background: #fbbf24;
+  color: #0d0d0d;
+  border: none;
+  border-radius: 50px;
+  padding: 0.65rem 2rem;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.2s;
+  animation: levelup-slideDown 0.5s 0.4s both;
+}
+
+.levelup-btn:hover  { background: #f9d05a; }
+.levelup-btn:active { transform: scale(0.95); }
+
+/* ─── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes levelup-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes levelup-scaleIn {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes levelup-pulse {
+  0%, 100% { box-shadow: 0 0 30px #fbbf2466, 0 0 80px #fbbf2433, inset 0 0 40px #fbbf2422; }
+  50%       { box-shadow: 0 0 50px #fbbf2499, 0 0 120px #fbbf2455, inset 0 0 60px #fbbf2433; }
+}
+
+@keyframes levelup-numberPop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes levelup-slideDown {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}

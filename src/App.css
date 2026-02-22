@@ -1,0 +1,29 @@
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.app-container {
+  width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: #1a1a1a;
+  position: relative;
+}
+
+.content-container {
+  padding-top: 100px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.placeholder-page {
+  color: #fff;
+  text-align: center;
+  margin-top: 2rem;
+}
+

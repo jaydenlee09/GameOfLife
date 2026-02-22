@@ -1,0 +1,480 @@
+/* ─── Page Layout ─────────────────────────────────────────────────────────── */
+.daily-log-container {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 100px);
+  overflow: hidden;
+  color: #fff;
+}
+
+/* ─── Left Sidebar ───────────────────────────────────────────────────────── */
+.log-sidebar {
+  width: 240px;
+  min-width: 200px;
+  background: #1a1a1a;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.log-sidebar-header {
+  padding: 1.5rem 1.25rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.log-sidebar-title {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #fbbf24;
+  margin: 0;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.log-entries-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.log-entries-list::-webkit-scrollbar {
+  width: 4px;
+}
+.log-entries-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.log-entries-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+.log-empty-hint {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* ─── Entry Pills ─────────────────────────────────────────────────────────── */
+.log-entry-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.15s ease;
+  gap: 0.5rem;
+}
+
+.log-entry-pill:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.log-entry-pill.active {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fff;
+}
+
+.log-entry-pill.today .log-entry-date {
+  color: #fbbf24;
+}
+
+.log-entry-pill-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.log-entry-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fbbf24;
+  flex-shrink: 0;
+}
+
+.log-entry-date {
+  font-size: 0.78rem;
+  font-weight: 900;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-entry-today-badge {
+  font-size: 0.6rem;
+  color: #fbbf24;
+  letter-spacing: 0.5px;
+  display: block;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+.log-entry-emotions-preview {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+
+/* ─── Main Panel ──────────────────────────────────────────────────────────── */
+.log-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 2.5rem;
+  background: #141414;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.log-main::-webkit-scrollbar {
+  width: 6px;
+}
+.log-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+.log-main::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+/* ─── Date Header ─────────────────────────────────────────────────────────── */
+.log-date-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.log-date-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.log-today-badge {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 20px;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.log-readonly-badge {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ─── Log Form ────────────────────────────────────────────────────────────── */
+.log-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* ─── Log Section Card ────────────────────────────────────────────────────── */
+.log-section {
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.log-section-title {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 0 0 0.3rem 0;
+  letter-spacing: 0.5px;
+}
+
+.log-section-subtitle {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0 0 1rem 0;
+  font-weight: 900;
+}
+
+/* ─── Emotions Grid ───────────────────────────────────────────────────────── */
+.emotions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.emotion-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  transition: all 0.15s ease;
+  font-family: 'League Spartan', sans-serif;
+}
+
+.emotion-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.emotion-chip.selected {
+  color: #fff;
+  font-weight: 900;
+}
+
+.emotion-emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.emotion-label {
+  line-height: 1;
+}
+
+/* ─── Reflection Inputs ───────────────────────────────────────────────────── */
+.reflection-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.reflection-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.reflection-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  font-size: 0.75rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.reflection-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  font-family: 'League Spartan', sans-serif;
+  font-weight: 900;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.reflection-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 900;
+}
+
+.reflection-input:focus {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* ─── Learned Textarea ────────────────────────────────────────────────────── */
+.learned-textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  font-family: 'League Spartan', sans-serif;
+  font-weight: 900;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  margin-top: 0.5rem;
+}
+
+.learned-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 900;
+}
+
+.learned-textarea:focus {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* ─── Video Upload ────────────────────────────────────────────────────────── */
+.video-upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 2rem 1.5rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  background: rgba(255, 255, 255, 0.02);
+  gap: 0.4rem;
+}
+
+.video-upload-area:hover {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.04);
+}
+
+.video-upload-icon {
+  font-size: 2rem;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.video-upload-text {
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.video-upload-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 900;
+}
+
+.video-file-input {
+  display: none;
+}
+
+.video-preview-wrapper {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.video-preview {
+  width: 100%;
+  max-height: 300px;
+  border-radius: 10px;
+  background: #000;
+  object-fit: contain;
+}
+
+.video-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.video-name {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-remove-btn {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  border-radius: 8px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 900;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: 'League Spartan', sans-serif;
+  transition: background 0.15s ease;
+}
+
+.video-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .daily-log-container {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+
+  .log-sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .log-entries-list {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .log-entry-pill {
+    flex-shrink: 0;
+    width: auto;
+  }
+
+  .log-main {
+    padding: 1.25rem 1rem;
+  }
+
+  .log-date-title {
+    font-size: 1.1rem;
+  }
+}
