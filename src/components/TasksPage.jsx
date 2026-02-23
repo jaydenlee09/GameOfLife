@@ -459,6 +459,7 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [showStatModal, setShowStatModal] = useState(false);
   const [gainedAttribute, setGainedAttribute] = useState('');
+  const [gainedHabitXp, setGainedHabitXp] = useState(10);
 
   const attributes = [
     'strength', 'intelligence', 'charisma', 'discipline',
@@ -497,18 +498,35 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
     setIsAdding(false);
   };
 
+  const calcStreakXp = (history, todayStr) => {
+    const today = new Date(todayStr);
+    let streak = 0;
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const ds = d.toISOString().split('T')[0];
+      if (history[ds]) streak++;
+      else break;
+    }
+    // streak = consecutive days including today; XP = 10 × (streak / 2), min 10
+    return Math.max(10, Math.round(10 * (streak / 2)));
+  };
+
   const toggleHabitDate = (habitId, date) => {
     const dateStr = date.toISOString().split('T')[0];
     setHabits(habits.map(habit => {
       if (habit.id !== habitId) return habit;
       const newHistory = { ...habit.history };
       if (newHistory[dateStr]) {
+        const xp = calcStreakXp(newHistory, dateStr);
         delete newHistory[dateStr];
-        onUpdateStat(habit.attribute, -15);
+        onUpdateStat(habit.attribute, -xp);
       } else {
         newHistory[dateStr] = true;
-        onUpdateStat(habit.attribute, 15);
+        const xp = calcStreakXp(newHistory, dateStr);
+        onUpdateStat(habit.attribute, xp);
         setGainedAttribute(habit.attribute);
+        setGainedHabitXp(xp);
         setShowStatModal(true);
       }
       return { ...habit, history: newHistory };
@@ -668,7 +686,7 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
           <div className="modal-content habit-stat-modal" onClick={(e) => e.stopPropagation()}>
             <span className="xp-badge-big">⚡</span>
             <h3 className="modal-title" style={{ color: '#fbbf24', textTransform: 'capitalize' }}>
-              +15 {gainedAttribute}
+              +{gainedHabitXp} {gainedAttribute}
             </h3>
             <p className="modal-body">Attribute increased! You are getting better every day.</p>
             <button onClick={() => setShowStatModal(false)} className="modal-btn primary">Keep Grinding</button>
