@@ -16,12 +16,14 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const XP_BY_TIMEFRAME = {
   today: 20,
+  tomorrow: 30,
   'this-week': 50,
   'this-month': 100,
 };
 
 const TIMEFRAME_LABELS = {
   today: 'Today',
+  tomorrow: 'Tomorrow',
   'this-week': 'This Week',
   'this-month': 'This Month',
 };
@@ -302,6 +304,24 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
 
+  // Rollover: move 'tomorrow' tasks to 'today' at midnight
+  React.useEffect(() => {
+    const rolloverTomorrow = () => {
+      setTodos(prev =>
+        prev.map(t =>
+          t.timeFrame === 'tomorrow' ? { ...t, timeFrame: 'today' } : t
+        )
+      );
+    };
+    const now = new Date();
+    const msUntilMidnight =
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0) - now;
+    const timeout = setTimeout(() => {
+      rolloverTomorrow();
+    }, msUntilMidnight);
+    return () => clearTimeout(timeout);
+  }, []);
+
   const handleAddTodo = (newTodo) => {
     setTodos([...todos, newTodo]);
   };
@@ -350,6 +370,7 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
 
   const grouped = {
     today: todos.filter(t => t.timeFrame === 'today' || !t.timeFrame),
+    tomorrow: todos.filter(t => t.timeFrame === 'tomorrow'),
     'this-week': todos.filter(t => t.timeFrame === 'this-week'),
     'this-month': todos.filter(t => t.timeFrame === 'this-month'),
   };
@@ -359,7 +380,7 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
     return (
       <div className="task-group" key={timeFrame}>
         <div className="task-group-header">
-          <span className="task-group-title">{label}</span>
+          <span className={`task-group-title${timeFrame === 'tomorrow' ? ' tomorrow' : ''}`}>{label}</span>
           <span className="task-group-count">{items.length}</span>
         </div>
         {items.map(todo => (
@@ -406,6 +427,7 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
       <h1 className="section-page-title">TO-DO</h1>
       <div className="todo-card">
         {renderGroup('today', 'Today')}
+        {renderGroup('tomorrow', 'Tomorrow')}
         {renderGroup('this-week', 'This Week')}
         {renderGroup('this-month', 'This Month')}
         <button className="add-task-btn" onClick={() => setShowAddModal(true)}>
