@@ -1,0 +1,487 @@
+/* ── Page Layout ─────────────────────────────────────────────────────────── */
+.cp-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+/* ── Page Header ──────────────────────────────────────────────────────────── */
+.cp-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cp-page-title {
+  margin: 0 0 0.3rem 0;
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.cp-page-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #737373;
+  font-weight: 600;
+}
+
+.cp-add-btn {
+  flex-shrink: 0;
+  background: #fbbf24;
+  border: none;
+  border-radius: 12px;
+  color: #000;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.cp-add-btn:hover {
+  background: #f59e0b;
+  transform: translateY(-1px);
+}
+
+.cp-add-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+.cp-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.cp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cp-section-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #a3a3a3;
+}
+
+.cp-section-count {
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: #525252;
+  background: #262626;
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.5px;
+}
+
+/* ── Cards Grid ───────────────────────────────────────────────────────────── */
+.cp-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* ── Challenge Card ───────────────────────────────────────────────────────── */
+.cp-card {
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.cp-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #212121;
+}
+
+.cp-card--active {
+  border-color: rgba(251, 191, 36, 0.25);
+  background: #1e1c14;
+}
+
+.cp-card--completed {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+.cp-card--completed .cp-card-text {
+  text-decoration: line-through;
+  color: #525252;
+}
+
+/* Card top row */
+.cp-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cp-card-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.cp-card-xp {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #fbbf24;
+  letter-spacing: 0.3px;
+}
+
+/* Card text */
+.cp-card-text {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.4;
+  flex: 1;
+}
+
+/* Card footer */
+.cp-card-footer {
+  margin-top: 4px;
+}
+
+.cp-start-btn {
+  width: 100%;
+  background: transparent;
+  border: 1.5px solid #525252;
+  border-radius: 10px;
+  color: #a3a3a3;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 8px 0;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  font-family: inherit;
+}
+
+.cp-start-btn:hover {
+  border-color: #fbbf24;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.cp-complete-btn {
+  background: transparent;
+  border: 1.5px solid #4ade80;
+  border-radius: 10px;
+  color: #4ade80;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.cp-complete-btn:hover {
+  background: rgba(74, 222, 128, 0.1);
+}
+
+/* Active state row */
+.cp-card-active-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cp-active-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-active-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fbbf24;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px #fbbf24aa;
+  animation: cp-pulse 2s ease-in-out infinite;
+}
+
+@keyframes cp-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.cp-time-left {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #737373;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Completed badge */
+.cp-card-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cp-done-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1.5px solid #4ade80;
+  color: #4ade80;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.cp-done-label {
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: #4ade80;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* ── Add Challenge Modal ──────────────────────────────────────────────────── */
+.cp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  animation: cp-fade-in 0.15s ease;
+}
+
+@keyframes cp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.cp-modal {
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 28px;
+  width: 460px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: cp-slide-up 0.2s ease;
+}
+
+@keyframes cp-slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cp-modal::-webkit-scrollbar { width: 4px; }
+.cp-modal::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+.cp-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cp-modal-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #fff;
+}
+
+.cp-modal-close {
+  background: none;
+  border: none;
+  color: #737373;
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.cp-modal-close:hover { color: #fff; }
+
+.cp-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.cp-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cp-label {
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #737373;
+}
+
+.cp-text-input {
+  background: #262626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cp-text-input::placeholder { color: #525252; }
+
+.cp-text-input:focus { border-color: rgba(251, 191, 36, 0.5); }
+
+.cp-xp-input {
+  width: 120px;
+  text-align: center;
+}
+
+/* Duration pills */
+.cp-pill-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cp-pill {
+  background: #262626;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #a3a3a3;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.cp-pill:hover { border-color: #fbbf24; color: #fbbf24; }
+
+.cp-pill--active {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+/* Category grid */
+.cp-category-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cp-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #262626;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #a3a3a3;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.cp-cat-pill:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* Submit button */
+.cp-submit-btn {
+  background: #fbbf24;
+  border: none;
+  border-radius: 12px;
+  color: #000;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  font-family: inherit;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.cp-submit-btn:hover:not(:disabled) { background: #f59e0b; }
+
+.cp-submit-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .cp-page { padding: 1.5rem 1rem 3rem; }
+  .cp-page-title { font-size: 2rem; }
+  .cp-cards-grid { grid-template-columns: 1fr; }
+  .cp-page-header { flex-direction: column; align-items: flex-start; }
+}

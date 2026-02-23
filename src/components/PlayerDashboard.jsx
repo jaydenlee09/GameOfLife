@@ -50,6 +50,7 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
     daily:   24 * 60 * 60 * 1000,
     fullDay: 24 * 60 * 60 * 1000,
     weekly:   7 * 24 * 60 * 60 * 1000,
+    monthly: 30 * 24 * 60 * 60 * 1000,
   };
 
   const getDeadlineMs = (startedAt, duration) => {
@@ -118,13 +119,22 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
             </div>
         </div>
 
-        {/* Challenges Section */}
+        {/* Active Challenges Section */}
         <div className="dashboard-card challenges-section">
-          <h3 className="section-title">CHALLENGES</h3>
+          <h3 className="section-title">ACTIVE CHALLENGES</h3>
           
           <div className="challenges-list">
-            {challenges.length > 0 ? (
-              challenges.map(challenge => {
+            {(() => {
+              const active = challenges.filter(c => c.started);
+              if (active.length === 0) {
+                return (
+                  <div className="empty-challenges">
+                    <span>No active challenges</span>
+                    <span className="empty-challenges-hint">Start one from the Challenges page</span>
+                  </div>
+                );
+              }
+              return active.map(challenge => {
                 const meta = STAT_META[challenge.category] || { label: challenge.category, Icon: null, color: '#a3a3a3' };
                 const { Icon } = meta;
                 return (
@@ -149,7 +159,7 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
                     <div className="challenge-actions">
                       {challenge.completed ? (
                         <div className="challenge-done-badge">✓</div>
-                      ) : challenge.started ? (
+                      ) : (
                         <div className="challenge-active">
                           <button
                             className="challenge-complete-btn"
@@ -161,21 +171,12 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
                             {formatTimeLeft(getDeadlineMs(challenge.startedAt, challenge.duration) - now, challenge.duration)}
                           </span>
                         </div>
-                      ) : (
-                        <button
-                          className="challenge-start-btn"
-                          onClick={() => onChallengeStart && onChallengeStart(challenge.id)}
-                        >
-                          START
-                        </button>
                       )}
                     </div>
                   </div>
                 );
-              })
-            ) : (
-              <div className="empty-challenges">No active challenges</div>
-            )}
+              });
+            })()}
           </div>
         </div>
 

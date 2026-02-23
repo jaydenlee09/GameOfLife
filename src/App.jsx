@@ -6,6 +6,7 @@ import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
 import LevelUpModal from './components/LevelUpModal'
 import DailyLogPage from './components/DailyLogPage'
+import ChallengesPage from './components/ChallengesPage'
 import { xpCapForLevel } from './utils/xpUtils'
 import CHALLENGES_POOL from './utils/challengesMeta'
 
@@ -50,50 +51,26 @@ function App() {
     localStorage.setItem('gameOfLife_logs', JSON.stringify(logs));
   }, [logs]);
 
-  // Helper: get the Monday date string for the current week
-  const getWeekKey = () => {
-    const now = new Date();
-    const day = now.getDay(); // 0 Sun, 1 Mon...
-    const diff = now.getDate() - ((day + 6) % 7); // shift to Monday
-    const monday = new Date(now.setDate(diff));
-    return monday.toDateString();
-  };
-
-  // Seeded shuffle using week key so the same 3 show all week
-  const pickWeeklyChallenges = (weekKey) => {
-    // Simple deterministic seed from weekKey string
-    let seed = weekKey.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    const seededRand = () => {
-      seed = (seed * 1664525 + 1013904223) & 0xffffffff;
-      return Math.abs(seed) / 0xffffffff;
-    };
-    const pool = [...CHALLENGES_POOL];
-    // Fisher-Yates with seeded random
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(seededRand() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    return pool.slice(0, 3).map(c => ({ ...c, completed: false, started: false }));
-  };
+  // Challenges — persist ALL challenges with their activation state
+  const buildDefaultChallenges = () =>
+    CHALLENGES_POOL.map(c => ({ ...c, completed: false, started: false, startedAt: null }));
 
   const [challenges, setChallenges] = useState(() => {
-    const saved = localStorage.getItem('gameOfLife_challenges');
-    const weekKey = getWeekKey();
+    const saved = localStorage.getItem('gameOfLife_challenges_v2');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.weekKey === weekKey) {
-        return parsed.selections;
-      }
+      // Merge saved state with pool so new pool additions appear automatically
+      const savedMap = Object.fromEntries(parsed.map(c => [c.id, c]));
+      const merged = CHALLENGES_POOL.map(c => savedMap[c.id] ? { ...c, ...savedMap[c.id] } : { ...c, completed: false, started: false, startedAt: null });
+      // Append any user-created challenges that are not in the pool
+      const userCreated = parsed.filter(c => !CHALLENGES_POOL.find(p => p.id === c.id));
+      return [...merged, ...userCreated];
     }
-    // New week — pick 3 fresh challenges
-    return pickWeeklyChallenges(weekKey);
+    return buildDefaultChallenges();
   });
 
   useEffect(() => {
-    localStorage.setItem('gameOfLife_challenges', JSON.stringify({
-      weekKey: getWeekKey(),
-      selections: challenges,
-    }));
+    localStorage.setItem('gameOfLife_challenges_v2', JSON.stringify(challenges));
   }, [challenges]);
 
   const handleChallengeStart = (challengeId) => {
@@ -110,6 +87,10 @@ function App() {
         c.id === challengeId ? { ...c, completed: true } : c
       ));
     }
+  };
+
+  const handleChallengeAdd = (newChallenge) => {
+    setChallenges(prev => [...prev, { ...newChallenge, completed: false, started: false, startedAt: null }]);
   };
 
   const [user, setUser] = useState(() => {
@@ -227,6 +208,15 @@ function App() {
             xpCap={xpCapForLevel(user.level)}
             equippedOutfit={user.equippedOutfit || {}}
             onUpdateOutfit={updateOutfit}
+          />
+        );
+      case 'challenges':
+        return (
+          <ChallengesPage
+            challenges={challenges}
+            onChallengeStart={handleChallengeStart}
+            onChallengeComplete={handleChallengeComplete}
+            onChallengeAdd={handleChallengeAdd}
           />
         );
       case 'tasks':

@@ -334,6 +334,15 @@ body {
   font-size: 0.85rem;
   text-align: center;
   padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.empty-challenges-hint {
+  font-size: 0.72rem;
+  color: #3a3a3a;
+  font-weight: 600;
 }
 
 /* Poor Decisions Section */

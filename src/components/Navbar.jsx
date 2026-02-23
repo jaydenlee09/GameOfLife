@@ -20,6 +20,12 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
               Tasks
             </button>
             <button
+              className={`nav-link ${activePage === 'challenges' ? 'active' : ''}`}
+              onClick={() => onNavigate('challenges')}
+            >
+              Challenges
+            </button>
+            <button
               className={`nav-link ${activePage === 'daily-log' ? 'active' : ''}`}
               onClick={() => onNavigate('daily-log')}
             >
