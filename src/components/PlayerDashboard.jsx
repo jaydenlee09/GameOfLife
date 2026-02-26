@@ -125,7 +125,7 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
           
           <div className="challenges-list">
             {(() => {
-              const active = challenges.filter(c => c.started);
+              const active = challenges.filter(c => c.started && !c.completed);
               if (active.length === 0) {
                 return (
                   <div className="empty-challenges">

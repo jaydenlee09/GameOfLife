@@ -151,9 +151,10 @@ const AddChallengeModal = ({ onClose, onAdd }) => {
 };
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
-const ChallengesPage = ({ challenges = [], onChallengeStart, onChallengeComplete, onChallengeAdd }) => {
+const ChallengesPage = ({ challenges = [], onChallengeStart, onChallengeComplete, onChallengeAdd, onChallengeDelete }) => {
   const [now, setNow] = useState(Date.now());
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -166,9 +167,10 @@ const ChallengesPage = ({ challenges = [], onChallengeStart, onChallengeComplete
     return deadline - now;
   };
 
-  // Group challenges by duration
+  // Separate completed from active, then group active by duration
+  const completedChallenges = challenges.filter(c => c.completed);
   const grouped = DURATION_ORDER.reduce((acc, dur) => {
-    acc[dur] = challenges.filter(c => c.duration === dur);
+    acc[dur] = challenges.filter(c => c.duration === dur && !c.completed);
     return acc;
   }, {});
 
@@ -210,13 +212,22 @@ const ChallengesPage = ({ challenges = [], onChallengeStart, onChallengeComplete
                       key={challenge.id}
                       className={`cp-card${challenge.completed ? ' cp-card--completed' : ''}${challenge.started && !challenge.completed ? ' cp-card--active' : ''}`}
                     >
-                      {/* Top row: category badge + XP */}
+                      {/* Top row: category badge + XP + delete */}
                       <div className="cp-card-top">
                         <span className="cp-card-category" style={{ color: meta.color, background: `${meta.color}18` }}>
                           {Icon && <Icon size={11} strokeWidth={2.5} />}
                           {meta.label.toUpperCase()}
                         </span>
-                        <span className="cp-card-xp">+{challenge.xp} XP</span>
+                        <div className="cp-card-top-right">
+                          <span className="cp-card-xp">+{challenge.xp} XP</span>
+                          <button
+                            className="cp-delete-btn"
+                            onClick={() => onChallengeDelete && onChallengeDelete(challenge.id)}
+                            title="Delete challenge"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
 
                       {/* Challenge text */}
@@ -261,6 +272,58 @@ const ChallengesPage = ({ challenges = [], onChallengeStart, onChallengeComplete
           );
         })}
       </div>
+
+      {/* Completed Challenges Section */}
+      {completedChallenges.length > 0 && (
+        <section className="cp-section">
+          <button
+            className="cp-completed-header"
+            onClick={() => setShowCompleted(v => !v)}
+          >
+            <div className="cp-section-header" style={{ marginBottom: 0 }}>
+              <h2 className="cp-section-title">Completed</h2>
+              <span className="cp-section-count">{completedChallenges.length}</span>
+            </div>
+            <span className={`cp-chevron${showCompleted ? ' cp-chevron--open' : ''}`}>▾</span>
+          </button>
+
+          {showCompleted && (
+            <div className="cp-cards-grid" style={{ marginTop: '1rem' }}>
+              {completedChallenges.map(challenge => {
+                const meta = STAT_META[challenge.category] || { label: challenge.category, Icon: null, color: '#a3a3a3' };
+                const { Icon } = meta;
+                return (
+                  <div key={challenge.id} className="cp-card cp-card--completed">
+                    <div className="cp-card-top">
+                      <span className="cp-card-category" style={{ color: meta.color, background: `${meta.color}18` }}>
+                        {Icon && <Icon size={11} strokeWidth={2.5} />}
+                        {meta.label.toUpperCase()}
+                      </span>
+                      <div className="cp-card-top-right">
+                        <span className="cp-card-xp">+{challenge.xp} XP</span>
+                        <button
+                          className="cp-delete-btn"
+                          onClick={() => onChallengeDelete && onChallengeDelete(challenge.id)}
+                          title="Delete challenge"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <p className="cp-card-text">{challenge.text}</p>
+                    <div className="cp-card-footer">
+                      <div className="cp-card-done">
+                        <span className="cp-done-badge">✓</span>
+                        <span className="cp-done-label">COMPLETED</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Add Challenge Modal */}
       {showAddModal && (

@@ -468,10 +468,11 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
 
   const getDaysOfWeek = () => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+    const diff = day === 0 ? -6 : 1 - day;
     const monday = new Date(today);
-    monday.setDate(diff);
+    monday.setDate(today.getDate() + diff);
     const days = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
@@ -499,12 +500,12 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
   };
 
   const calcStreakXp = (history, todayStr) => {
-    const today = new Date(todayStr);
+    const today = parseLocalDate(todayStr);
     let streak = 0;
     for (let i = 0; i < 365; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const ds = d.toISOString().split('T')[0];
+      const ds = localDateStr(d);
       if (history[ds]) streak++;
       else break;
     }
@@ -513,7 +514,7 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
   };
 
   const toggleHabitDate = (habitId, date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = localDateStr(date);
     setHabits(habits.map(habit => {
       if (habit.id !== habitId) return habit;
       const newHistory = { ...habit.history };
@@ -541,10 +542,11 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
 
   const getStreak = (habit) => {
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    today.setHours(0, 0, 0, 0);
+    const todayStr = localDateStr(today);
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = localDateStr(yesterday);
 
     // Streak is alive if today OR yesterday is checked (so it stays alive all day)
     const hasToday = !!habit.history[todayStr];
@@ -557,7 +559,7 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
     for (let i = startOffset; i < 365; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = localDateStr(d);
       if (habit.history[dateStr]) consecutive++;
       else break;
     }
@@ -620,7 +622,7 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
               </div>
               <div className="habit-days-col">
                 {days.map((date, i) => {
-                  const dateStr = date.toISOString().split('T')[0];
+                  const dateStr = localDateStr(date);
                   const isCompleted = !!habit.history[dateStr];
                   return (
                     <div
@@ -699,6 +701,28 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
 
 // ─── Habit Graph Helpers ──────────────────────────────────────────────────────
 
+/**
+ * Returns "YYYY-MM-DD" in LOCAL time for a given Date.
+ * Using toISOString() gives UTC midnight which can be the wrong calendar day
+ * for users in non-UTC timezones.
+ */
+const localDateStr = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+/**
+ * Parse a "YYYY-MM-DD" string as LOCAL midnight.
+ * new Date("YYYY-MM-DD") treats it as UTC midnight, which is the wrong day
+ * in timezones behind UTC.
+ */
+const parseLocalDate = (dateStr) => {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  return new Date(y, mo - 1, d);
+};
+
 /** Returns the Monday of the ISO week for a given Date */
 const getMondayOf = (date) => {
   const d = new Date(date);
@@ -709,14 +733,18 @@ const getMondayOf = (date) => {
   return d;
 };
 
-/** "YYYY-Www" key for a date */
+/** "YYYY-MM-DD" (Monday) week key for a date — local time */
 const weekKey = (date) => {
   const mon = getMondayOf(date);
-  return mon.toISOString().split('T')[0];
+  return localDateStr(mon);
 };
 
-/** "YYYY-MM" key for a date */
-const monthKey = (date) => date.toISOString().slice(0, 7);
+/** "YYYY-MM" key for a date — local time */
+const monthKey = (date) => {
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, '0');
+  return `${y}-${mo}`;
+};
 
 /**
  * For each habit's history, count completions grouped by a key function.
@@ -726,7 +754,7 @@ const aggregateHistory = (habits, keyFn) => {
   const counts = {};
   habits.forEach((habit) => {
     Object.keys(habit.history).forEach((dateStr) => {
-      const k = keyFn(new Date(dateStr));
+      const k = keyFn(parseLocalDate(dateStr));
       counts[k] = (counts[k] || 0) + 1;
     });
   });
@@ -747,17 +775,17 @@ const buildDailyData = (habits) => {
     });
   });
 
-  // Current week — 7 days starting from this Monday
+  // Current week — 7 days starting from this Monday (local dates)
   const currentWeekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    return d.toISOString().split('T')[0];
+    return localDateStr(d);
   });
 
   // Find best week: group all dates by week, sum totals, pick highest
   const weekTotals = {};
   Object.entries(dayTotals).forEach(([dateStr, count]) => {
-    const wk = weekKey(new Date(dateStr));
+    const wk = weekKey(parseLocalDate(dateStr));
     weekTotals[wk] = (weekTotals[wk] || 0) + count;
   });
 
@@ -769,9 +797,9 @@ const buildDailyData = (habits) => {
 
   const bestWeekDays = bestWeekKey
     ? Array.from({ length: 7 }, (_, i) => {
-        const base = new Date(bestWeekKey);
+        const base = parseLocalDate(bestWeekKey);
         base.setDate(base.getDate() + i);
-        return base.toISOString().split('T')[0];
+        return localDateStr(base);
       })
     : null;
 
@@ -793,7 +821,7 @@ const buildWeeklyData = (habits) => {
 
   const weekTotals = {};
   Object.entries(dayTotals).forEach(([dateStr, count]) => {
-    const wk = weekKey(new Date(dateStr));
+    const wk = weekKey(parseLocalDate(dateStr));
     weekTotals[wk] = (weekTotals[wk] || 0) + count;
   });
 
@@ -803,7 +831,7 @@ const buildWeeklyData = (habits) => {
     const d = new Date(today);
     d.setDate(d.getDate() - (7 * (7 - i)));
     const mon = getMondayOf(d);
-    return mon.toISOString().split('T')[0];
+    return localDateStr(mon);
   });
 
   const allValues = Object.values(weekTotals);

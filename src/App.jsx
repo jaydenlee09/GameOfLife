@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import PlayerDashboard from './components/PlayerDashboard'
 import Navbar from './components/Navbar'
@@ -37,6 +37,48 @@ function App() {
   useEffect(() => {
     localStorage.setItem('gameOfLife_todos', JSON.stringify(todos));
   }, [todos]);
+
+  // ─── Midnight rollover: promote "tomorrow" tasks to "today" ───────────────
+  const todayStr = () => new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  const promoteTomorrowTasks = (currentTodos) =>
+    currentTodos.map(t =>
+      t.timeFrame === 'tomorrow'
+        ? { ...t, timeFrame: 'today', xp: 20 }
+        : t
+    );
+
+  // On mount: check if the date has changed since last visit
+  useEffect(() => {
+    const lastDate = localStorage.getItem('gameOfLife_lastDate');
+    const today = todayStr();
+    if (lastDate && lastDate !== today) {
+      setTodos(prev => promoteTomorrowTasks(prev));
+    }
+    localStorage.setItem('gameOfLife_lastDate', today);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // While the app is open: schedule a timeout that fires exactly at midnight
+  const midnightTimerRef = useRef(null);
+  useEffect(() => {
+    const scheduleMidnightRollover = () => {
+      const now = new Date();
+      const msUntilMidnight =
+        new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+
+      midnightTimerRef.current = setTimeout(() => {
+        setTodos(prev => promoteTomorrowTasks(prev));
+        localStorage.setItem('gameOfLife_lastDate', todayStr());
+        scheduleMidnightRollover(); // reschedule for the next midnight
+      }, msUntilMidnight);
+    };
+
+    scheduleMidnightRollover();
+    return () => clearTimeout(midnightTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     localStorage.setItem('gameOfLife_habits', JSON.stringify(habits));
@@ -91,6 +133,10 @@ function App() {
 
   const handleChallengeAdd = (newChallenge) => {
     setChallenges(prev => [...prev, { ...newChallenge, completed: false, started: false, startedAt: null }]);
+  };
+
+  const handleChallengeDelete = (challengeId) => {
+    setChallenges(prev => prev.filter(c => c.id !== challengeId));
   };
 
   const [user, setUser] = useState(() => {
@@ -217,6 +263,7 @@ function App() {
             onChallengeStart={handleChallengeStart}
             onChallengeComplete={handleChallengeComplete}
             onChallengeAdd={handleChallengeAdd}
+            onChallengeDelete={handleChallengeDelete}
           />
         );
       case 'tasks':
