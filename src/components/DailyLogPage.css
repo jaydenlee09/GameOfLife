@@ -459,6 +459,80 @@
   cursor: default;
 }
 
+.commitment-input--locked {
+  border-color: rgba(251, 191, 36, 0.6) !important;
+  color: #fbbf24 !important;
+}
+
+.commit-hold-btn-wrap {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.commit-hold-btn {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.07);
+  color: #fbbf24;
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: border-color 0.15s ease;
+  font-family: 'League Spartan', sans-serif;
+}
+
+.commit-hold-btn--holding {
+  border-color: #fbbf24;
+}
+
+.commit-hold-btn--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.commit-hold-label {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.commit-hold-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: rgba(251, 191, 36, 0.22);
+  transition: width 0.05s linear;
+  z-index: 1;
+  border-radius: 10px 0 0 10px;
+}
+
+.commit-confirmed-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.08);
+  color: #4ade80;
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  font-family: 'League Spartan', sans-serif;
+}
+
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .daily-log-container {

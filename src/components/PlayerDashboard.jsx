@@ -3,6 +3,7 @@ import './PlayerDashboard.css';
 import characterFull from '../assets/character_full.png';
 import STAT_META from './statMeta';
 import { getRankForLevel } from '../utils/rankMeta';
+import RANKS from '../utils/rankMeta';
 
 const formatArchiveDate = (dateKey) => {
   if (!dateKey) return '';
@@ -21,6 +22,8 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
   const [archiveOpen, setArchiveOpen] = useState(false);
 
   const rank = getRankForLevel(user.level);
+  const nextRank = RANKS.find(r => r.minLevel > user.level) || null;
+  const nextRankLevel = nextRank ? nextRank.minLevel : null;
 
   const handlePoorDecisionSubmit = () => {
     if (!poorDecisionText.trim() || !poorDecisionStat) return;
@@ -127,6 +130,16 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
                         </div>
                         <span className="level-text-right">{user.xp}/{xpCap}</span>
             </div>
+            {nextRank && (
+              <p className="next-rank-hint">
+                <span className="next-rank-icon">🏆</span>
+                <span>
+                  Rank up to{' '}
+                  <span className="next-rank-name" style={{ color: nextRank.color }}>{nextRank.name}</span>
+                  {' '}at Level {nextRankLevel}
+                </span>
+              </p>
+            )}
         </div>
 
         {/* Active Challenges Section */}

@@ -107,9 +107,56 @@ const VideoSection = ({ videoDataUrl, videoName, onVideoChange }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+const COMMIT_HOLD_DURATION = 3000;
+
 const DailyLogPage = ({ logs, setLogs }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
+
+  // ── Hold-to-Commit state ──
+  const [commitHolding, setCommitHolding] = useState(false);
+  const [commitProgress, setCommitProgress] = useState(0);
+  const [committed, setCommitted] = useState(false);
+  const commitIntervalRef = useRef(null);
+  const commitStartRef = useRef(null);
+
+  const startCommitHold = useCallback((entry, updateFieldFn) => {
+    if (!entry.commitment?.trim() || committed) return;
+    if (commitIntervalRef.current) return;
+    setCommitHolding(true);
+    commitStartRef.current = Date.now();
+    commitIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - commitStartRef.current;
+      const pct = Math.min((elapsed / COMMIT_HOLD_DURATION) * 100, 100);
+      setCommitProgress(pct);
+      if (pct >= 100) {
+        clearInterval(commitIntervalRef.current);
+        commitIntervalRef.current = null;
+        setCommitHolding(false);
+        setCommitted(true);
+      }
+    }, 16);
+  }, [committed]);
+
+  const stopCommitHold = useCallback(() => {
+    if (commitIntervalRef.current) {
+      clearInterval(commitIntervalRef.current);
+      commitIntervalRef.current = null;
+    }
+    setCommitHolding(false);
+    setCommitProgress(0);
+  }, []);
+
+  // Reset committed state when date or commitment text changes
+  useEffect(() => {
+    setCommitted(false);
+    setCommitProgress(0);
+    setCommitHolding(false);
+    if (commitIntervalRef.current) {
+      clearInterval(commitIntervalRef.current);
+      commitIntervalRef.current = null;
+    }
+  }, [selectedDate]);
 
   // Ensure today's entry always exists
   useEffect(() => {
@@ -316,12 +363,37 @@ const DailyLogPage = ({ logs, setLogs }) => {
             <p className="log-section-subtitle">One thing you commit to doing tomorrow</p>
             <input
               type="text"
-              className="reflection-input commitment-input"
+              className={`reflection-input commitment-input${committed ? ' commitment-input--locked' : ''}`}
               placeholder="I will..."
               value={currentEntry.commitment || ''}
-              onChange={e => isToday && updateField('commitment', e.target.value)}
-              readOnly={!isToday}
+              onChange={e => isToday && !committed && updateField('commitment', e.target.value)}
+              readOnly={!isToday || committed}
             />
+            {isToday && (
+              <div className="commit-hold-btn-wrap">
+                {committed ? (
+                  <div className="commit-confirmed-banner">
+                    <span>✅ Commitment locked in!</span>
+                  </div>
+                ) : (
+                  <button
+                    className={`commit-hold-btn${commitHolding ? ' commit-hold-btn--holding' : ''}${!currentEntry.commitment?.trim() ? ' commit-hold-btn--disabled' : ''}`}
+                    onPointerDown={() => startCommitHold(currentEntry, updateField)}
+                    onPointerUp={stopCommitHold}
+                    onPointerLeave={stopCommitHold}
+                    disabled={!currentEntry.commitment?.trim()}
+                  >
+                    <span className="commit-hold-label">
+                      {commitProgress > 0 ? 'Hold…' : 'Hold to Commit'}
+                    </span>
+                    <div
+                      className="commit-hold-progress"
+                      style={{ width: `${commitProgress}%` }}
+                    />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
         </div>

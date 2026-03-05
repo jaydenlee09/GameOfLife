@@ -71,7 +71,27 @@ function App() {
 
       midnightTimerRef.current = setTimeout(() => {
         setTodos(prev => promoteTomorrowTasks(prev));
-        localStorage.setItem('gameOfLife_lastDate', todayStr());
+        const newToday = todayStr();
+        localStorage.setItem('gameOfLife_lastDate', newToday);
+
+        // Show commitment modal for yesterday's commitment at midnight
+        setLogs(currentLogs => {
+          const yesterdayKey = (() => {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            return d.toISOString().slice(0, 10);
+          })();
+          const yesterdayEntry = currentLogs[yesterdayKey];
+          setCommitmentArchive(currentArchive => {
+            const alreadyConfirmed = currentArchive.some(a => a.confirmedOn === newToday);
+            if (yesterdayEntry?.commitment?.trim() && !alreadyConfirmed) {
+              setCommitmentModal({ date: yesterdayKey, commitment: yesterdayEntry.commitment.trim() });
+            }
+            return currentArchive;
+          });
+          return currentLogs;
+        });
+
         scheduleMidnightRollover(); // reschedule for the next midnight
       }, msUntilMidnight);
     };
