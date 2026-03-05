@@ -152,3 +152,33 @@
   from { transform: translateY(-12px); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
 }
+
+/* ─── Rank-up section ────────────────────────────────────────────────────── */
+.levelup-rank-up {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  animation: levelup-slideDown 0.5s 0.25s both;
+}
+
+.levelup-rank-badge {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px currentColor);
+  animation: levelup-badgePop 0.55s 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.levelup-rank-name {
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+@keyframes levelup-badgePop {
+  from { transform: scale(0.4) rotate(-15deg); opacity: 0; }
+  to   { transform: scale(1)   rotate(0deg);   opacity: 1; }
+}

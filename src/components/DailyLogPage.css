@@ -442,6 +442,23 @@
   background: rgba(239, 68, 68, 0.2);
 }
 
+/* ─── Commitment Section ──────────────────────────────────────────────────── */
+.commitment-section {
+  border-color: rgba(251, 191, 36, 0.2);
+  border-left: 3px solid #fbbf24;
+}
+
+.commitment-input {
+  width: 100%;
+  margin-top: 0.5rem;
+  box-sizing: border-box;
+}
+
+.commitment-input[readonly] {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .daily-log-container {

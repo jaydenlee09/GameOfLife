@@ -5,9 +5,11 @@ import Navbar from './components/Navbar'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
 import LevelUpModal from './components/LevelUpModal'
+import CommitmentModal from './components/CommitmentModal'
 import DailyLogPage from './components/DailyLogPage'
 import ChallengesPage from './components/ChallengesPage'
 import { xpCapForLevel } from './utils/xpUtils'
+import { getRankUpAtLevel } from './utils/rankMeta'
 import CHALLENGES_POOL from './utils/challengesMeta'
 
 function App() {
@@ -93,7 +95,51 @@ function App() {
     localStorage.setItem('gameOfLife_logs', JSON.stringify(logs));
   }, [logs]);
 
-  // Challenges — persist ALL challenges with their activation state
+  // ─── Commitment Archive ───────────────────────────────────────────────────
+  const [commitmentArchive, setCommitmentArchive] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_commitmentArchive');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gameOfLife_commitmentArchive', JSON.stringify(commitmentArchive));
+  }, [commitmentArchive]);
+
+  // Helper: local-time YYYY-MM-DD for a given day offset
+  const getLocalDateKey = (offsetDays = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const [commitmentModal, setCommitmentModal] = useState(null); // { date, commitment }
+
+  // On mount: show commitment modal if yesterday had a commitment not yet confirmed today
+  useEffect(() => {
+    const yesterdayKey = getLocalDateKey(-1);
+    const todayKey = getLocalDateKey(0);
+    const yesterdayEntry = logs[yesterdayKey];
+    const alreadyConfirmed = commitmentArchive.some(a => a.confirmedOn === todayKey);
+    if (yesterdayEntry?.commitment?.trim() && !alreadyConfirmed) {
+      setCommitmentModal({ date: yesterdayKey, commitment: yesterdayEntry.commitment.trim() });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCommitmentConfirm = () => {
+    if (!commitmentModal) return;
+    const todayKey = getLocalDateKey(0);
+    addXp(10);
+    setCommitmentArchive(prev => [
+      { date: commitmentModal.date, text: commitmentModal.commitment, confirmedOn: todayKey },
+      ...prev,
+    ]);
+    setCommitmentModal(null);
+  };
+  // ─────────────────────────────────────────────────────────────────────────
   const buildDefaultChallenges = () =>
     CHALLENGES_POOL.map(c => ({ ...c, completed: false, started: false, startedAt: null }));
 
@@ -145,7 +191,6 @@ function App() {
       name: 'Player 1',
       level: 1,
       xp: 0,
-      equippedOutfit: { head: null, top: null, bottom: null, accessory: null },
       stats: {
         strength: 0,
         intelligence: 0,
@@ -170,16 +215,6 @@ function App() {
     setUser(prev => ({ ...prev, name: newName }));
   };
 
-  const updateOutfit = (slot, itemId) => {
-    setUser(prev => ({
-      ...prev,
-      equippedOutfit: {
-        ...(prev.equippedOutfit || {}),
-        [slot]: prev.equippedOutfit?.[slot] === itemId ? null : itemId,
-      },
-    }));
-  };
-
   const addXp = (amount) => {
     setUser(prev => {
       let currentXp = prev.xp + amount;
@@ -193,7 +228,8 @@ function App() {
       }
 
       if (didLevelUp) {
-        setTimeout(() => setLevelUpModal({ newLevel: currentLevel }), 300);
+        const rankUp = getRankUpAtLevel(currentLevel);
+        setTimeout(() => setLevelUpModal({ newLevel: currentLevel, newRank: rankUp }), 300);
       }
       return { ...prev, level: currentLevel, xp: currentXp };
     });
@@ -220,7 +256,8 @@ function App() {
       if (currentLevel === 1 && currentXp < 0) currentXp = 0;
 
       if (didLevelUp) {
-        setTimeout(() => setLevelUpModal({ newLevel: currentLevel }), 300);
+        const rankUp = getRankUpAtLevel(currentLevel);
+        setTimeout(() => setLevelUpModal({ newLevel: currentLevel, newRank: rankUp }), 300);
       }
 
       return {
@@ -239,21 +276,20 @@ function App() {
     switch(currentPage) {
       case 'statistics':
         return (
-          <PlayerDashboard 
-            user={user} 
-            onUpdateName={updateName} 
+          <PlayerDashboard
+            user={user}
+            onUpdateName={updateName}
             todos={todos}
             habits={habits}
             onUpdateStat={updateStat}
-            onAddXp={addXp} 
-            setTodos={setTodos} 
+            onAddXp={addXp}
+            setTodos={setTodos}
             setHabits={setHabits}
             challenges={challenges}
             onChallengeStart={handleChallengeStart}
             onChallengeComplete={handleChallengeComplete}
             xpCap={xpCapForLevel(user.level)}
-            equippedOutfit={user.equippedOutfit || {}}
-            onUpdateOutfit={updateOutfit}
+            commitmentArchive={commitmentArchive}
           />
         );
       case 'challenges':
@@ -293,7 +329,14 @@ function App() {
         {renderPage()}
       </div>
       {levelUpModal && (
-        <LevelUpModal newLevel={levelUpModal.newLevel} onClose={() => setLevelUpModal(null)} />
+        <LevelUpModal newLevel={levelUpModal.newLevel} newRank={levelUpModal.newRank} onClose={() => setLevelUpModal(null)} />
+      )}
+      {commitmentModal && (
+        <CommitmentModal
+          commitment={commitmentModal.commitment}
+          date={commitmentModal.date}
+          onConfirm={handleCommitmentConfirm}
+        />
       )}
     </div>
   )

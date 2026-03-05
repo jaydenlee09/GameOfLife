@@ -109,10 +109,6 @@ body {
   background: #d4d4d4; 
   transition: width 0.5s ease;
 }
-  color: #0f172a; /* Dark text on white fill */
-  mix-blend-mode: difference; /* Or just handle color based on fill width, but simple dark is fine if bar starts filled */
-  color: #000; /* Assuming white fill covers it, make it visible on white */
-}
 
 /* Handle text color contrast dynamically is hard with just CSS. 
    Let's just use mix-blend-mode or fixed colors. 
@@ -498,222 +494,28 @@ body {
   filter: drop-shadow(0 10px 30px rgba(0,0,0,0.5));
 }
 
-.character-clothing-layer {
-  position: absolute;
-  top: 0%;
-  left: 0;
-  /* Match the image exactly — same dimensions as the base character */
-  width: 100%;
-  height: 100%;
+/* Rank Badge Display */
+.rank-badge-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.rank-badge-img {
+  width: 72px;
+  height: 72px;
   object-fit: contain;
-  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.15));
 }
 
-/* Customize Button */
-.customize-btn {
-  background: #262626;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 900;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  padding: 8px 20px;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.customize-btn:hover {
-  background: #333;
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-/* Wardrobe Modal */
-.wardrobe-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-}
-
-.wardrobe-modal {
-  background: #1c1c1c;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 28px;
-  width: 480px;
-  max-width: 95vw;
-  max-height: 80vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.wardrobe-modal::-webkit-scrollbar {
-  width: 4px;
-}
-.wardrobe-modal::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 4px;
-}
-
-.wardrobe-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.wardrobe-title {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 900;
-  letter-spacing: 1px;
-  color: #fff;
-}
-
-.wardrobe-close {
-  background: none;
-  border: none;
-  color: #a3a3a3;
-  font-size: 1.2rem;
-  cursor: pointer;
-  line-height: 1;
-  transition: color 0.15s;
-}
-
-.wardrobe-close:hover {
-  color: #fff;
-}
-
-.wardrobe-slot-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.wardrobe-slot-title {
-  margin: 0;
-  font-size: 0.7rem;
-  font-weight: 900;
-  letter-spacing: 1.5px;
-  color: #a3a3a3;
-  text-transform: uppercase;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  padding-bottom: 6px;
-}
-
-.wardrobe-items-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.wardrobe-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  border-radius: 12px;
-  padding: 8px;
-  background: #262626;
-  border: 2px solid transparent;
-  transition: border-color 0.2s, background 0.2s;
-  width: 88px;
-}
-
-.wardrobe-item:hover:not(.wardrobe-item--locked) {
-  background: #333;
-  border-color: rgba(255,255,255,0.15);
-}
-
-.wardrobe-item--equipped {
-  border-color: #fbbf24;
-  background: #2a2210;
-}
-
-.wardrobe-item--locked {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.wardrobe-item-img-wrap {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #333;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wardrobe-item-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.wardrobe-item-lock {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  border-radius: 8px;
-}
-
-.wardrobe-lock-icon {
-  font-size: 1.1rem;
-}
-
-.wardrobe-lock-level {
-  font-size: 0.55rem;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  color: #fff;
-  text-transform: uppercase;
-}
-
-.wardrobe-item-equipped-badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #fbbf24;
-  color: #000;
-  font-size: 0.6rem;
-  font-weight: 900;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wardrobe-item-name {
+.rank-name-label {
   font-size: 0.65rem;
-  font-weight: 800;
-  color: #d4d4d4;
-  text-align: center;
+  font-weight: 900;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  line-height: 1.2;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
+
 
 /* --- Right Column --- */
 .right-column {
@@ -779,16 +581,125 @@ body {
   border-radius: 9999px;
   transition: width 0.3s ease;
 }
-  border-radius: 999px;
-  width: 100%;
-  overflow: hidden;
+
+/* Commitment Archive Section */
+.commitment-archive-section {
+  background: #1c1c1c;
+  border-radius: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  flex: 0 0 auto;
 }
 
-.attribute-bar-fill {
-  height: 100%;
-  background: white;
-  border-radius: 999px;
-  transition: width 0.3s ease;
+.commitment-archive-title {
+  color: #fbbf24 !important;
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  font-size: 1rem !important;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.commitment-archive-count {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border-radius: 20px;
+  padding: 1px 7px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.commitment-archive-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.commitment-archive-chevron {
+  font-size: 1.1rem;
+  color: #fbbf24;
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+
+.commitment-archive-chevron--open {
+  transform: rotate(180deg);
+}
+
+.commitment-archive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.commitment-archive-list::-webkit-scrollbar {
+  width: 3px;
+}
+.commitment-archive-list::-webkit-scrollbar-thumb {
+  background: rgba(251, 191, 36, 0.2);
+  border-radius: 2px;
+}
+
+.commitment-archive-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #525252;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.commitment-archive-entry {
+  background: #262626;
+  border-radius: 10px;
+  padding: 8px 12px;
+  border-left: 3px solid rgba(251, 191, 36, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.commitment-archive-entry-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.commitment-archive-date {
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.commitment-archive-badge {
+  font-size: 0.6rem;
+  font-weight: 900;
+  color: #4ade80;
+  letter-spacing: 0.5px;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 20px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.commitment-archive-text {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
 }
 
 /* Responsive */

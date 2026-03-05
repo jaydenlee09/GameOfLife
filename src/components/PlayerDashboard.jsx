@@ -2,15 +2,25 @@ import React, { useState, useEffect } from 'react';
 import './PlayerDashboard.css';
 import characterFull from '../assets/character_full.png';
 import STAT_META from './statMeta';
-import WARDROBE_ITEMS from '../utils/wardrobeMeta';
+import { getRankForLevel } from '../utils/rankMeta';
 
-const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart, onChallengeComplete, xpCap = 100, equippedOutfit = {}, onUpdateOutfit, onUpdateStat }) => {
+const formatArchiveDate = (dateKey) => {
+  if (!dateKey) return '';
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+};
+
+const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart, onChallengeComplete, xpCap = 100, onUpdateStat, commitmentArchive = [] }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(user.name);
-  const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [poorDecisionText, setPoorDecisionText] = useState('');
   const [poorDecisionStat, setPoorDecisionStat] = useState('');
   const [poorDecisionOpen, setPoorDecisionOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+
+  const rank = getRankForLevel(user.level);
 
   const handlePoorDecisionSubmit = () => {
     if (!poorDecisionText.trim() || !poorDecisionStat) return;
@@ -218,80 +228,45 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
             </div>
           )}
         </div>
-      </div>
 
-      {/* CENTER COLUMN - Character */}
+        {/* Commitment Archive Section */}
+        <div className={`dashboard-card commitment-archive-section${archiveOpen ? ' commitment-archive-section--open' : ''}`}>
+          <div className="commitment-archive-header" onClick={() => setArchiveOpen(o => !o)}>
+            <h3 className="section-title commitment-archive-title">
+              🎯 COMMITMENTS
+              {commitmentArchive.length > 0 && (
+                <span className="commitment-archive-count">{commitmentArchive.length}</span>
+              )}
+            </h3>
+            <span className={`commitment-archive-chevron${archiveOpen ? ' commitment-archive-chevron--open' : ''}`}>▾</span>
+          </div>
+          {archiveOpen && (
+            <div className="commitment-archive-list">
+              {commitmentArchive.length === 0 ? (
+                <p className="commitment-archive-empty">No confirmed commitments yet.</p>
+              ) : (
+                commitmentArchive.map((entry, i) => (
+                  <div key={i} className="commitment-archive-entry">
+                    <div className="commitment-archive-entry-meta">
+                      <span className="commitment-archive-date">{formatArchiveDate(entry.date)}</span>
+                      <span className="commitment-archive-badge">✓ +10 XP</span>
+                    </div>
+                    <p className="commitment-archive-text">{entry.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </div>
       <div className="dashboard-column center-column">
+        <div className="rank-badge-display">
+          <img src={rank.badge} alt={rank.name} className="rank-badge-img" />
+          <span className="rank-name-label" style={{ color: rank.color }}>{rank.name.toUpperCase()}</span>
+        </div>
         <div className="character-container">
           <img src={characterFull} alt="Character" className="character-image" />
-          {/* Clothing layers */}
-          {['bottom', 'top', 'accessory', 'head'].map(slot => {
-            const itemId = equippedOutfit[slot];
-            if (!itemId) return null;
-            const item = WARDROBE_ITEMS.find(i => i.id === itemId);
-            if (!item) return null;
-            return (
-              <img
-                key={slot}
-                src={item.image}
-                alt={item.name}
-                className="character-clothing-layer"
-              />
-            );
-          })}
         </div>
-
-        <button className="customize-btn" onClick={() => setWardrobeOpen(true)}>
-          ✦ CUSTOMIZE
-        </button>
-
-        {/* Wardrobe Modal */}
-        {wardrobeOpen && (
-          <div className="wardrobe-overlay" onClick={() => setWardrobeOpen(false)}>
-            <div className="wardrobe-modal" onClick={e => e.stopPropagation()}>
-              <div className="wardrobe-header">
-                <h2 className="wardrobe-title">WARDROBE</h2>
-                <button className="wardrobe-close" onClick={() => setWardrobeOpen(false)}>✕</button>
-              </div>
-
-              {['head', 'top', 'bottom', 'accessory'].map(slot => {
-                const slotItems = WARDROBE_ITEMS.filter(i => i.slot === slot);
-                if (slotItems.length === 0) return null;
-                return (
-                  <div key={slot} className="wardrobe-slot-group">
-                    <h3 className="wardrobe-slot-title">{slot.toUpperCase()}</h3>
-                    <div className="wardrobe-items-grid">
-                      {slotItems.map(item => {
-                        const unlocked = user.level >= item.unlockLevel;
-                        const equipped = equippedOutfit[slot] === item.id;
-                        return (
-                          <div
-                            key={item.id}
-                            className={`wardrobe-item ${equipped ? 'wardrobe-item--equipped' : ''} ${!unlocked ? 'wardrobe-item--locked' : ''}`}
-                            onClick={() => unlocked && onUpdateOutfit(slot, item.id)}
-                            title={unlocked ? item.name : `Unlocks at Level ${item.unlockLevel}`}
-                          >
-                            <div className="wardrobe-item-img-wrap">
-                              <img src={item.image} alt={item.name} className="wardrobe-item-img" />
-                              {!unlocked && (
-                                <div className="wardrobe-item-lock">
-                                  <span className="wardrobe-lock-icon">🔒</span>
-                                  <span className="wardrobe-lock-level">LVL {item.unlockLevel}</span>
-                                </div>
-                              )}
-                              {equipped && <div className="wardrobe-item-equipped-badge">✓</div>}
-                            </div>
-                            <span className="wardrobe-item-name">{item.name}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* RIGHT COLUMN - Attributes */}

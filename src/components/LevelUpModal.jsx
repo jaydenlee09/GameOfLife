@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import './LevelUpModal.css';
 
-const LevelUpModal = ({ newLevel, onClose }) => {
+const LevelUpModal = ({ newLevel, newRank, onClose }) => {
   // Play a triumphant ascending chime
   useEffect(() => {
     try {
@@ -41,7 +41,17 @@ const LevelUpModal = ({ newLevel, onClose }) => {
         <div className="levelup-content">
           <p className="levelup-pre">✦ LEVEL UP ✦</p>
           <h1 className="levelup-number">{newLevel}</h1>
-          <p className="levelup-sub">You're getting stronger.</p>
+          {newRank ? (
+            <div className="levelup-rank-up">
+              <img src={newRank.badge} alt={newRank.name} className="levelup-rank-badge" />
+              <p className="levelup-rank-name" style={{ color: newRank.color }}>
+                {newRank.name.toUpperCase()}
+              </p>
+              <p className="levelup-sub">New rank unlocked!</p>
+            </div>
+          ) : (
+            <p className="levelup-sub">You're getting stronger.</p>
+          )}
           <button className="levelup-btn" onClick={onClose}>Let's Go!</button>
         </div>
 
