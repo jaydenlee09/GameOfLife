@@ -11,6 +11,7 @@ import ChallengesPage from './components/ChallengesPage'
 import { xpCapForLevel } from './utils/xpUtils'
 import { getRankUpAtLevel } from './utils/rankMeta'
 import CHALLENGES_POOL from './utils/challengesMeta'
+import MentorPage from './components/MentorPage'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('statistics');
@@ -114,6 +115,15 @@ function App() {
   useEffect(() => {
     localStorage.setItem('gameOfLife_logs', JSON.stringify(logs));
   }, [logs]);
+
+  const [chatHistory, setChatHistory] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_chatHistory');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gameOfLife_chatHistory', JSON.stringify(chatHistory));
+  }, [chatHistory]);
 
   // ─── Commitment Archive ───────────────────────────────────────────────────
   const [commitmentArchive, setCommitmentArchive] = useState(() => {
@@ -337,6 +347,18 @@ function App() {
         return <DailyLogPage logs={logs} setLogs={setLogs} />;
       case 'timer':
         return <TimerPage onUpdateStat={updateStat} />;
+      case 'mentor':
+        return (
+          <MentorPage
+            user={user}
+            todos={todos}
+            habits={habits}
+            logs={logs}
+            challenges={challenges}
+            chatHistory={chatHistory}
+            setChatHistory={setChatHistory}
+          />
+        );
       default:
         return <PlayerDashboard user={user} onUpdateName={updateName} />;
     }

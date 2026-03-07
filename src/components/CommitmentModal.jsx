@@ -49,7 +49,7 @@ const CommitmentModal = ({ commitment, date, onConfirm }) => {
       <div className="cm-modal">
         <div className="cm-header">
           <span className="cm-icon">🎯</span>
-          <h2 className="cm-title">Yesterday's Commitment</h2>
+          <h2 className="cm-title">Today's Commitment</h2>
           <p className="cm-date">{formatDate(date)}</p>
         </div>
 
