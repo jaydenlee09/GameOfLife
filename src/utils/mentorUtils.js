@@ -171,7 +171,7 @@ export const sendToMentor = async (history, userMessage, systemPrompt) => {
     config: {
       systemInstruction: systemPrompt,
       temperature: 0.8,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 8192,
     },
   });
 
