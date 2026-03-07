@@ -109,7 +109,17 @@ function App() {
 
   const [logs, setLogs] = useState(() => {
     const savedLogs = localStorage.getItem('gameOfLife_logs');
-    return savedLogs ? JSON.parse(savedLogs) : {};
+    if (!savedLogs) return {};
+    const parsed = JSON.parse(savedLogs);
+    // Migrate: remove any stale blob:// URLs stored from before the IndexedDB fix.
+    // The actual video binary lives in IndexedDB; only videoName is needed here.
+    for (const key of Object.keys(parsed)) {
+      const entry = parsed[key];
+      if (entry.videoDataUrl) {
+        delete entry.videoDataUrl;
+      }
+    }
+    return parsed;
   });
 
   useEffect(() => {

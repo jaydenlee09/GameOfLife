@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './DailyLogPage.css';
 import EMOTIONS from '../utils/logMeta';
+import { saveVideo, getVideo, deleteVideo } from '../utils/videoDB';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,26 +45,75 @@ const EMPTY_ENTRY = () => ({
   proud: ['', '', ''],
   improve: ['', '', ''],
   learned: '',
-  videoDataUrl: null,
   videoName: null,
   commitment: '',
 });
 
 // ─── Video Upload Section ─────────────────────────────────────────────────────
 
-const VideoSection = ({ videoDataUrl, videoName, onVideoChange }) => {
+const VideoSection = ({ date, videoName, onVideoChange }) => {
   const fileInputRef = useRef(null);
+  // objectUrl is a fresh blob URL created from the IndexedDB blob — lives only
+  // in this component's lifetime and is revoked on cleanup.
+  const [objectUrl, setObjectUrl] = useState(null);
+  const objectUrlRef = useRef(null);
+
+  // Load blob from IndexedDB whenever the date or videoName changes
+  useEffect(() => {
+    let cancelled = false;
+
+    // Revoke any previous object URL
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+      setObjectUrl(null);
+    }
+
+    if (!videoName) return;
+
+    getVideo(date)
+      .then((blob) => {
+        if (cancelled || !blob) return;
+        const url = URL.createObjectURL(blob);
+        objectUrlRef.current = url;
+        setObjectUrl(url);
+      })
+      .catch(() => {
+        // silently ignore — user will see upload UI
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [date, videoName]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Use IndexedDB for video storage (avoid localStorage 5MB limit)
-    const objectUrl = URL.createObjectURL(file);
-    onVideoChange({ objectUrl, name: file.name, useObjectUrl: true });
+    // Persist raw blob to IndexedDB so it survives page reloads
+    saveVideo(date, file).catch(console.error);
+
+    // Create a temporary object URL for immediate playback in this session
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(file);
+    objectUrlRef.current = url;
+    setObjectUrl(url);
+
+    onVideoChange({ name: file.name });
   };
 
   const handleRemove = () => {
+    deleteVideo(date).catch(console.error);
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setObjectUrl(null);
     onVideoChange(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -73,14 +123,23 @@ const VideoSection = ({ videoDataUrl, videoName, onVideoChange }) => {
       <h3 className="log-section-title">📹 Day in Review</h3>
       <p className="log-section-subtitle">Upload a short video from your camera roll</p>
 
-      {videoDataUrl ? (
+      {objectUrl ? (
         <div className="video-preview-wrapper">
           <video
             className="video-preview"
-            src={videoDataUrl}
+            src={objectUrl}
             controls
             playsInline
           />
+          <div className="video-meta">
+            <span className="video-name">{videoName}</span>
+            <button className="video-remove-btn" onClick={handleRemove}>✕ Remove</button>
+          </div>
+        </div>
+      ) : videoName ? (
+        // Blob is still loading from IndexedDB (or failed)
+        <div className="video-preview-wrapper">
+          <div className="video-loading">⏳ Loading video…</div>
           <div className="video-meta">
             <span className="video-name">{videoName}</span>
             <button className="video-remove-btn" onClick={handleRemove}>✕ Remove</button>
@@ -203,13 +262,7 @@ const DailyLogPage = ({ logs, setLogs }) => {
 
   // ── Video ──
   const handleVideoChange = (videoData) => {
-    if (!videoData) {
-      updateField('videoDataUrl', null);
-      updateField('videoName', null);
-    } else {
-      updateField('videoDataUrl', videoData.objectUrl);
-      updateField('videoName', videoData.name);
-    }
+    updateField('videoName', videoData ? videoData.name : null);
   };
 
   const isToday = selectedDate === todayKey;
@@ -236,7 +289,7 @@ const DailyLogPage = ({ logs, setLogs }) => {
               entry.proud?.some(v => v.trim()) ||
               entry.improve?.some(v => v.trim()) ||
               entry.learned?.trim() ||
-              entry.videoDataUrl;
+              entry.videoName;
 
             return (
               <button
@@ -352,7 +405,7 @@ const DailyLogPage = ({ logs, setLogs }) => {
 
           {/* ── Video Upload ── */}
           <VideoSection
-            videoDataUrl={currentEntry.videoDataUrl || null}
+            date={selectedDate}
             videoName={currentEntry.videoName || null}
             onVideoChange={handleVideoChange}
           />
