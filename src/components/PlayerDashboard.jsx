@@ -87,14 +87,16 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
     return `${secs}s left`;
   };
 
-  // Returns a CSS gradient based on level tier
-  const getLevelGradient = (level) => {
-    if (level <= 10) return 'linear-gradient(90deg, #6ee7b7, #3b82f6)';  // green → blue      (Novice)
-    if (level <= 20) return 'linear-gradient(90deg, #93c5fd, #818cf8)';  // sky → indigo      (Apprentice)
-    if (level <= 30) return 'linear-gradient(90deg, #c084fc, #e879f9)';  // violet → fuchsia  (Adept)
-    if (level <= 40) return 'linear-gradient(90deg, #fbbf24, #f97316)';  // amber → orange    (Expert)
-    if (level <= 50) return 'linear-gradient(90deg, #f97316, #ef4444)';  // orange → red      (Master)
-    return 'linear-gradient(90deg, #ef4444, #fbbf24, #ef4444)';          // red-gold          (Legend)
+  // Returns gradient + glow color based on rank
+  const getRankStyle = (level) => {
+    if (level <= 5)  return { gradient: 'linear-gradient(90deg, #a0522d, #cd7f32)', glow: '#cd7f32' }; // Bronze
+    if (level <= 10) return { gradient: 'linear-gradient(90deg, #a8a8a8, #e8e8e8)', glow: '#c0c0c0' }; // Silver
+    if (level <= 20) return { gradient: 'linear-gradient(90deg, #f59e0b, #fbbf24)', glow: '#fbbf24' }; // Gold
+    if (level <= 30) return { gradient: 'linear-gradient(90deg, #22d3ee, #67e8f9)', glow: '#67e8f9' }; // Platinum
+    if (level <= 45) return { gradient: 'linear-gradient(90deg, #a855f7, #c084fc)', glow: '#c084fc' }; // Master
+    if (level <= 60) return { gradient: 'linear-gradient(90deg, #ea580c, #f97316)', glow: '#f97316' }; // Champion
+    if (level <= 80) return { gradient: 'linear-gradient(90deg, #dc2626, #ef4444)', glow: '#ef4444' }; // Grand Champion
+    return { gradient: 'linear-gradient(90deg, #ef4444, #fbbf24, #ef4444)', glow: '#fbbf24' };         // Supreme
   };
 
   return (
@@ -125,7 +127,11 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
                         <div className="level-progress-bar">
                             <div 
                                 className="level-progress-fill" 
-                                style={{ width: `${Math.min((user.xp / xpCap) * 100, 100)}%`, background: getLevelGradient(user.level) }}
+                                style={{
+                                  width: `${Math.min((user.xp / xpCap) * 100, 100)}%`,
+                                  background: getRankStyle(user.level).gradient,
+                                  '--glow-color': getRankStyle(user.level).glow,
+                                }}
                             ></div>
                         </div>
                         <span className="level-text-right">{user.xp}/{xpCap}</span>

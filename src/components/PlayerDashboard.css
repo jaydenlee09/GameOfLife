@@ -107,7 +107,8 @@ body {
 .level-progress-fill {
   height: 100%;
   background: #d4d4d4; 
-  transition: width 0.5s ease;
+  transition: width 0.5s ease, box-shadow 0.5s ease;
+  box-shadow: 0 0 10px var(--glow-color, #d4d4d4), 0 0 24px var(--glow-color, #d4d4d4);
 }
 
 /* Handle text color contrast dynamically is hard with just CSS. 
@@ -122,8 +123,9 @@ body {
   font-weight: 800;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  mix-blend-mode: exclusion;
-  color: white; 
+  mix-blend-mode: normal;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .level-text-left {
