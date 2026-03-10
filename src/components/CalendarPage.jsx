@@ -108,9 +108,9 @@ const primaryColor = (ev) => {
 const defaultForm = (o = {}) => ({
   title: '', date: toDateKey(new Date()),
   startHour: 9, startMin: 0, endHour: 10, endMin: 0,
-  xpAmount: 30, attributes: [], recurrence: 'none', notes: '', ...o,
+  xpAmount: 20, attributes: [], recurrence: 'none', notes: '', subEvents: [], ...o,
 });
-const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 30, recurrence: 'none', color: '#fbbf24' });
+const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', color: '#fbbf24' });
 const toTimeInput = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 const parseTimeInput = (val) => { const [h,m] = val.split(':'); return { h: parseInt(h,10), m: parseInt(m,10) }; };
 
@@ -198,18 +198,18 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
 
   const openEdit = (ev) => {
     if (ev.recurrence !== 'none' && ev._isVirtual) { setEditScope({ show: true, ev }); return; }
-    setForm({ title: ev.title, date: ev.date, startHour: ev.startHour, startMin: ev.startMin, endHour: ev.endHour, endMin: ev.endMin, xpAmount: ev.xpAmount, attributes: [...ev.attributes], recurrence: ev.recurrence, notes: ev.notes || '' });
+    setForm({ title: ev.title, date: ev.date, startHour: ev.startHour, startMin: ev.startMin, endHour: ev.endHour, endMin: ev.endMin, xpAmount: ev.xpAmount, attributes: [...ev.attributes], recurrence: ev.recurrence, notes: ev.notes || '', subEvents: ev.subEvents ? [...ev.subEvents] : [] });
     setEditingId(ev.id);
     setModal('edit');
   };
 
-  const closeModal = () => { setModal(null); setEditingId(null); setEditScope(null); setDeleteScope(null); };
+  const closeModal = () => { setModal(null); setEditingId(null); setEditScope(null); setDeleteScope(null); setNewSubEvent(''); };
 
   const buildEventFromForm = (id) => ({
     id: id || Date.now(), title: form.title.trim(), date: form.date,
     startHour: form.startHour, startMin: form.startMin, endHour: form.endHour, endMin: form.endMin,
     xpAmount: Number(form.xpAmount)||20, attributes: form.attributes, recurrence: form.recurrence,
-    notes: form.notes||'', completed: false, completedDates: [],
+    notes: form.notes||'', subEvents: form.subEvents||[], completed: false, completedDates: [],
   });
 
   const isFormValid = () => form.title.trim() && (form.endHour*60+form.endMin) > (form.startHour*60+form.startMin);
@@ -222,7 +222,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
       setCalendarEvents(prev=>prev.map(ev=>ev.id!==editingId?ev:{
         ...ev, title:form.title.trim(), startHour:form.startHour, startMin:form.startMin,
         endHour:form.endHour, endMin:form.endMin, xpAmount:Number(form.xpAmount)||20,
-        attributes:form.attributes, recurrence:form.recurrence, notes:form.notes||'',
+        attributes:form.attributes, recurrence:form.recurrence, notes:form.notes||'', subEvents:form.subEvents||[],
       }));
     } else {
       setCalendarEvents(prev=>[
@@ -235,7 +235,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
 
   const handleEditScopeSelect = (scope) => {
     const ev = editScope.ev;
-    setForm({ title:ev.title, date:ev._instanceDate, startHour:ev.startHour, startMin:ev.startMin, endHour:ev.endHour, endMin:ev.endMin, xpAmount:ev.xpAmount, attributes:[...ev.attributes], recurrence:ev.recurrence, notes:ev.notes||'' });
+    setForm({ title:ev.title, date:ev._instanceDate, startHour:ev.startHour, startMin:ev.startMin, endHour:ev.endHour, endMin:ev.endMin, xpAmount:ev.xpAmount, attributes:[...ev.attributes], recurrence:ev.recurrence, notes:ev.notes||'', subEvents:ev.subEvents?[...ev.subEvents]:[] });
     setEditingId(ev.id);
     setEditScope(null);
     if (scope === 'this') {
@@ -335,12 +335,15 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
 
   const handleDragEnd = () => { setDragOver(null); setDraggingTemplate(null); setDraggingEvent(null); };
 
-  // ─── Notes Preview ───────────────────────────────────────────────────────────
-  const notesPreview = (notes) => {
-    if (!notes) return null;
-    const words = notes.trim().split(/\s+/);
-    return words.length <= 3 ? notes : words.slice(0, 3).join(' ') + '...';
+  // ─── Notes Preview (removed) / Sub-events ───────────────────────────────────
+  const [newSubEvent, setNewSubEvent] = useState('');
+  const addSubEvent = () => {
+    const t = newSubEvent.trim();
+    if (!t) return;
+    setForm(f => ({ ...f, subEvents: [...(f.subEvents||[]), { id: Date.now(), title: t }] }));
+    setNewSubEvent('');
   };
+  const removeSubEvent = (id) => setForm(f => ({ ...f, subEvents: f.subEvents.filter(s => s.id !== id) }));
 
   // ─── Template CRUD ───────────────────────────────────────────────────────────
   const openTmplCreate = () => { setTmplForm(defaultTmplForm()); setTmplModal('create'); };
@@ -438,7 +441,13 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
                             {ev.attributes.map(a=><span key={a} className="cal-event-attr-dot" style={{background:STAT_META[a]?.color}} title={STAT_META[a]?.label}/>)}
                           </div>
                         )}
-                        {height>60&&ev.notes&&<div className="cal-event-notes-preview" title={ev.notes}>{notesPreview(ev.notes)}</div>}
+                        {height>60&&ev.subEvents?.length>0&&(
+                          <div className="cal-event-subevents">
+                            {ev.subEvents.map(se=>(
+                              <div key={se.id} className="cal-event-subevent">{se.title}</div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="cal-event-actions">
                         <button className={`cal-event-btn cal-event-complete ${done?'cal-event-complete--done':''}`} onClick={(e)=>completeEvent(ev,e)} title={done?'Completed':'Mark complete'}>{done?'✓':'○'}</button>
@@ -630,6 +639,27 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
               <div className="cal-field">
                 <label className="cal-label">Repeat</label>
                 {renderRecurBtns(form.recurrence, r=>setForm(f=>({...f,recurrence:r})))}
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Sub-Events</label>
+                <div className="cal-subevents-list">
+                  {(form.subEvents||[]).map(se=>(
+                    <div key={se.id} className="cal-subevent-row">
+                      <span className="cal-subevent-name">{se.title}</span>
+                      <button type="button" className="cal-subevent-del" onClick={()=>removeSubEvent(se.id)}>✕</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="cal-subevent-add-row">
+                  <input
+                    className="cal-input cal-subevent-input"
+                    placeholder="e.g. Math test…"
+                    value={newSubEvent}
+                    onChange={e=>setNewSubEvent(e.target.value)}
+                    onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addSubEvent();}}}
+                  />
+                  <button type="button" className="cal-btn cal-btn--ghost cal-subevent-add-btn" onClick={addSubEvent}>Add</button>
+                </div>
               </div>
               <div className="cal-field">
                 <label className="cal-label">Notes</label>
