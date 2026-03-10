@@ -12,6 +12,7 @@ import { xpCapForLevel } from './utils/xpUtils'
 import { getRankUpAtLevel } from './utils/rankMeta'
 import CHALLENGES_POOL from './utils/challengesMeta'
 import MentorPage from './components/MentorPage'
+import CalendarPage from './components/CalendarPage'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('statistics');
@@ -134,6 +135,32 @@ function App() {
   useEffect(() => {
     localStorage.setItem('gameOfLife_chatHistory', JSON.stringify(chatHistory));
   }, [chatHistory]);
+
+  // ─── Calendar Events ──────────────────────────────────────────────────────────
+  const [calendarEvents, setCalendarEvents] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_calendarEvents');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gameOfLife_calendarEvents', JSON.stringify(calendarEvents));
+  }, [calendarEvents]);
+
+  const DEFAULT_QUICK_EVENTS = [
+    { id: 't1', title: 'Morning Routine', duration: 30, attributes: ['discipline','health'], xpAmount: 20, recurrence: 'daily', color: '#fbbf24' },
+    { id: 't2', title: 'Deep Work', duration: 90, attributes: ['focus','productivity'], xpAmount: 50, recurrence: 'none', color: '#38bdf8' },
+    { id: 't3', title: 'Workout', duration: 60, attributes: ['strength','health'], xpAmount: 40, recurrence: 'daily', color: '#f87171' },
+  ];
+
+  const [quickEvents, setQuickEvents] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_quickEvents');
+    return saved ? JSON.parse(saved) : DEFAULT_QUICK_EVENTS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gameOfLife_quickEvents', JSON.stringify(quickEvents));
+  }, [quickEvents]);
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // ─── Commitment Archive ───────────────────────────────────────────────────
   const [commitmentArchive, setCommitmentArchive] = useState(() => {
@@ -367,6 +394,16 @@ function App() {
             challenges={challenges}
             chatHistory={chatHistory}
             setChatHistory={setChatHistory}
+          />
+        );
+      case 'calendar':
+        return (
+          <CalendarPage
+            calendarEvents={calendarEvents}
+            setCalendarEvents={setCalendarEvents}
+            quickEvents={quickEvents}
+            setQuickEvents={setQuickEvents}
+            onUpdateStat={updateStat}
           />
         );
       default:

@@ -43,6 +43,12 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
             >
               Mentor
             </button>
+            <button
+              className={`nav-link ${activePage === 'calendar' ? 'active' : ''}`}
+              onClick={() => onNavigate('calendar')}
+            >
+              Calendar
+            </button>
           </div>
           <div className="navbar-profile">
             <span className="profile-email">{userEmail || 'Player'}</span>

@@ -1,0 +1,733 @@
+import { useState, useEffect, useRef } from 'react';
+import STAT_META from './statMeta';
+import './CalendarPage.css';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const SLOT_HEIGHT = 16;
+const SLOTS_PER_HOUR = 4;
+const TOTAL_SLOTS = 96;
+const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
+const DAYS_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ─── Pure Helpers ─────────────────────────────────────────────────────────────
+const fmtHour = (h) => {
+  if (h === 0) return '12 AM';
+  if (h < 12) return `${h} AM`;
+  if (h === 12) return '12 PM';
+  return `${h - 12} PM`;
+};
+const fmtTime = (h, m) => {
+  const suffix = h < 12 ? 'AM' : 'PM';
+  const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
+};
+const toDateKey = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+const getMondayOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+const slotToMinutes = (slot) => slot * 15;
+const minsFromEvent = (ev) => ev.startHour * 60 + ev.startMin;
+const minsEndFromEvent = (ev) => ev.endHour * 60 + ev.endMin;
+const overlaps = (a, b) => minsFromEvent(a) < minsEndFromEvent(b) && minsFromEvent(b) < minsEndFromEvent(a);
+
+const buildColumns = (events) => {
+  if (!events.length) return [];
+  const sorted = [...events].sort((a, b) => minsFromEvent(a) - minsFromEvent(b));
+  const result = sorted.map(e => ({ ...e, colIndex: 0, totalCols: 1 }));
+  const clusters = [];
+  let cluster = [];
+  for (let i = 0; i < result.length; i++) {
+    if (!cluster.length) { cluster.push(result[i]); }
+    else if (overlaps(cluster[cluster.length - 1], result[i])) { cluster.push(result[i]); }
+    else { clusters.push(cluster); cluster = [result[i]]; }
+  }
+  if (cluster.length) clusters.push(cluster);
+  for (const cl of clusters) {
+    const cols = [];
+    for (const ev of cl) {
+      const sm = minsFromEvent(ev);
+      let placed = false;
+      for (let c = 0; c < cols.length; c++) {
+        if (sm >= cols[c]) { ev.colIndex = c; cols[c] = minsEndFromEvent(ev); placed = true; break; }
+      }
+      if (!placed) { ev.colIndex = cols.length; cols.push(minsEndFromEvent(ev)); }
+      ev.totalCols = cols.length;
+    }
+    const maxCols = cl.reduce((m, e) => Math.max(m, e.colIndex + 1), 0);
+    for (const ev of cl) ev.totalCols = maxCols;
+  }
+  return result;
+};
+
+const expandEventsForDates = (storedEvents, dateKeys) => {
+  const result = [];
+  for (const ev of storedEvents) {
+    if (ev.recurrence === 'none' || !ev.recurrence) {
+      if (dateKeys.includes(ev.date)) result.push({ ...ev, _instanceDate: ev.date });
+    } else if (ev.recurrence === 'daily') {
+      for (const dk of dateKeys) {
+        if (dk >= ev.date) result.push({ ...ev, _instanceDate: dk, _isVirtual: dk !== ev.date });
+      }
+    } else if (ev.recurrence === 'weekly') {
+      const evDay = new Date(ev.date + 'T00:00:00').getDay();
+      for (const dk of dateKeys) {
+        const dkDay = new Date(dk + 'T00:00:00').getDay();
+        if (dk >= ev.date && dkDay === evDay) result.push({ ...ev, _instanceDate: dk, _isVirtual: dk !== ev.date });
+      }
+    }
+  }
+  return result.filter(ev => {
+    if (ev._exceptDates?.includes(ev._instanceDate)) return false;
+    if (ev._forwardDeleteFrom && ev._instanceDate >= ev._forwardDeleteFrom) return false;
+    return true;
+  });
+};
+
+const isInstanceCompleted = (ev) => {
+  if (ev.recurrence === 'none' || !ev.recurrence) return ev.completed;
+  return ev.completedDates?.includes(ev._instanceDate);
+};
+const primaryColor = (ev) => {
+  if (!ev.attributes?.length) return '#fbbf24';
+  return STAT_META[ev.attributes[0]]?.color || '#fbbf24';
+};
+
+// ─── Default Forms ────────────────────────────────────────────────────────────
+const defaultForm = (o = {}) => ({
+  title: '', date: toDateKey(new Date()),
+  startHour: 9, startMin: 0, endHour: 10, endMin: 0,
+  xpAmount: 30, attributes: [], recurrence: 'none', notes: '', ...o,
+});
+const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 30, recurrence: 'none', color: '#fbbf24' });
+const toTimeInput = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+const parseTimeInput = (val) => { const [h,m] = val.split(':'); return { h: parseInt(h,10), m: parseInt(m,10) }; };
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function CalendarPage({ calendarEvents, setCalendarEvents, quickEvents, setQuickEvents, onUpdateStat }) {
+  const [view, setView] = useState('week');
+  const [anchor, setAnchor] = useState(() => new Date());
+  const [modal, setModal] = useState(null);
+  const [form, setForm] = useState(defaultForm());
+  const [editingId, setEditingId] = useState(null);
+  const [editScope, setEditScope] = useState(null);
+  const [deleteScope, setDeleteScope] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [tmplModal, setTmplModal] = useState(null);
+  const [tmplForm, setTmplForm] = useState(defaultTmplForm());
+  const [dragOver, setDragOver] = useState(null);
+  const [draggingTemplate, setDraggingTemplate] = useState(null);
+  const [draggingEvent, setDraggingEvent] = useState(null); // { ev, offsetSlots }
+  const [currentMinute, setCurrentMinute] = useState(() => { const n = new Date(); return n.getHours()*60+n.getMinutes(); });
+  const gridRef = useRef(null);
+  const todayKey = toDateKey(new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => { const n = new Date(); setCurrentMinute(n.getHours()*60+n.getMinutes()); }, 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (gridRef.current) {
+      const pct = currentMinute / (24*60);
+      gridRef.current.scrollTop = Math.max(0, pct * gridRef.current.scrollHeight - 200);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Date Ranges ────────────────────────────────────────────────────────────
+  const weekDates = (() => {
+    const mon = getMondayOfWeek(anchor);
+    return Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(d.getDate()+i); return d; });
+  })();
+
+  const monthCalDates = (() => {
+    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const startOfGrid = getMondayOfWeek(first);
+    return Array.from({length:42},(_,i)=>{ const d=new Date(startOfGrid); d.setDate(d.getDate()+i); return d; });
+  })();
+
+  const activeDates = view === 'day' ? [anchor] : view === 'week' ? weekDates : monthCalDates;
+  const activeDateKeys = activeDates.map(toDateKey);
+
+  // ─── Navigation ─────────────────────────────────────────────────────────────
+  const navigate = (dir) => setAnchor(prev => {
+    const d = new Date(prev);
+    if (view === 'day') d.setDate(d.getDate() + dir);
+    else if (view === 'week') d.setDate(d.getDate() + dir*7);
+    else d.setMonth(d.getMonth() + dir);
+    return d;
+  });
+  const goToday = () => setAnchor(new Date());
+
+  const headerLabel = () => {
+    if (view === 'day') return `${DAYS_LABEL[anchor.getDay()]} ${MONTHS_SHORT[anchor.getMonth()]} ${anchor.getDate()}, ${anchor.getFullYear()}`;
+    if (view === 'week') {
+      const first = weekDates[0], last = weekDates[6];
+      if (first.getMonth() === last.getMonth()) return `${MONTHS_FULL[first.getMonth()]} ${first.getFullYear()}`;
+      return `${MONTHS_SHORT[first.getMonth()]} – ${MONTHS_SHORT[last.getMonth()]} ${last.getFullYear()}`;
+    }
+    return `${MONTHS_FULL[anchor.getMonth()]} ${anchor.getFullYear()}`;
+  };
+
+  // ─── Modal Helpers ───────────────────────────────────────────────────────────
+  const openCreate = (date, slot, fromTemplate = null) => {
+    const startMins = slotToMinutes(slot);
+    const endMins = fromTemplate ? startMins + fromTemplate.duration : startMins + 60;
+    const clampEnd = Math.min(endMins, 24*60 - 1);
+    setForm(defaultForm({
+      date,
+      startHour: Math.floor(startMins/60), startMin: startMins%60,
+      endHour: Math.floor(clampEnd/60), endMin: clampEnd%60,
+      ...(fromTemplate ? { title: fromTemplate.title, attributes: [...fromTemplate.attributes], xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence } : {}),
+    }));
+    setEditingId(null);
+    setModal('create');
+  };
+
+  const openEdit = (ev) => {
+    if (ev.recurrence !== 'none' && ev._isVirtual) { setEditScope({ show: true, ev }); return; }
+    setForm({ title: ev.title, date: ev.date, startHour: ev.startHour, startMin: ev.startMin, endHour: ev.endHour, endMin: ev.endMin, xpAmount: ev.xpAmount, attributes: [...ev.attributes], recurrence: ev.recurrence, notes: ev.notes || '' });
+    setEditingId(ev.id);
+    setModal('edit');
+  };
+
+  const closeModal = () => { setModal(null); setEditingId(null); setEditScope(null); setDeleteScope(null); };
+
+  const buildEventFromForm = (id) => ({
+    id: id || Date.now(), title: form.title.trim(), date: form.date,
+    startHour: form.startHour, startMin: form.startMin, endHour: form.endHour, endMin: form.endMin,
+    xpAmount: Number(form.xpAmount)||20, attributes: form.attributes, recurrence: form.recurrence,
+    notes: form.notes||'', completed: false, completedDates: [],
+  });
+
+  const isFormValid = () => form.title.trim() && (form.endHour*60+form.endMin) > (form.startHour*60+form.startMin);
+
+  const saveEvent = () => { if (!isFormValid()) return; setCalendarEvents(prev=>[...prev, buildEventFromForm()]); closeModal(); };
+
+  const updateEvent = (scope='all') => {
+    if (!isFormValid()) return;
+    if (scope === 'all') {
+      setCalendarEvents(prev=>prev.map(ev=>ev.id!==editingId?ev:{
+        ...ev, title:form.title.trim(), startHour:form.startHour, startMin:form.startMin,
+        endHour:form.endHour, endMin:form.endMin, xpAmount:Number(form.xpAmount)||20,
+        attributes:form.attributes, recurrence:form.recurrence, notes:form.notes||'',
+      }));
+    } else {
+      setCalendarEvents(prev=>[
+        ...prev.map(ev=>ev.id!==editingId?ev:{...ev,_exceptDates:[...(ev._exceptDates||[]),form.date]}),
+        {...buildEventFromForm(), id:Date.now()},
+      ]);
+    }
+    closeModal();
+  };
+
+  const handleEditScopeSelect = (scope) => {
+    const ev = editScope.ev;
+    setForm({ title:ev.title, date:ev._instanceDate, startHour:ev.startHour, startMin:ev.startMin, endHour:ev.endHour, endMin:ev.endMin, xpAmount:ev.xpAmount, attributes:[...ev.attributes], recurrence:ev.recurrence, notes:ev.notes||'' });
+    setEditingId(ev.id);
+    setEditScope(null);
+    if (scope === 'this') {
+      const newId = Date.now();
+      setCalendarEvents(prev=>[
+        ...prev.map(e=>e.id===ev.id?{...e,_exceptDates:[...(e._exceptDates||[]),ev._instanceDate]}:e),
+        {...ev, id:newId, date:ev._instanceDate, recurrence:'none', _isVirtual:false, _instanceDate:undefined, completed:false, completedDates:[]},
+      ]);
+      setTimeout(()=>setEditingId(newId),0);
+    }
+    setModal('edit');
+  };
+
+  // ─── Delete ──────────────────────────────────────────────────────────────────
+  const requestDelete = (ev, e) => {
+    e.stopPropagation();
+    if (ev.recurrence !== 'none') { setDeleteScope({ show:true, ev }); return; }
+    setCalendarEvents(prev=>prev.filter(e=>e.id!==ev.id));
+  };
+  const handleDeleteScope = (scope) => {
+    const ev = deleteScope.ev;
+    if (scope==='this') setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,_exceptDates:[...(e._exceptDates||[]),ev._instanceDate]}:e));
+    else if (scope==='this-forward') setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,_forwardDeleteFrom:ev._instanceDate}:e));
+    else setCalendarEvents(prev=>prev.filter(e=>e.id!==ev.id));
+    setDeleteScope(null);
+  };
+
+  // ─── Complete ────────────────────────────────────────────────────────────────
+  const completeEvent = (ev, e) => {
+    e.stopPropagation();
+    if (isInstanceCompleted(ev)) return;
+    ev.attributes.forEach(attr=>onUpdateStat(attr, ev.xpAmount));
+    if (ev.recurrence==='none'||!ev.recurrence) setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completed:true}:e));
+    else setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completedDates:[...(e.completedDates||[]),ev._instanceDate]}:e));
+  };
+
+  // ─── Drag & Drop ─────────────────────────────────────────────────────────────
+  const handleTemplateDragStart = (e, tmpl) => { setDraggingTemplate(tmpl); e.dataTransfer.effectAllowed='copy'; };
+
+  const handleEventDragStart = (e, ev) => {
+    e.stopPropagation();
+    const startSlot = ev.startHour * SLOTS_PER_HOUR + Math.round(ev.startMin / 15);
+    setDraggingEvent({ ev, startSlot });
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleSlotDragOver = (e, date, slot) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = draggingEvent ? 'move' : 'copy';
+    setDragOver({date, slot});
+  };
+
+  const handleSlotDrop = (e, date, slot) => {
+    e.preventDefault();
+    if (draggingEvent) {
+      const { ev, startSlot } = draggingEvent;
+      const offsetSlots = slot - startSlot;
+      const durationSlots = (minsEndFromEvent(ev) - minsFromEvent(ev)) / 15;
+      let newStartSlot = slot;
+      let newEndSlot = newStartSlot + durationSlots;
+      // clamp to 0–96
+      if (newStartSlot < 0) { newEndSlot -= newStartSlot; newStartSlot = 0; }
+      if (newEndSlot > TOTAL_SLOTS) { newStartSlot -= (newEndSlot - TOTAL_SLOTS); newEndSlot = TOTAL_SLOTS; }
+      const newStartH = Math.floor(newStartSlot / SLOTS_PER_HOUR);
+      const newStartM = (newStartSlot % SLOTS_PER_HOUR) * 15;
+      const newEndH = Math.floor(newEndSlot / SLOTS_PER_HOUR);
+      const newEndM = (newEndSlot % SLOTS_PER_HOUR) * 15;
+      if (ev.recurrence !== 'none' && ev._isVirtual && date !== ev._instanceDate) {
+        // Moving a recurring instance to a different date — detach and save as one-off
+        setCalendarEvents(prev => [
+          ...prev.map(e => e.id === ev.id ? { ...e, _exceptDates: [...(e._exceptDates || []), ev._instanceDate] } : e),
+          { ...ev, id: Date.now(), date, recurrence: 'none', _isVirtual: false, _instanceDate: undefined,
+            startHour: newStartH, startMin: newStartM, endHour: newEndH, endMin: newEndM,
+            completed: false, completedDates: [] },
+        ]);
+      } else if (ev.recurrence !== 'none' && ev._isVirtual) {
+        // Same date, just retime — detach this instance
+        setCalendarEvents(prev => [
+          ...prev.map(e => e.id === ev.id ? { ...e, _exceptDates: [...(e._exceptDates || []), ev._instanceDate] } : e),
+          { ...ev, id: Date.now(), date, recurrence: 'none', _isVirtual: false, _instanceDate: undefined,
+            startHour: newStartH, startMin: newStartM, endHour: newEndH, endMin: newEndM,
+            completed: false, completedDates: [] },
+        ]);
+      } else {
+        setCalendarEvents(prev => prev.map(e => e.id === ev.id
+          ? { ...e, date, startHour: newStartH, startMin: newStartM, endHour: newEndH, endMin: newEndM }
+          : e
+        ));
+      }
+    } else if (draggingTemplate) {
+      openCreate(date, slot, draggingTemplate);
+    }
+    setDragOver(null);
+    setDraggingTemplate(null);
+    setDraggingEvent(null);
+  };
+
+  const handleDragEnd = () => { setDragOver(null); setDraggingTemplate(null); setDraggingEvent(null); };
+
+  // ─── Notes Preview ───────────────────────────────────────────────────────────
+  const notesPreview = (notes) => {
+    if (!notes) return null;
+    const words = notes.trim().split(/\s+/);
+    return words.length <= 3 ? notes : words.slice(0, 3).join(' ') + '...';
+  };
+
+  // ─── Template CRUD ───────────────────────────────────────────────────────────
+  const openTmplCreate = () => { setTmplForm(defaultTmplForm()); setTmplModal('create'); };
+  const openTmplEdit = (tmpl) => { setTmplForm({...tmpl}); setTmplModal({edit:true,id:tmpl.id}); };
+  const closeTmplModal = () => setTmplModal(null);
+  const saveTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>[...prev,{...tmplForm,id:Date.now(),title:tmplForm.title.trim()}]); closeTmplModal(); };
+  const updateTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>prev.map(t=>t.id===tmplModal.id?{...tmplForm,id:tmplModal.id,title:tmplForm.title.trim()}:t)); closeTmplModal(); };
+  const deleteTmpl = (id) => setQuickEvents(prev=>prev.filter(t=>t.id!==id));
+  const toggleTmplAttr = (key) => setTmplForm(f=>({...f,attributes:f.attributes.includes(key)?f.attributes.filter(a=>a!==key):[...f.attributes,key]}));
+  const toggleAttr = (key) => setForm(f=>({...f,attributes:f.attributes.includes(key)?f.attributes.filter(a=>a!==key):[...f.attributes,key]}));
+
+  // ─── Expand events ───────────────────────────────────────────────────────────
+  const expandedEvents = expandEventsForDates(calendarEvents, activeDateKeys);
+  const byDate = {};
+  for (const dk of activeDateKeys) byDate[dk] = [];
+  for (const ev of expandedEvents) { if (byDate[ev._instanceDate]!==undefined) byDate[ev._instanceDate].push(ev); }
+  const columnedByDate = {};
+  for (const dk of activeDateKeys) columnedByDate[dk] = buildColumns(byDate[dk]);
+
+  // ─── Time Grid (Day / Week) ──────────────────────────────────────────────────
+  const renderTimeGrid = (dates) => (
+    <div className="cal-grid-wrapper">
+      <div className="cal-day-header-row" style={{ gridTemplateColumns: `64px repeat(${dates.length}, 1fr)` }}>
+        <div className="cal-time-gutter-header" />
+        {dates.map((d,i) => {
+          const dk = toDateKey(d);
+          const isToday = dk === todayKey;
+          return (
+            <div key={i} className={`cal-day-header ${isToday?'cal-day-header--today':''}`}>
+              <span className="cal-day-name">{DAYS_LABEL[d.getDay()]}</span>
+              <span className={`cal-day-num ${isToday?'cal-day-num--today':''}`}>{d.getDate()}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="cal-scroll-area" ref={gridRef}>
+        <div className="cal-time-grid" style={{ height: TOTAL_HEIGHT, gridTemplateColumns: `64px repeat(${dates.length}, 1fr)` }}>
+          <div className="cal-time-gutter">
+            {Array.from({length:24},(_,h)=>(
+              <div key={h} className="cal-hour-cell" style={{height: SLOT_HEIGHT*4}}>
+                <span className="cal-hour-label">{fmtHour(h)}</span>
+              </div>
+            ))}
+          </div>
+          {dates.map((d,di) => {
+            const dk = toDateKey(d);
+            const dayEvents = columnedByDate[dk] || [];
+            const isToday = dk === todayKey;
+            const durationSlots = draggingEvent
+                ? Math.round((minsEndFromEvent(draggingEvent.ev) - minsFromEvent(draggingEvent.ev)) / 15)
+                : draggingTemplate ? Math.ceil(draggingTemplate.duration/15) : 4;
+            return (
+              <div key={di} className={`cal-day-col ${isToday?'cal-day-col--today':''}`} style={{height:TOTAL_HEIGHT}}>
+                {Array.from({length:TOTAL_SLOTS},(_,s)=>{
+                  const isDragTarget = dragOver?.date===dk && dragOver?.slot===s;
+                  return (
+                    <div
+                      key={s}
+                      className={`cal-slot ${s%4===0?'cal-slot--hour':''} ${isDragTarget?'cal-slot--drag':''}`}
+                      style={{ top: s*SLOT_HEIGHT, height: isDragTarget ? durationSlots*SLOT_HEIGHT : SLOT_HEIGHT }}
+                      onClick={()=>openCreate(dk,s)}
+                      onDragOver={(e)=>handleSlotDragOver(e,dk,s)}
+                      onDrop={(e)=>handleSlotDrop(e,dk,s)}
+                    />
+                  );
+                })}
+                {isToday && (
+                  <div className="cal-now-line" style={{top:(currentMinute/(24*60))*TOTAL_HEIGHT}}>
+                    <div className="cal-now-dot"/><div className="cal-now-bar"/>
+                  </div>
+                )}
+                {dayEvents.map((ev,ei)=>{
+                  const startMin=minsFromEvent(ev), endMin=minsEndFromEvent(ev);
+                  const top=(startMin/(24*60))*TOTAL_HEIGHT;
+                  const height=Math.max(((endMin-startMin)/(24*60))*TOTAL_HEIGHT,18);
+                  const left=`calc(${(ev.colIndex/ev.totalCols)*100}% + 2px)`;
+                  const width=`calc(${(1/ev.totalCols)*100}% - 4px)`;
+                  const color=primaryColor(ev);
+                  const done=isInstanceCompleted(ev);
+                  return (
+                    <div
+                      key={`${ev.id}-${ev._instanceDate}-${ei}`}
+                      className={`cal-event ${done?'cal-event--done':''}`}
+                      style={{top,height,left,width,'--ev-color':color}}
+                      draggable
+                      onDragStart={(e)=>handleEventDragStart(e,ev)}
+                      onDragEnd={handleDragEnd}
+                      onClick={(e)=>{e.stopPropagation();openEdit(ev);}}
+                    >
+                      <div className="cal-event-inner">
+                        <div className="cal-event-title">{ev.title}</div>
+                        {height>30&&<div className="cal-event-time">{fmtTime(ev.startHour,ev.startMin)} – {fmtTime(ev.endHour,ev.endMin)}</div>}
+                        {height>48&&ev.attributes.length>0&&(
+                          <div className="cal-event-attrs">
+                            {ev.attributes.map(a=><span key={a} className="cal-event-attr-dot" style={{background:STAT_META[a]?.color}} title={STAT_META[a]?.label}/>)}
+                          </div>
+                        )}
+                        {height>60&&ev.notes&&<div className="cal-event-notes-preview" title={ev.notes}>{notesPreview(ev.notes)}</div>}
+                      </div>
+                      <div className="cal-event-actions">
+                        <button className={`cal-event-btn cal-event-complete ${done?'cal-event-complete--done':''}`} onClick={(e)=>completeEvent(ev,e)} title={done?'Completed':'Mark complete'}>{done?'✓':'○'}</button>
+                        <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete">✕</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Month View ──────────────────────────────────────────────────────────────
+  const renderMonthView = () => {
+    const currentMonth = anchor.getMonth();
+    return (
+      <div className="cal-month-wrapper">
+        <div className="cal-month-dow-row">
+          {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=><div key={d} className="cal-month-dow">{d}</div>)}
+        </div>
+        <div className="cal-month-grid">
+          {monthCalDates.map((d,i)=>{
+            const dk=toDateKey(d);
+            const isToday=dk===todayKey;
+            const inMonth=d.getMonth()===currentMonth;
+            const dayEvs=columnedByDate[dk]||[];
+            return (
+              <div key={i} className={`cal-month-cell ${isToday?'cal-month-cell--today':''} ${!inMonth?'cal-month-cell--out':''}`}
+                onClick={()=>{setAnchor(d);setView('day');}}>
+                <div className={`cal-month-daynum ${isToday?'cal-month-daynum--today':''}`}>{d.getDate()}</div>
+                <div className="cal-month-events">
+                  {dayEvs.slice(0,3).map((ev,ei)=>{
+                    const done=isInstanceCompleted(ev);
+                    return (
+                      <div key={`${ev.id}-${ei}`} className={`cal-month-chip ${done?'cal-month-chip--done':''}`}
+                        style={{'--chip-color':primaryColor(ev)}}
+                        onClick={(e)=>{e.stopPropagation();openEdit(ev);}}>
+                        {ev.title}
+                      </div>
+                    );
+                  })}
+                  {dayEvs.length>3&&<div className="cal-month-more">+{dayEvs.length-3} more</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ─── Sidebar ─────────────────────────────────────────────────────────────────
+  const renderSidebar = () => (
+    <div className={`cal-sidebar ${sidebarOpen?'cal-sidebar--open':'cal-sidebar--closed'}`}>
+      <button className="cal-sidebar-toggle" onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?'Collapse':'Expand'}>
+        {sidebarOpen?'‹':'›'}
+      </button>
+      {sidebarOpen&&(
+        <div className="cal-sidebar-content">
+          <div className="cal-sidebar-header">
+            <span className="cal-sidebar-title">Quick Events</span>
+            <button className="cal-sidebar-add-btn" onClick={openTmplCreate} title="Add template">＋</button>
+          </div>
+          <p className="cal-sidebar-hint">Drag onto the calendar to place</p>
+          <div className="cal-sidebar-list">
+            {quickEvents.map(tmpl=>(
+              <div key={tmpl.id} className="cal-tmpl-card" style={{'--tmpl-color':tmpl.color||'#fbbf24'}}
+                draggable onDragStart={(e)=>handleTemplateDragStart(e,tmpl)} onDragEnd={handleDragEnd}>
+                <div className="cal-tmpl-info">
+                  <div className="cal-tmpl-title">{tmpl.title}</div>
+                  <div className="cal-tmpl-meta">
+                    {tmpl.duration}min
+                    {tmpl.recurrence!=='none'&&<span className="cal-tmpl-recur">{tmpl.recurrence}</span>}
+                  </div>
+                  {tmpl.attributes.length>0&&(
+                    <div className="cal-tmpl-attrs">
+                      {tmpl.attributes.map(a=><span key={a} className="cal-tmpl-attr-dot" style={{background:STAT_META[a]?.color}} title={STAT_META[a]?.label}/>)}
+                    </div>
+                  )}
+                </div>
+                <div className="cal-tmpl-actions">
+                  <button className="cal-tmpl-btn" onClick={()=>openTmplEdit(tmpl)} title="Edit">✏</button>
+                  <button className="cal-tmpl-btn cal-tmpl-btn--del" onClick={()=>deleteTmpl(tmpl.id)} title="Delete">✕</button>
+                </div>
+              </div>
+            ))}
+            {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click ＋ to add one.</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ─── Shared Modal Fields ─────────────────────────────────────────────────────
+  const renderAttrPills = (attrs, toggle) => (
+    <div className="cal-attr-pills">
+      {Object.entries(STAT_META).map(([key,meta])=>{
+        const sel=attrs.includes(key); const Icon=meta.Icon;
+        return (
+          <button key={key} type="button" className={`cal-attr-pill ${sel?'cal-attr-pill--selected':''}`} style={sel?{'--pill-color':meta.color}:{}} onClick={()=>toggle(key)}>
+            <Icon size={13}/>{meta.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const renderRecurBtns = (val, set) => (
+    <div className="cal-recur-row">
+      {['none','daily','weekly'].map(r=>(
+        <button key={r} type="button" className={`cal-recur-btn ${val===r?'cal-recur-btn--active':''}`} onClick={()=>set(r)}>
+          {r==='none'?'No Repeat':r==='daily'?'Daily':'Weekly'}
+        </button>
+      ))}
+    </div>
+  );
+
+  // ─── Render ───────────────────────────────────────────────────────────────────
+  return (
+    <div className="cal-page">
+      {/* ── Header ── */}
+      <div className="cal-header">
+        <div className="cal-header-left">
+          <h2 className="cal-month-label">{headerLabel()}</h2>
+          <button className="cal-today-btn" onClick={goToday}>Today</button>
+        </div>
+        <div className="cal-view-tabs">
+          {['day','week','month'].map(v=>(
+            <button key={v} className={`cal-view-tab ${view===v?'cal-view-tab--active':''}`} onClick={()=>setView(v)}>
+              {v.charAt(0).toUpperCase()+v.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className="cal-header-right">
+          <button className="cal-nav-btn" onClick={()=>navigate(-1)}>&#8249;</button>
+          <button className="cal-nav-btn" onClick={()=>navigate(1)}>&#8250;</button>
+        </div>
+      </div>
+
+      {/* ── Body ── */}
+      <div className="cal-body">
+        {renderSidebar()}
+        <div className="cal-main">
+          {view==='day'&&renderTimeGrid([anchor])}
+          {view==='week'&&renderTimeGrid(weekDates)}
+          {view==='month'&&renderMonthView()}
+        </div>
+      </div>
+
+      {/* ── Create / Edit Event Modal ── */}
+      {(modal==='create'||modal==='edit')&&(
+        <div className="cal-modal-overlay" onClick={closeModal}>
+          <div className="cal-modal" onClick={e=>e.stopPropagation()}>
+            <div className="cal-modal-header">
+              <h3>{modal==='create'?'New Event':'Edit Event'}</h3>
+              <button className="cal-modal-close" onClick={closeModal}>✕</button>
+            </div>
+            <div className="cal-modal-body">
+              <div className="cal-field">
+                <label className="cal-label">Title</label>
+                <input className="cal-input" placeholder="Event title…" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} autoFocus />
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Date</label>
+                <input className="cal-input" type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
+              </div>
+              <div className="cal-field-row">
+                <div className="cal-field">
+                  <label className="cal-label">Start</label>
+                  <input className="cal-input" type="time" step="900" value={toTimeInput(form.startHour,form.startMin)} onChange={e=>{const{h,m}=parseTimeInput(e.target.value);setForm(f=>({...f,startHour:h,startMin:m}));}}/>
+                </div>
+                <div className="cal-field">
+                  <label className="cal-label">End</label>
+                  <input className="cal-input" type="time" step="900" value={toTimeInput(form.endHour,form.endMin)} onChange={e=>{const{h,m}=parseTimeInput(e.target.value);setForm(f=>({...f,endHour:h,endMin:m}));}}/>
+                </div>
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">XP per attribute</label>
+                <input className="cal-input cal-input--xp" type="number" min="1" max="500" value={form.xpAmount} onChange={e=>setForm(f=>({...f,xpAmount:e.target.value}))}/>
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Attributes (full XP to each)</label>
+                {renderAttrPills(form.attributes, toggleAttr)}
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Repeat</label>
+                {renderRecurBtns(form.recurrence, r=>setForm(f=>({...f,recurrence:r})))}
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Notes</label>
+                <textarea className="cal-input cal-textarea" placeholder="Optional notes…" rows={3} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/>
+              </div>
+            </div>
+            {!isFormValid()&&form.title&&<p className="cal-modal-err">End time must be after start time.</p>}
+            <div className="cal-modal-footer">
+              <button className="cal-btn cal-btn--ghost" onClick={closeModal}>Cancel</button>
+              <button className="cal-btn cal-btn--primary" disabled={!isFormValid()} onClick={modal==='create'?saveEvent:()=>updateEvent('all')}>
+                {modal==='create'?'Add Event':'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit scope (recurring) ── */}
+      {editScope?.show&&(
+        <div className="cal-modal-overlay" onClick={()=>setEditScope(null)}>
+          <div className="cal-scope-modal" onClick={e=>e.stopPropagation()}>
+            <h4>Edit recurring event</h4>
+            <p>Which events do you want to change?</p>
+            <div className="cal-scope-btns">
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this')}>This event only</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this-forward')}>This &amp; future events</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('all')}>All events</button>
+            </div>
+            <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setEditScope(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete scope (recurring) ── */}
+      {deleteScope?.show&&(
+        <div className="cal-modal-overlay" onClick={()=>setDeleteScope(null)}>
+          <div className="cal-scope-modal" onClick={e=>e.stopPropagation()}>
+            <h4>Delete recurring event</h4>
+            <p>Which events do you want to delete?</p>
+            <div className="cal-scope-btns">
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this')}>This event only</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this-forward')}>This &amp; future events</button>
+              <button className="cal-btn cal-btn--danger" onClick={()=>handleDeleteScope('all')}>All events</button>
+            </div>
+            <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setDeleteScope(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Template Modal ── */}
+      {tmplModal&&(
+        <div className="cal-modal-overlay" onClick={closeTmplModal}>
+          <div className="cal-modal" onClick={e=>e.stopPropagation()}>
+            <div className="cal-modal-header">
+              <h3>{tmplModal==='create'?'New Template':'Edit Template'}</h3>
+              <button className="cal-modal-close" onClick={closeTmplModal}>✕</button>
+            </div>
+            <div className="cal-modal-body">
+              <div className="cal-field">
+                <label className="cal-label">Name</label>
+                <input className="cal-input" placeholder="Template name…" value={tmplForm.title} onChange={e=>setTmplForm(f=>({...f,title:e.target.value}))} autoFocus/>
+              </div>
+              <div className="cal-field-row">
+                <div className="cal-field">
+                  <label className="cal-label">Duration (min)</label>
+                  <input className="cal-input cal-input--xp" type="number" min="5" max="480" step="5" value={tmplForm.duration} onChange={e=>setTmplForm(f=>({...f,duration:Number(e.target.value)}))}/>
+                </div>
+                <div className="cal-field">
+                  <label className="cal-label">XP per attribute</label>
+                  <input className="cal-input cal-input--xp" type="number" min="1" max="500" value={tmplForm.xpAmount} onChange={e=>setTmplForm(f=>({...f,xpAmount:Number(e.target.value)}))}/>
+                </div>
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Attributes</label>
+                {renderAttrPills(tmplForm.attributes, toggleTmplAttr)}
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Repeat</label>
+                {renderRecurBtns(tmplForm.recurrence, r=>setTmplForm(f=>({...f,recurrence:r})))}
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Color</label>
+                <div className="cal-color-row">
+                  {['#fbbf24','#f87171','#4ade80','#38bdf8','#c084fc','#fb923c','#f472b6','#a3e635'].map(c=>(
+                    <button key={c} type="button" className={`cal-color-swatch ${tmplForm.color===c?'cal-color-swatch--active':''}`} style={{background:c}} onClick={()=>setTmplForm(f=>({...f,color:c}))}/>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="cal-modal-footer">
+              <button className="cal-btn cal-btn--ghost" onClick={closeTmplModal}>Cancel</button>
+              <button className="cal-btn cal-btn--primary" disabled={!tmplForm.title.trim()} onClick={tmplModal==='create'?saveTmpl:updateTmpl}>
+                {tmplModal==='create'?'Add Template':'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
