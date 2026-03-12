@@ -433,6 +433,13 @@ function App() {
       {levelUpModal && (
         <LevelUpModal newLevel={levelUpModal.newLevel} newRank={levelUpModal.newRank} onClose={() => setLevelUpModal(null)} />
       )}
+      {commitmentModal && (
+        <CommitmentModal
+          commitment={commitmentModal.commitment}
+          date={commitmentModal.date}
+          onConfirm={() => setCommitmentModal(null)}
+        />
+      )}
     </div>
   )
 }

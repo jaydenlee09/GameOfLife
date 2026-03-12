@@ -49,7 +49,7 @@ const CommitmentModal = ({ commitment, date, onConfirm }) => {
       <div className="cm-modal">
         <div className="cm-header">
           <span className="cm-icon">🎯</span>
-          <h2 className="cm-title">Today's Commitment</h2>
+          <h2 className="cm-title">Yesterday's Commitment</h2>
           <p className="cm-date">{formatDate(date)}</p>
         </div>
 
@@ -58,7 +58,7 @@ const CommitmentModal = ({ commitment, date, onConfirm }) => {
         </div>
 
         <p className="cm-instruction">
-          Did you follow through? Hold the button below to confirm your commitment and earn <span className="cm-xp">+10 XP</span>.
+          You made a commitment yesterday. Stay true to your word — hold the button to acknowledge it.
         </p>
 
         <div className="cm-hold-btn-wrap">
@@ -69,7 +69,7 @@ const CommitmentModal = ({ commitment, date, onConfirm }) => {
             onPointerLeave={stopHold}
           >
             <span className="cm-hold-label">
-              {progress > 0 ? 'Hold…' : 'Hold to Confirm'}
+              {progress > 0 ? 'Hold…' : 'Hold to Commit'}
             </span>
             <div
               className="cm-hold-progress"
