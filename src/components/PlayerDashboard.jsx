@@ -132,18 +132,20 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
             )}
             
             <div className="level-bar-container">
-                        <span className="level-text-left">LEVEL {user.level}</span>
-                        <div className="level-progress-bar">
-                            <div 
-                                className="level-progress-fill" 
-                                style={{
-                                  width: `${Math.min((user.xp / xpCap) * 100, 100)}%`,
-                                  background: getRankStyle(user.level).gradient,
-                                  '--glow-color': getRankStyle(user.level).glow,
-                                }}
-                            ></div>
-                        </div>
-                        <span className="level-text-right">{user.xp}/{xpCap}</span>
+              <div className="level-bar-top">
+                <span className="level-text-left">Level {user.level}</span>
+                <span className="level-text-right">{user.xp}/{xpCap} XP</span>
+              </div>
+              <div className="level-progress-bar">
+                <div
+                  className="level-progress-fill"
+                  style={{
+                    width: `${Math.min((user.xp / xpCap) * 100, 100)}%`,
+                    background: getRankStyle(user.level).gradient,
+                    '--glow-color': getRankStyle(user.level).glow,
+                  }}
+                ></div>
+              </div>
             </div>
             {nextRank && (
               <p className="next-rank-hint">
