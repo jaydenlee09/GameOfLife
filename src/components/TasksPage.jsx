@@ -497,19 +497,91 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
   );
 };
 
+// ─── Habit Edit Modal ─────────────────────────────────────────────────────────
+const HabitEditModal = ({ habit, onClose, onSave }) => {
+  const [name, setName] = useState(habit.name);
+  // normalise: old habits may have single `attribute` string
+  const initialAttrs = habit.attributes
+    ? habit.attributes
+    : habit.attribute
+      ? [habit.attribute]
+      : ['discipline'];
+  const [selectedAttrs, setSelectedAttrs] = useState(initialAttrs);
+
+  const allAttrs = Object.keys(STAT_META);
+
+  const toggleAttr = (attr) => {
+    setSelectedAttrs(prev =>
+      prev.includes(attr)
+        ? prev.length > 1 ? prev.filter(a => a !== attr) : prev
+        : [...prev, attr]
+    );
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onSave({ ...habit, name: name.trim(), attributes: selectedAttrs });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content add-task-modal" onClick={e => e.stopPropagation()}>
+        <h3 className="modal-title">Edit Habit</h3>
+        <form onSubmit={handleSave} className="add-task-form-modal">
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Habit name…"
+            className="modal-text-input"
+            autoFocus
+          />
+          <div className="modal-field-group">
+            <label className="modal-label">Attributes</label>
+            <div className="category-pill-grid">
+              {allAttrs.map(attr => (
+                <button
+                  key={attr}
+                  type="button"
+                  className={`category-pill${selectedAttrs.includes(attr) ? ' selected' : ''}`}
+                  onClick={() => toggleAttr(attr)}
+                >
+                  {STAT_META[attr].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="modal-btn secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="modal-btn primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // ─── Habit Tracker ────────────────────────────────────────────────────────────
 const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
   const [inputValue, setInputValue] = useState('');
-  const [selectedAttribute, setSelectedAttribute] = useState('discipline');
+  const [selectedAttributes, setSelectedAttributes] = useState(['discipline']);
   const [isAdding, setIsAdding] = useState(false);
   const [showStatModal, setShowStatModal] = useState(false);
-  const [gainedAttribute, setGainedAttribute] = useState('');
+  const [gainedAttributes, setGainedAttributes] = useState([]);
   const [gainedHabitXp, setGainedHabitXp] = useState(10);
+  const [editingHabit, setEditingHabit] = useState(null); // habit object being edited
 
-  const attributes = [
-    'strength', 'intelligence', 'charisma', 'discipline',
-    'mentalHealth', 'health', 'focus', 'creativity', 'productivity',
-  ];
+  const allAttrs = Object.keys(STAT_META);
+
+  const toggleNewAttr = (attr) => {
+    setSelectedAttributes(prev =>
+      prev.includes(attr)
+        ? prev.length > 1 ? prev.filter(a => a !== attr) : prev
+        : [...prev, attr]
+    );
+  };
 
   const getDaysOfWeek = () => {
     const today = new Date();
@@ -536,11 +608,11 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
     setHabits([...habits, {
       id: Date.now(),
       name: inputValue.trim(),
-      attribute: selectedAttribute,
+      attributes: selectedAttributes,
       history: {},
     }]);
     setInputValue('');
-    setSelectedAttribute('discipline');
+    setSelectedAttributes(['discipline']);
     setIsAdding(false);
   };
 
@@ -562,16 +634,20 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
     const dateStr = localDateStr(date);
     setHabits(habits.map(habit => {
       if (habit.id !== habitId) return habit;
+      // normalise: old habits may have single `attribute`
+      const attrs = habit.attributes
+        ? habit.attributes
+        : habit.attribute ? [habit.attribute] : ['discipline'];
       const newHistory = { ...habit.history };
       if (newHistory[dateStr]) {
         const xp = calcStreakXp(newHistory, dateStr);
         delete newHistory[dateStr];
-        onUpdateStat(habit.attribute, -xp);
+        attrs.forEach(attr => onUpdateStat(attr, -xp));
       } else {
         newHistory[dateStr] = true;
         const xp = calcStreakXp(newHistory, dateStr);
-        onUpdateStat(habit.attribute, xp);
-        setGainedAttribute(habit.attribute);
+        attrs.forEach(attr => onUpdateStat(attr, xp));
+        setGainedAttributes(attrs);
         setGainedHabitXp(xp);
         setShowStatModal(true);
       }
@@ -583,6 +659,10 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
     if (window.confirm('Delete this habit?')) {
       setHabits(habits.filter(h => h.id !== id));
     }
+  };
+
+  const saveHabitEdit = (updatedHabit) => {
+    setHabits(habits.map(h => h.id === updatedHabit.id ? updatedHabit : h));
   };
 
   const getStreak = (habit) => {
@@ -653,17 +733,37 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
           const streak = getStreak(habit);
           const best = getBestStreak(habit);
           const total = getTotalCompletions(habit);
+          // normalise: old habits may have single `attribute`
+          const attrs = habit.attributes
+            ? habit.attributes
+            : habit.attribute ? [habit.attribute] : ['discipline'];
           return (
             <div key={habit.id} className="habit-grid-row">
               <div className="habit-label-col">
-                <span
-                  className="habit-name-display"
-                  onDoubleClick={() => deleteHabit(habit.id)}
-                  title="Double-click to delete"
-                >
-                  {habit.name}
-                </span>
-                <span className="habit-attribute-badge">{habit.attribute}</span>
+                <div className="habit-name-row">
+                  <span className="habit-name-display" title={habit.name}>
+                    {habit.name}
+                  </span>
+                  <button
+                    className="habit-edit-btn"
+                    title="Edit habit"
+                    onClick={() => setEditingHabit(habit)}
+                  >✎</button>
+                  <button
+                    className="habit-delete-btn"
+                    title="Delete habit"
+                    onClick={() => deleteHabit(habit.id)}
+                  >✕</button>
+                </div>
+                <div className="habit-attribute-badges">
+                  {attrs.map(a => (
+                    <span
+                      key={a}
+                      className="habit-attribute-badge"
+                      style={{ color: STAT_META[a]?.color ?? '#555' }}
+                    >{STAT_META[a]?.label ?? a}</span>
+                  ))}
+                </div>
               </div>
               <div className="habit-days-col">
                 {days.map((date, i) => {
@@ -703,7 +803,7 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
             <span>+</span> Add a new habit
           </button>
         ) : (
-          <form onSubmit={handleAddHabit} className="add-habit-form">
+          <form onSubmit={handleAddHabit} className="add-habit-form add-habit-form--expanded">
             <input
               type="text"
               value={inputValue}
@@ -712,17 +812,23 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
               autoFocus
               className="habit-input-dark"
             />
-            <select
-              value={selectedAttribute}
-              onChange={(e) => setSelectedAttribute(e.target.value)}
-              className="habit-attribute-select"
-            >
-              {attributes.map(attr => (
-                <option key={attr} value={attr}>{attr}</option>
+            <div className="habit-attr-pill-row">
+              {allAttrs.map(attr => (
+                <button
+                  key={attr}
+                  type="button"
+                  className={`habit-attr-pill${selectedAttributes.includes(attr) ? ' selected' : ''}`}
+                  onClick={() => toggleNewAttr(attr)}
+                  style={selectedAttributes.includes(attr) ? { borderColor: STAT_META[attr].color, color: STAT_META[attr].color } : {}}
+                >
+                  {STAT_META[attr].label}
+                </button>
               ))}
-            </select>
-            <button type="submit" className="save-habit-btn">Save</button>
-            <button type="button" onClick={() => setIsAdding(false)} className="cancel-habit-btn">Cancel</button>
+            </div>
+            <div className="habit-form-actions">
+              <button type="submit" className="save-habit-btn">Save</button>
+              <button type="button" onClick={() => setIsAdding(false)} className="cancel-habit-btn">Cancel</button>
+            </div>
           </form>
         )}
       </div>
@@ -732,13 +838,33 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
         <div className="modal-overlay" onClick={() => setShowStatModal(false)}>
           <div className="modal-content habit-stat-modal" onClick={(e) => e.stopPropagation()}>
             <span className="xp-badge-big">⚡</span>
-            <h3 className="modal-title" style={{ color: '#fbbf24', textTransform: 'capitalize' }}>
-              +{gainedHabitXp} {gainedAttribute}
+            <h3 className="modal-title" style={{ color: '#fbbf24' }}>
+              +{gainedHabitXp} XP
             </h3>
-            <p className="modal-body">Attribute increased! You are getting better every day.</p>
+            <div className="habit-gained-attrs">
+              {gainedAttributes.map(a => (
+                <span
+                  key={a}
+                  className="habit-gained-attr-badge"
+                  style={{ color: STAT_META[a]?.color ?? '#fbbf24', borderColor: STAT_META[a]?.color ?? '#fbbf24' }}
+                >
+                  {STAT_META[a]?.label ?? a}
+                </span>
+              ))}
+            </div>
+            <p className="modal-body">Attribute{gainedAttributes.length > 1 ? 's' : ''} increased! You are getting better every day.</p>
             <button onClick={() => setShowStatModal(false)} className="modal-btn primary">Keep Grinding</button>
           </div>
         </div>
+      )}
+
+      {/* Edit Habit Modal */}
+      {editingHabit && (
+        <HabitEditModal
+          habit={editingHabit}
+          onClose={() => setEditingHabit(null)}
+          onSave={saveHabitEdit}
+        />
       )}
     </div>
   );

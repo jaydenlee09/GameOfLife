@@ -744,26 +744,66 @@
   flex-shrink: 0;
 }
 
+.habit-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .habit-name-display {
   display: block;
   color: #fff;
   font-weight: 700;
   font-size: 0.95rem;
-  cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 110px;
 }
 
-.habit-name-display:hover {
+.habit-edit-btn,
+.habit-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.habit-edit-btn {
+  color: #555;
+}
+
+.habit-edit-btn:hover {
   color: #fbbf24;
+  background: rgba(251,191,36,0.1);
+}
+
+.habit-delete-btn {
+  color: #444;
+}
+
+.habit-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239,68,68,0.1);
+}
+
+.habit-attribute-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 3px;
 }
 
 .habit-attribute-badge {
-  display: block;
-  font-size: 0.68rem;
-  color: #555;
-  margin-top: 2px;
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  margin-top: 0;
   text-transform: capitalize;
 }
 
@@ -881,6 +921,63 @@
   margin-top: 0.25rem;
 }
 
+.add-habit-form--expanded {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.habit-attr-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.habit-attr-pill {
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 20px;
+  color: #666;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  font-family: 'League Spartan', sans-serif;
+}
+
+.habit-attr-pill:hover {
+  border-color: #555;
+  color: #aaa;
+}
+
+.habit-attr-pill.selected {
+  background: rgba(251,191,36,0.08);
+}
+
+.habit-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.habit-gained-attrs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.habit-gained-attr-badge {
+  border: 1px solid;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 12px;
+  text-transform: capitalize;
+}
+
 .habit-input-dark {
   flex: 1;
   background: transparent;
@@ -894,21 +991,6 @@
 
 .habit-input-dark::placeholder {
   color: #444;
-}
-
-.habit-attribute-select {
-  background: transparent;
-  border: none;
-  color: #fbbf24;
-  font-size: 0.85rem;
-  font-weight: 700;
-  outline: none;
-  cursor: pointer;
-}
-
-.habit-attribute-select option {
-  background: #1c1c1c;
-  color: #fff;
 }
 
 .save-habit-btn {
