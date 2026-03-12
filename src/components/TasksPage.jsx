@@ -36,7 +36,15 @@ const STAT_LABELS = Object.fromEntries(Object.entries(STAT_META).map(([k, v]) =>
 const AddTaskModal = ({ onClose, onAdd }) => {
   const [text, setText] = useState('');
   const [timeFrame, setTimeFrame] = useState('today');
-  const [category, setCategory] = useState('discipline');
+  const [categories, setCategories] = useState(['discipline']);
+
+  const toggleCategory = (attr) => {
+    setCategories(prev =>
+      prev.includes(attr)
+        ? prev.length > 1 ? prev.filter(a => a !== attr) : prev // keep at least one
+        : [...prev, attr]
+    );
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -46,7 +54,7 @@ const AddTaskModal = ({ onClose, onAdd }) => {
       text: text.trim(),
       timeFrame,
       xp: XP_BY_TIMEFRAME[timeFrame],
-      category,
+      categories,
       completed: false,
       notes: '',
       subtasks: [],
@@ -86,19 +94,19 @@ const AddTaskModal = ({ onClose, onAdd }) => {
           </div>
 
           <div className="modal-field-group">
-            <label className="modal-label">Attribute</label>
+            <label className="modal-label">Attributes <span className="modal-label-hint">(select one or more)</span></label>
             <div className="category-pills">
               {STAT_ATTRIBUTES.map((attr) => {
                 const meta = STAT_META[attr];
                 const { Icon } = meta;
-                const isActive = category === attr;
+                const isActive = categories.includes(attr);
                 return (
                   <button
                     key={attr}
                     type="button"
                     className={`category-pill ${isActive ? 'active' : ''}`}
                     style={isActive ? { background: `${meta.color}22`, borderColor: meta.color, color: meta.color } : {}}
-                    onClick={() => setCategory(attr)}
+                    onClick={() => toggleCategory(attr)}
                   >
                     <Icon size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />
                     {meta.label}
@@ -119,28 +127,55 @@ const AddTaskModal = ({ onClose, onAdd }) => {
 };
 
 // ─── Confirm Complete Modal ───────────────────────────────────────────────────
-const ConfirmModal = ({ task, onConfirm, onCancel }) => (
-  <div className="modal-overlay">
-    <div className="modal-content">
-      <h3 className="modal-title">Complete Task?</h3>
-      <p className="modal-body">
-        Mark <strong>"{task.text}"</strong> as done and earn{' '}
-        <span className="xp-highlight">+{task.xp} XP</span>?
-      </p>
-      <div className="modal-actions">
-        <button onClick={onCancel} className="modal-btn secondary">Cancel</button>
-        <button onClick={onConfirm} className="modal-btn primary">Complete!</button>
+const ConfirmModal = ({ task, onConfirm, onCancel }) => {
+  const cats = task.categories || (task.category ? [task.category] : []);
+  const xpEach = cats.length > 0 ? Math.floor(task.xp / cats.length) : task.xp;
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h3 className="modal-title">Complete Task?</h3>
+        <p className="modal-body">
+          Mark <strong>"{task.text}"</strong> as done and earn{' '}
+          <span className="xp-highlight">+{task.xp} XP</span>?
+        </p>
+        {cats.length > 0 && (
+          <p className="modal-body" style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '-0.4rem' }}>
+            {cats.length === 1
+              ? `+${task.xp} XP → ${STAT_LABELS[cats[0]] || cats[0]}`
+              : `+${xpEach} XP each → ${cats.map(c => STAT_LABELS[c] || c).join(', ')}`}
+          </p>
+        )}
+        <div className="modal-actions">
+          <button onClick={onCancel} className="modal-btn secondary">Cancel</button>
+          <button onClick={onConfirm} className="modal-btn primary">Complete!</button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── XP Gained Modal ─────────────────────────────────────────────────────────
-const XpModal = ({ xp, onClose }) => (
+const XpModal = ({ xp, categories, onClose }) => (
   <div className="modal-overlay" onClick={onClose}>
     <div className="modal-content xp-modal" onClick={(e) => e.stopPropagation()}>
       <span className="xp-badge-big">✨</span>
       <h3 className="modal-title xp-title">+{xp} XP</h3>
+      {categories && categories.length > 0 && (
+        <div className="xp-modal-attrs">
+          {categories.map(cat => {
+            const meta = STAT_META[cat];
+            if (!meta) return null;
+            const { Icon } = meta;
+            const each = Math.floor(xp / categories.length);
+            return (
+              <span key={cat} className="xp-modal-attr-pill" style={{ color: meta.color, borderColor: `${meta.color}55`, background: `${meta.color}18` }}>
+                <Icon size={11} strokeWidth={2.5} />
+                {meta.label} +{each}
+              </span>
+            );
+          })}
+        </div>
+      )}
       <p className="modal-body">Great job! Keep up the momentum.</p>
       <button onClick={onClose} className="modal-btn primary">Awesome!</button>
     </div>
@@ -150,7 +185,7 @@ const XpModal = ({ xp, onClose }) => (
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
   const [newSubtask, setNewSubtask] = useState('');
-  const [subtaskXpModal, setSubtaskXpModal] = useState(null); // { subtaskText, category }
+  const [subtaskXpModal, setSubtaskXpModal] = useState(null); // { subtaskText, categories }
 
   if (!task) {
     return (
@@ -194,9 +229,10 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
       };
     }));
 
-    if (!wasCompleted && parentTask?.category) {
-      onUpdateStat(parentTask.category, 10);
-      setSubtaskXpModal({ subtaskText: subtask.text, category: parentTask.category });
+    const parentCats = parentTask?.categories || (parentTask?.category ? [parentTask.category] : []);
+    if (!wasCompleted && parentCats.length > 0) {
+      parentCats.forEach(cat => onUpdateStat(cat, 10));
+      setSubtaskXpModal({ subtaskText: subtask.text, categories: parentCats });
     }
   };
 
@@ -210,19 +246,22 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
   return (
     <div className="detail-panel">
       <div className="detail-top">
-        {(() => {
-          const meta = STAT_META[liveTask.category];
-          const Icon = meta?.Icon;
-          return (
-            <span
-              className="detail-category-pill"
-              style={meta ? { background: `${meta.color}22`, borderColor: meta.color, color: meta.color } : {}}
-            >
-              {Icon && <Icon size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />}
-              {meta?.label || liveTask.category}
-            </span>
-          );
-        })()}
+        <div className="detail-category-pills">
+          {(liveTask.categories || (liveTask.category ? [liveTask.category] : [])).map(cat => {
+            const meta = STAT_META[cat];
+            const Icon = meta?.Icon;
+            return (
+              <span
+                key={cat}
+                className="detail-category-pill"
+                style={meta ? { background: `${meta.color}22`, borderColor: meta.color, color: meta.color } : {}}
+              >
+                {Icon && <Icon size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />}
+                {meta?.label || cat}
+              </span>
+            );
+          })}
+        </div>
         <h2 className="detail-title">{liveTask.text}</h2>
         <textarea
           className="detail-notes"
@@ -276,11 +315,11 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
         <div className="modal-overlay" onClick={() => setSubtaskXpModal(null)}>
           <div className="modal-content xp-modal" onClick={(e) => e.stopPropagation()}>
             <span className="xp-badge-big">⚡</span>
-            <h3 className="modal-title xp-title">+10 XP</h3>
+            <h3 className="modal-title xp-title">+10 XP each</h3>
             <p className="modal-body">
               <strong style={{ color: '#fff' }}>"{subtaskXpModal.subtaskText}"</strong> complete!{' '}
               <span style={{ color: '#fbbf24', fontWeight: 700, textTransform: 'capitalize' }}>
-                {STAT_LABELS[subtaskXpModal.category] || subtaskXpModal.category}
+                {(subtaskXpModal.categories || []).map(c => STAT_LABELS[c] || c).join(', ')}
               </span>{' '}
               increased.
             </p>
@@ -301,6 +340,7 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
   const [showXpModal, setShowXpModal] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState(null);
   const [gainedXp, setGainedXp] = useState(20);
+  const [gainedCategories, setGainedCategories] = useState([]);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
 
@@ -338,9 +378,14 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
     const task = todos.find(t => t.id === pendingTaskId);
     if (!task) return;
     setGainedXp(task.xp);
+    const cats = task.categories || (task.category ? [task.category] : []);
+    setGainedCategories(cats);
     setTodos(todos.filter(t => t.id !== pendingTaskId));
-    // Award XP to the specific attribute AND contribute to total XP/level
-    onUpdateStat(task.category, task.xp);
+    // Split XP evenly across all selected attributes
+    if (cats.length > 0) {
+      const xpEach = Math.floor(task.xp / cats.length);
+      cats.forEach(cat => onUpdateStat(cat, xpEach));
+    }
     if (selectedTask?.id === pendingTaskId) setSelectedTask(null);
     setShowConfirmModal(false);
     setPendingTaskId(null);
@@ -446,7 +491,7 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
         />
       )}
       {showXpModal && (
-        <XpModal xp={gainedXp} onClose={() => setShowXpModal(false)} />
+        <XpModal xp={gainedXp} categories={gainedCategories} onClose={() => setShowXpModal(false)} />
       )}
     </div>
   );

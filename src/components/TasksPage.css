@@ -422,6 +422,32 @@
   border: 1px solid rgba(251, 191, 36, 0.3) !important;
 }
 
+.xp-modal-attrs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.xp-modal-attr-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 20px;
+  border: 1px solid;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+}
+
+.modal-label-hint {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 0.3rem;
+}
+
 .xp-title {
   color: #fbbf24 !important;
   font-size: 2rem !important;
@@ -488,6 +514,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.detail-category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .detail-category-pill {
