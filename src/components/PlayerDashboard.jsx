@@ -20,6 +20,15 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
   const [poorDecisionStat, setPoorDecisionStat] = useState('');
   const [poorDecisionOpen, setPoorDecisionOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  const handleConfirmClick = () => {
+    setConfirming(true);
+    setTimeout(() => {
+      setConfirming(false);
+      onCommitmentConfirm && onCommitmentConfirm();
+    }, 1800);
+  };
 
   const rank = getRankForLevel(user.level);
   const nextRank = RANKS.find(r => r.minLevel > user.level) || null;
@@ -262,19 +271,30 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
 
           {/* Pending commitment — inline confirm / deny */}
           {pendingCommitment && (
-            <div className="commitment-pending">
+            <div className={`commitment-pending${confirming ? ' commitment-pending--confirming' : ''}`}>
+              {confirming && (
+                <div className="commitment-confirm-popup">
+                  <div className="commitment-confirm-popup-inner">
+                    <span className="commitment-confirm-checkmark">✓</span>
+                    <span className="commitment-confirm-xp">+10 XP</span>
+                    <span className="commitment-confirm-label">Commitment kept!</span>
+                  </div>
+                </div>
+              )}
               <p className="commitment-pending-label">Yesterday's commitment:</p>
               <p className="commitment-pending-text">"{pendingCommitment.commitment}"</p>
               <div className="commitment-pending-actions">
                 <button
                   className="commitment-pending-btn commitment-pending-btn--confirm"
-                  onClick={onCommitmentConfirm}
+                  onClick={handleConfirmClick}
+                  disabled={confirming}
                 >
                   ✓ I did it &nbsp;<span className="commitment-pending-xp">+10 XP</span>
                 </button>
                 <button
                   className="commitment-pending-btn commitment-pending-btn--deny"
                   onClick={onCommitmentDeny}
+                  disabled={confirming}
                 >
                   ✗ I didn't
                 </button>
