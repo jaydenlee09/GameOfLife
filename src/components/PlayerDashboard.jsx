@@ -13,7 +13,7 @@ const formatArchiveDate = (dateKey) => {
   });
 };
 
-const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart, onChallengeComplete, xpCap = 100, onUpdateStat, commitmentArchive = [] }) => {
+const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart, onChallengeComplete, xpCap = 100, onUpdateStat, commitmentArchive = [], pendingCommitment = null, onCommitmentConfirm, onCommitmentDeny }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(user.name);
   const [poorDecisionText, setPoorDecisionText] = useState('');
@@ -259,16 +259,42 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
             </h3>
             <span className={`commitment-archive-chevron${archiveOpen ? ' commitment-archive-chevron--open' : ''}`}>▾</span>
           </div>
+
+          {/* Pending commitment — inline confirm / deny */}
+          {pendingCommitment && (
+            <div className="commitment-pending">
+              <p className="commitment-pending-label">Yesterday's commitment:</p>
+              <p className="commitment-pending-text">"{pendingCommitment.commitment}"</p>
+              <div className="commitment-pending-actions">
+                <button
+                  className="commitment-pending-btn commitment-pending-btn--confirm"
+                  onClick={onCommitmentConfirm}
+                >
+                  ✓ I did it &nbsp;<span className="commitment-pending-xp">+10 XP</span>
+                </button>
+                <button
+                  className="commitment-pending-btn commitment-pending-btn--deny"
+                  onClick={onCommitmentDeny}
+                >
+                  ✗ I didn't
+                </button>
+              </div>
+            </div>
+          )}
+
           {archiveOpen && (
             <div className="commitment-archive-list">
               {commitmentArchive.length === 0 ? (
                 <p className="commitment-archive-empty">No confirmed commitments yet.</p>
               ) : (
                 commitmentArchive.map((entry, i) => (
-                  <div key={i} className="commitment-archive-entry">
+                  <div key={i} className={`commitment-archive-entry${entry.denied ? ' commitment-archive-entry--denied' : ''}`}>
                     <div className="commitment-archive-entry-meta">
                       <span className="commitment-archive-date">{formatArchiveDate(entry.date)}</span>
-                      <span className="commitment-archive-badge">✓ +10 XP</span>
+                      {entry.denied
+                        ? <span className="commitment-archive-badge commitment-archive-badge--denied">✗ Missed</span>
+                        : <span className="commitment-archive-badge">✓ +10 XP</span>
+                      }
                     </div>
                     <p className="commitment-archive-text">{entry.text}</p>
                   </div>

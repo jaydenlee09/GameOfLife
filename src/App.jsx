@@ -201,7 +201,17 @@ function App() {
     const todayKey = getLocalDateKey(0);
     addXp(10);
     setCommitmentArchive(prev => [
-      { date: commitmentModal.date, text: commitmentModal.commitment, confirmedOn: todayKey },
+      { date: commitmentModal.date, text: commitmentModal.commitment, confirmedOn: todayKey, denied: false },
+      ...prev,
+    ]);
+    setCommitmentModal(null);
+  };
+
+  const handleCommitmentDeny = () => {
+    if (!commitmentModal) return;
+    const todayKey = getLocalDateKey(0);
+    setCommitmentArchive(prev => [
+      { date: commitmentModal.date, text: commitmentModal.commitment, confirmedOn: todayKey, denied: true },
       ...prev,
     ]);
     setCommitmentModal(null);
@@ -357,6 +367,9 @@ function App() {
             onChallengeComplete={handleChallengeComplete}
             xpCap={xpCapForLevel(user.level)}
             commitmentArchive={commitmentArchive}
+            pendingCommitment={commitmentModal}
+            onCommitmentConfirm={handleCommitmentConfirm}
+            onCommitmentDeny={handleCommitmentDeny}
           />
         );
       case 'challenges':
@@ -419,13 +432,6 @@ function App() {
       </div>
       {levelUpModal && (
         <LevelUpModal newLevel={levelUpModal.newLevel} newRank={levelUpModal.newRank} onClose={() => setLevelUpModal(null)} />
-      )}
-      {commitmentModal && (
-        <CommitmentModal
-          commitment={commitmentModal.commitment}
-          date={commitmentModal.date}
-          onConfirm={handleCommitmentConfirm}
-        />
       )}
     </div>
   )
