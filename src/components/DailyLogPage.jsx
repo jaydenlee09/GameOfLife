@@ -168,7 +168,7 @@ const VideoSection = ({ date, videoName, onVideoChange }) => {
 
 const COMMIT_HOLD_DURATION = 3000;
 
-const DailyLogPage = ({ logs, setLogs }) => {
+const DailyLogPage = ({ logs, setLogs, onCommitmentLocked }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
 
@@ -179,7 +179,7 @@ const DailyLogPage = ({ logs, setLogs }) => {
   const commitIntervalRef = useRef(null);
   const commitStartRef = useRef(null);
 
-  const startCommitHold = useCallback((entry, updateFieldFn) => {
+  const startCommitHold = useCallback((entry) => {
     if (!entry.commitment?.trim() || committed) return;
     if (commitIntervalRef.current) return;
     setCommitHolding(true);
@@ -193,9 +193,13 @@ const DailyLogPage = ({ logs, setLogs }) => {
         commitIntervalRef.current = null;
         setCommitHolding(false);
         setCommitted(true);
+        onCommitmentLocked && onCommitmentLocked({
+          date: selectedDate,
+          text: entry.commitment.trim(),
+        });
       }
     }, 16);
-  }, [committed]);
+  }, [committed, onCommitmentLocked, selectedDate]);
 
   const stopCommitHold = useCallback(() => {
     if (commitIntervalRef.current) {
@@ -431,7 +435,7 @@ const DailyLogPage = ({ logs, setLogs }) => {
                 ) : (
                   <button
                     className={`commit-hold-btn${commitHolding ? ' commit-hold-btn--holding' : ''}${!currentEntry.commitment?.trim() ? ' commit-hold-btn--disabled' : ''}`}
-                    onPointerDown={() => startCommitHold(currentEntry, updateField)}
+                    onPointerDown={() => startCommitHold(currentEntry)}
                     onPointerUp={stopCommitHold}
                     onPointerLeave={stopCommitHold}
                     disabled={!currentEntry.commitment?.trim()}

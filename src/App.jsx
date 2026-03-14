@@ -11,11 +11,13 @@ import ChallengesPage from './components/ChallengesPage'
 import { xpCapForLevel } from './utils/xpUtils'
 import { getRankUpAtLevel } from './utils/rankMeta'
 import CHALLENGES_POOL from './utils/challengesMeta'
-import MentorPage from './components/MentorPage'
 import CalendarPage from './components/CalendarPage'
+import MentorAssistant from './components/MentorAssistant'
+import { applyMentorAction } from './utils/mentorActions'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('statistics');
+  const [mentorOpen, setMentorOpen] = useState(false);
 
   // Lifted State for Tasks & Habits
   const [todos, setTodos] = useState(() => {
@@ -85,7 +87,7 @@ function App() {
           })();
           const yesterdayEntry = currentLogs[yesterdayKey];
           setCommitmentArchive(currentArchive => {
-            const alreadyConfirmed = currentArchive.some(a => a.confirmedOn === newToday);
+            const alreadyConfirmed = currentArchive.some(a => a.date === yesterdayKey && a.confirmedOn === newToday);
             if (yesterdayEntry?.commitment?.trim() && !alreadyConfirmed) {
               setCommitmentModal({ date: yesterdayKey, commitment: yesterdayEntry.commitment.trim() });
             }
@@ -184,37 +186,62 @@ function App() {
 
   const [commitmentModal, setCommitmentModal] = useState(null); // { date, commitment }
 
+  const upsertCommitmentRecord = (date, text) => {
+    const trimmedText = (text || '').trim();
+    if (!date || !trimmedText) return;
+    setCommitmentArchive(prev => {
+      const existingIndex = prev.findIndex(entry => entry.date === date);
+      if (existingIndex === -1) {
+        return [{ date, text: trimmedText, confirmedOn: null, denied: null }, ...prev];
+      }
+      const next = [...prev];
+      next[existingIndex] = {
+        ...next[existingIndex],
+        date,
+        text: trimmedText,
+      };
+      return next;
+    });
+  };
+
+  const resolveCommitmentRecord = (date, text, denied) => {
+    const todayKey = getLocalDateKey(0);
+    setCommitmentArchive(prev => {
+      const existingIndex = prev.findIndex(entry => entry.date === date);
+      if (existingIndex === -1) {
+        return [{ date, text, confirmedOn: todayKey, denied }, ...prev];
+      }
+      const next = [...prev];
+      next[existingIndex] = {
+        ...next[existingIndex],
+        date,
+        text: next[existingIndex].text || text,
+        confirmedOn: todayKey,
+        denied,
+      };
+      return next;
+    });
+  };
+
   // On mount: show commitment modal if yesterday had a commitment not yet confirmed today
   useEffect(() => {
     const yesterdayKey = getLocalDateKey(-1);
     const todayKey = getLocalDateKey(0);
     const yesterdayEntry = logs[yesterdayKey];
-    const alreadyConfirmed = commitmentArchive.some(a => a.confirmedOn === todayKey);
+    const alreadyConfirmed = commitmentArchive.some(a => a.date === yesterdayKey && a.confirmedOn === todayKey);
     if (yesterdayEntry?.commitment?.trim() && !alreadyConfirmed) {
       setCommitmentModal({ date: yesterdayKey, commitment: yesterdayEntry.commitment.trim() });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleCommitmentConfirm = () => {
-    if (!commitmentModal) return;
-    const todayKey = getLocalDateKey(0);
-    addXp(10);
-    setCommitmentArchive(prev => [
-      { date: commitmentModal.date, text: commitmentModal.commitment, confirmedOn: todayKey, denied: false },
-      ...prev,
-    ]);
-    setCommitmentModal(null);
-  };
-
-  const handleCommitmentDeny = () => {
-    if (!commitmentModal) return;
-    const todayKey = getLocalDateKey(0);
-    setCommitmentArchive(prev => [
-      { date: commitmentModal.date, text: commitmentModal.commitment, confirmedOn: todayKey, denied: true },
-      ...prev,
-    ]);
-    setCommitmentModal(null);
+  const handleArchiveCommitmentResolve = (date, text, denied) => {
+    if (!date) return;
+    if (!denied) addXp(10);
+    resolveCommitmentRecord(date, text, denied);
+    if (commitmentModal?.date === date) {
+      setCommitmentModal(null);
+    }
   };
   // ─────────────────────────────────────────────────────────────────────────
   const buildDefaultChallenges = () =>
@@ -367,9 +394,7 @@ function App() {
             onChallengeComplete={handleChallengeComplete}
             xpCap={xpCapForLevel(user.level)}
             commitmentArchive={commitmentArchive}
-            pendingCommitment={commitmentModal}
-            onCommitmentConfirm={handleCommitmentConfirm}
-            onCommitmentDeny={handleCommitmentDeny}
+            onResolveCommitment={handleArchiveCommitmentResolve}
           />
         );
       case 'challenges':
@@ -394,21 +419,17 @@ function App() {
           />
         );
       case 'daily-log':
-        return <DailyLogPage logs={logs} setLogs={setLogs} />;
-      case 'timer':
-        return <TimerPage onUpdateStat={updateStat} />;
-      case 'mentor':
         return (
-          <MentorPage
-            user={user}
-            todos={todos}
-            habits={habits}
+          <DailyLogPage
             logs={logs}
-            challenges={challenges}
-            chatHistory={chatHistory}
-            setChatHistory={setChatHistory}
+            setLogs={setLogs}
+            onCommitmentLocked={({ date, text }) => {
+              upsertCommitmentRecord(date, text);
+            }}
           />
         );
+      case 'timer':
+        return <TimerPage onUpdateStat={updateStat} />;
       case 'calendar':
         return (
           <CalendarPage
@@ -424,12 +445,42 @@ function App() {
     }
   };
 
+  const handleMentorAction = (action) => {
+    return applyMentorAction(action, {
+      setTodos,
+      setCalendarEvents,
+      setQuickEvents,
+      setChallenges,
+    });
+  };
+
   return (
     <div className="app-container">
-      <Navbar activePage={currentPage} onNavigate={setCurrentPage} userEmail={user.name} userLevel={user.level} userXp={user.xp} userXpCap={xpCapForLevel(user.level)} />
+      <Navbar
+        activePage={currentPage}
+        onNavigate={setCurrentPage}
+        onOpenMentor={() => setMentorOpen(true)}
+        userEmail={user.name}
+        userLevel={user.level}
+        userXp={user.xp}
+        userXpCap={xpCapForLevel(user.level)}
+      />
       <div className="content-container">
         {renderPage()}
       </div>
+      <MentorAssistant
+        isOpen={mentorOpen}
+        onToggle={() => setMentorOpen(open => !open)}
+        onClose={() => setMentorOpen(false)}
+        user={user}
+        todos={todos}
+        habits={habits}
+        logs={logs}
+        challenges={challenges}
+        chatHistory={chatHistory}
+        setChatHistory={setChatHistory}
+        onApplyAction={handleMentorAction}
+      />
       {levelUpModal && (
         <LevelUpModal newLevel={levelUpModal.newLevel} newRank={levelUpModal.newRank} onClose={() => setLevelUpModal(null)} />
       )}

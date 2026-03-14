@@ -13,7 +13,7 @@ const formatArchiveDate = (dateKey) => {
   });
 };
 
-const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart, onChallengeComplete, xpCap = 100, onUpdateStat, commitmentArchive = [], pendingCommitment = null, onCommitmentConfirm, onCommitmentDeny }) => {
+const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart, onChallengeComplete, xpCap = 100, onUpdateStat, commitmentArchive = [], onResolveCommitment }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(user.name);
   const [poorDecisionText, setPoorDecisionText] = useState('');
@@ -22,12 +22,17 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  const handleConfirmClick = () => {
+  const handleArchiveResolve = (entry, denied) => {
+    if (!entry || !onResolveCommitment) return;
+    if (denied) {
+      onResolveCommitment(entry.date, entry.text, true);
+      return;
+    }
     setConfirming(true);
     setTimeout(() => {
+      onResolveCommitment(entry.date, entry.text, false);
       setConfirming(false);
-      onCommitmentConfirm && onCommitmentConfirm();
-    }, 1800);
+    }, 1400);
   };
 
   const rank = getRankForLevel(user.level);
@@ -110,6 +115,15 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
 
   return (
     <div className="player-dashboard">
+      {confirming && (
+        <div className="commitment-confirm-popup">
+          <div className="commitment-confirm-popup-inner">
+            <span className="commitment-confirm-checkmark">✓</span>
+            <span className="commitment-confirm-xp">+10 XP</span>
+            <span className="commitment-confirm-label">Commitment kept!</span>
+          </div>
+        </div>
+      )}
       
       {/* LEFT COLUMN */}
       <div className="dashboard-column left-column">
@@ -271,54 +285,44 @@ const PlayerDashboard = ({ user, onUpdateName, challenges = [], onChallengeStart
             <span className={`commitment-archive-chevron${archiveOpen ? ' commitment-archive-chevron--open' : ''}`}>▾</span>
           </div>
 
-          {/* Pending commitment — inline confirm / deny */}
-          {pendingCommitment && (
-            <div className={`commitment-pending${confirming ? ' commitment-pending--confirming' : ''}`}>
-              {confirming && (
-                <div className="commitment-confirm-popup">
-                  <div className="commitment-confirm-popup-inner">
-                    <span className="commitment-confirm-checkmark">✓</span>
-                    <span className="commitment-confirm-xp">+10 XP</span>
-                    <span className="commitment-confirm-label">Commitment kept!</span>
-                  </div>
-                </div>
-              )}
-              <p className="commitment-pending-label">Yesterday's commitment:</p>
-              <p className="commitment-pending-text">"{pendingCommitment.commitment}"</p>
-              <div className="commitment-pending-actions">
-                <button
-                  className="commitment-pending-btn commitment-pending-btn--confirm"
-                  onClick={handleConfirmClick}
-                  disabled={confirming}
-                >
-                  ✓ I did it &nbsp;<span className="commitment-pending-xp">+10 XP</span>
-                </button>
-                <button
-                  className="commitment-pending-btn commitment-pending-btn--deny"
-                  onClick={onCommitmentDeny}
-                  disabled={confirming}
-                >
-                  ✗ I didn't
-                </button>
-              </div>
-            </div>
-          )}
-
           {archiveOpen && (
             <div className="commitment-archive-list">
               {commitmentArchive.length === 0 ? (
-                <p className="commitment-archive-empty">No confirmed commitments yet.</p>
+                <p className="commitment-archive-empty">No commitments yet.</p>
               ) : (
                 commitmentArchive.map((entry, i) => (
-                  <div key={i} className={`commitment-archive-entry${entry.denied ? ' commitment-archive-entry--denied' : ''}`}>
+                  <div key={i} className={`commitment-archive-entry${entry.denied === true ? ' commitment-archive-entry--denied' : ''}`}>
                     <div className="commitment-archive-entry-meta">
                       <span className="commitment-archive-date">{formatArchiveDate(entry.date)}</span>
-                      {entry.denied
-                        ? <span className="commitment-archive-badge commitment-archive-badge--denied">✗ Missed</span>
-                        : <span className="commitment-archive-badge">✓ +10 XP</span>
-                      }
+                      {!entry.confirmedOn && entry.denied == null && (
+                        <span className="commitment-archive-badge">⏳ Pending check-in</span>
+                      )}
+                      {(entry.confirmedOn || entry.denied != null) && entry.denied === true && (
+                        <span className="commitment-archive-badge commitment-archive-badge--denied">✗ Missed</span>
+                      )}
+                      {(entry.confirmedOn || entry.denied != null) && entry.denied !== true && (
+                        <span className="commitment-archive-badge">✓ +10 XP</span>
+                      )}
                     </div>
                     <p className="commitment-archive-text">{entry.text}</p>
+                    {!entry.confirmedOn && entry.denied == null && (
+                      <div className="commitment-pending-actions">
+                        <button
+                          className="commitment-pending-btn commitment-pending-btn--confirm"
+                          onClick={() => handleArchiveResolve(entry, false)}
+                          disabled={confirming}
+                        >
+                          ✓ I did it &nbsp;<span className="commitment-pending-xp">+10 XP</span>
+                        </button>
+                        <button
+                          className="commitment-pending-btn commitment-pending-btn--deny"
+                          onClick={() => handleArchiveResolve(entry, true)}
+                          disabled={confirming}
+                        >
+                          ✗ I didn't
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

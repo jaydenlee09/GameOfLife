@@ -140,11 +140,43 @@ INSTRUCTIONS:
 - When asked about a specific area, go deeper with actionable steps.
 - Reference journal emotions if they reveal stress, anxiety, or burnout — address those directly.
 - If their commitment streak is broken (no recent journal entries), call it out.
-- Always end responses with a clear next action or challenge.`;
+- Always end responses with a clear next action or challenge.
+
+AI ACTION FORMAT:
+- You can propose structured app actions, but they require user confirmation before execution.
+- Respond ONLY valid JSON using this exact shape:
+  {
+    "message": "string",
+    "actions": [
+      {
+        "type": "create_task | create_calendar_event | create_quick_event_template | create_challenge",
+        "payload": { "...": "..." }
+      }
+    ]
+  }
+- If no actions are needed, return an empty array: "actions": []
+- Do not include markdown, code fences, or extra text outside JSON.`;
+};
+
+const parseMentorResponse = (rawText) => {
+  const fallbackText = rawText || 'No response received.';
+  if (!rawText) return { text: fallbackText, actions: [] };
+
+  try {
+    const parsed = JSON.parse(rawText);
+    const text = typeof parsed.message === 'string' && parsed.message.trim()
+      ? parsed.message
+      : fallbackText;
+    const actions = Array.isArray(parsed.actions) ? parsed.actions : [];
+    return { text, actions };
+  } catch {
+    return { text: fallbackText, actions: [] };
+  }
 };
 
 /**
- * Sends a message to Gemini 2.5 Flash via the @google/genai SDK and returns the response text.
+ * Sends a message to Gemini 2.5 Flash via the @google/genai SDK.
+ * Returns: { text: string, actions: array }
  * history: array of { role: 'user'|'model', parts: [{ text }] }
  * caps history at 20 messages before sending
  */
@@ -172,8 +204,9 @@ export const sendToMentor = async (history, userMessage, systemPrompt) => {
       systemInstruction: systemPrompt,
       temperature: 0.8,
       maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
     },
   });
 
-  return response.text || 'No response received.';
+  return parseMentorResponse(response.text || '');
 };

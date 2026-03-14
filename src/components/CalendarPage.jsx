@@ -41,6 +41,23 @@ const slotToMinutes = (slot) => slot * 15;
 const minsFromEvent = (ev) => ev.startHour * 60 + ev.startMin;
 const minsEndFromEvent = (ev) => ev.endHour * 60 + ev.endMin;
 const overlaps = (a, b) => minsFromEvent(a) < minsEndFromEvent(b) && minsFromEvent(b) < minsEndFromEvent(a);
+const cloneSubEvents = (subEvents = []) => subEvents.map((subEvent) => ({ ...subEvent }));
+const normalizeBonusTask = (task = {}, index = 0) => ({
+  id: task.id ?? `bonus-${index}-${task.title || 'task'}`,
+  title: task.title || '',
+  xpAmount: Number(task.xpAmount) || 10,
+  attributes: Array.isArray(task.attributes) ? [...task.attributes] : [],
+  completed: Boolean(task.completed),
+  completedDates: Array.isArray(task.completedDates) ? [...task.completedDates] : [],
+});
+const cloneBonusTasks = (bonusTasks = []) => bonusTasks.map((task, index) => normalizeBonusTask(task, index));
+const normalizeEvent = (ev = {}) => ({
+  ...ev,
+  attributes: Array.isArray(ev.attributes) ? [...ev.attributes] : [],
+  subEvents: cloneSubEvents(ev.subEvents || []),
+  bonusTasks: cloneBonusTasks(ev.bonusTasks || []),
+  completedDates: Array.isArray(ev.completedDates) ? [...ev.completedDates] : [],
+});
 
 const buildColumns = (events) => {
   if (!events.length) return [];
@@ -74,17 +91,18 @@ const buildColumns = (events) => {
 const expandEventsForDates = (storedEvents, dateKeys) => {
   const result = [];
   for (const ev of storedEvents) {
-    if (ev.recurrence === 'none' || !ev.recurrence) {
-      if (dateKeys.includes(ev.date)) result.push({ ...ev, _instanceDate: ev.date });
-    } else if (ev.recurrence === 'daily') {
+    const normalizedEvent = normalizeEvent(ev);
+    if (normalizedEvent.recurrence === 'none' || !normalizedEvent.recurrence) {
+      if (dateKeys.includes(normalizedEvent.date)) result.push({ ...normalizedEvent, _instanceDate: normalizedEvent.date });
+    } else if (normalizedEvent.recurrence === 'daily') {
       for (const dk of dateKeys) {
-        if (dk >= ev.date) result.push({ ...ev, _instanceDate: dk, _isVirtual: dk !== ev.date });
+        if (dk >= normalizedEvent.date) result.push({ ...normalizedEvent, _instanceDate: dk, _isVirtual: dk !== normalizedEvent.date });
       }
-    } else if (ev.recurrence === 'weekly') {
-      const evDay = new Date(ev.date + 'T00:00:00').getDay();
+    } else if (normalizedEvent.recurrence === 'weekly') {
+      const evDay = new Date(normalizedEvent.date + 'T00:00:00').getDay();
       for (const dk of dateKeys) {
         const dkDay = new Date(dk + 'T00:00:00').getDay();
-        if (dk >= ev.date && dkDay === evDay) result.push({ ...ev, _instanceDate: dk, _isVirtual: dk !== ev.date });
+        if (dk >= normalizedEvent.date && dkDay === evDay) result.push({ ...normalizedEvent, _instanceDate: dk, _isVirtual: dk !== normalizedEvent.date });
       }
     }
   }
@@ -99,18 +117,54 @@ const isInstanceCompleted = (ev) => {
   if (ev.recurrence === 'none' || !ev.recurrence) return ev.completed;
   return ev.completedDates?.includes(ev._instanceDate);
 };
+const isBonusTaskCompleted = (task, ev) => {
+  if (ev.recurrence === 'none' || !ev.recurrence) return Boolean(task.completed);
+  return task.completedDates?.includes(ev._instanceDate);
+};
 const primaryColor = (ev) => {
   if (!ev.attributes?.length) return '#fbbf24';
   return STAT_META[ev.attributes[0]]?.color || '#fbbf24';
+};
+const buildDetachedInstanceEvent = (ev, overrides = {}) => {
+  const normalizedEvent = normalizeEvent(ev);
+  const instanceDate = ev._instanceDate || normalizedEvent.date;
+
+  return {
+    id: overrides.id || Date.now(),
+    title: overrides.title ?? normalizedEvent.title,
+    date: overrides.date ?? instanceDate,
+    startHour: overrides.startHour ?? normalizedEvent.startHour,
+    startMin: overrides.startMin ?? normalizedEvent.startMin,
+    endHour: overrides.endHour ?? normalizedEvent.endHour,
+    endMin: overrides.endMin ?? normalizedEvent.endMin,
+    xpAmount: overrides.xpAmount ?? normalizedEvent.xpAmount,
+    attributes: overrides.attributes ? [...overrides.attributes] : [...normalizedEvent.attributes],
+    recurrence: 'none',
+    notes: overrides.notes ?? normalizedEvent.notes ?? '',
+    subEvents: overrides.subEvents ? cloneSubEvents(overrides.subEvents) : cloneSubEvents(normalizedEvent.subEvents),
+    bonusTasks: overrides.bonusTasks
+      ? cloneBonusTasks(overrides.bonusTasks)
+      : normalizedEvent.bonusTasks.map((task, index) => {
+          const normalizedTask = normalizeBonusTask(task, index);
+          return {
+            ...normalizedTask,
+            completed: isBonusTaskCompleted(normalizedTask, ev),
+            completedDates: [],
+          };
+        }),
+    completed: isInstanceCompleted(ev),
+    completedDates: [],
+  };
 };
 
 // ─── Default Forms ────────────────────────────────────────────────────────────
 const defaultForm = (o = {}) => ({
   title: '', date: toDateKey(new Date()),
   startHour: 9, startMin: 0, endHour: 10, endMin: 0,
-  xpAmount: 20, attributes: [], recurrence: 'none', notes: '', subEvents: [], ...o,
+  xpAmount: 20, attributes: [], recurrence: 'none', notes: '', subEvents: [], bonusTasks: [], ...o,
 });
 const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', color: '#fbbf24' });
+const defaultBonusTaskForm = () => ({ title: '', xpAmount: 10, attributes: [] });
 const toTimeInput = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 const parseTimeInput = (val) => { const [h,m] = val.split(':'); return { h: parseInt(h,10), m: parseInt(m,10) }; };
 
@@ -126,6 +180,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tmplModal, setTmplModal] = useState(null);
   const [tmplForm, setTmplForm] = useState(defaultTmplForm());
+  const [newBonusTask, setNewBonusTask] = useState(defaultBonusTaskForm());
   const [dragOver, setDragOver] = useState(null);
   const [draggingTemplate, setDraggingTemplate] = useState(null);
   const [draggingEvent, setDraggingEvent] = useState(null); // { ev, offsetSlots }
@@ -193,23 +248,26 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
       ...(fromTemplate ? { title: fromTemplate.title, attributes: [...fromTemplate.attributes], xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence } : {}),
     }));
     setEditingId(null);
+    setNewBonusTask(defaultBonusTaskForm());
     setModal('create');
   };
 
   const openEdit = (ev) => {
     if (ev.recurrence !== 'none' && ev._isVirtual) { setEditScope({ show: true, ev }); return; }
-    setForm({ title: ev.title, date: ev.date, startHour: ev.startHour, startMin: ev.startMin, endHour: ev.endHour, endMin: ev.endMin, xpAmount: ev.xpAmount, attributes: [...ev.attributes], recurrence: ev.recurrence, notes: ev.notes || '', subEvents: ev.subEvents ? [...ev.subEvents] : [] });
+    const normalizedEvent = normalizeEvent(ev);
+    setForm({ title: normalizedEvent.title, date: normalizedEvent.date, startHour: normalizedEvent.startHour, startMin: normalizedEvent.startMin, endHour: normalizedEvent.endHour, endMin: normalizedEvent.endMin, xpAmount: normalizedEvent.xpAmount, attributes: [...normalizedEvent.attributes], recurrence: normalizedEvent.recurrence, notes: normalizedEvent.notes || '', subEvents: cloneSubEvents(normalizedEvent.subEvents), bonusTasks: cloneBonusTasks(normalizedEvent.bonusTasks) });
     setEditingId(ev.id);
+    setNewBonusTask(defaultBonusTaskForm());
     setModal('edit');
   };
 
-  const closeModal = () => { setModal(null); setEditingId(null); setEditScope(null); setDeleteScope(null); setNewSubEvent(''); };
+  const closeModal = () => { setModal(null); setEditingId(null); setEditScope(null); setDeleteScope(null); setNewSubEvent(''); setNewBonusTask(defaultBonusTaskForm()); };
 
   const buildEventFromForm = (id) => ({
     id: id || Date.now(), title: form.title.trim(), date: form.date,
     startHour: form.startHour, startMin: form.startMin, endHour: form.endHour, endMin: form.endMin,
     xpAmount: Number(form.xpAmount)||20, attributes: form.attributes, recurrence: form.recurrence,
-    notes: form.notes||'', subEvents: form.subEvents||[], completed: false, completedDates: [],
+    notes: form.notes||'', subEvents: cloneSubEvents(form.subEvents||[]), bonusTasks: cloneBonusTasks(form.bonusTasks||[]), completed: false, completedDates: [],
   });
 
   const isFormValid = () => form.title.trim() && (form.endHour*60+form.endMin) > (form.startHour*60+form.startMin);
@@ -222,7 +280,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
       setCalendarEvents(prev=>prev.map(ev=>ev.id!==editingId?ev:{
         ...ev, title:form.title.trim(), startHour:form.startHour, startMin:form.startMin,
         endHour:form.endHour, endMin:form.endMin, xpAmount:Number(form.xpAmount)||20,
-        attributes:form.attributes, recurrence:form.recurrence, notes:form.notes||'', subEvents:form.subEvents||[],
+        attributes:form.attributes, recurrence:form.recurrence, notes:form.notes||'', subEvents:cloneSubEvents(form.subEvents||[]), bonusTasks:cloneBonusTasks(form.bonusTasks||[]),
       }));
     } else {
       setCalendarEvents(prev=>[
@@ -235,14 +293,22 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
 
   const handleEditScopeSelect = (scope) => {
     const ev = editScope.ev;
-    setForm({ title:ev.title, date:ev._instanceDate, startHour:ev.startHour, startMin:ev.startMin, endHour:ev.endHour, endMin:ev.endMin, xpAmount:ev.xpAmount, attributes:[...ev.attributes], recurrence:ev.recurrence, notes:ev.notes||'', subEvents:ev.subEvents?[...ev.subEvents]:[] });
+    const normalizedEvent = normalizeEvent(ev);
+    const instanceBonusTasks = normalizedEvent.bonusTasks.map((task, index) => {
+      const normalizedTask = normalizeBonusTask(task, index);
+      return ev.recurrence !== 'none' && ev._isVirtual
+        ? { ...normalizedTask, completed: isBonusTaskCompleted(normalizedTask, ev), completedDates: [] }
+        : normalizedTask;
+    });
+    setForm({ title:normalizedEvent.title, date:ev._instanceDate, startHour:normalizedEvent.startHour, startMin:normalizedEvent.startMin, endHour:normalizedEvent.endHour, endMin:normalizedEvent.endMin, xpAmount:normalizedEvent.xpAmount, attributes:[...normalizedEvent.attributes], recurrence:normalizedEvent.recurrence, notes:normalizedEvent.notes||'', subEvents:cloneSubEvents(normalizedEvent.subEvents), bonusTasks:instanceBonusTasks });
     setEditingId(ev.id);
     setEditScope(null);
+    setNewBonusTask(defaultBonusTaskForm());
     if (scope === 'this') {
       const newId = Date.now();
       setCalendarEvents(prev=>[
         ...prev.map(e=>e.id===ev.id?{...e,_exceptDates:[...(e._exceptDates||[]),ev._instanceDate]}:e),
-        {...ev, id:newId, date:ev._instanceDate, recurrence:'none', _isVirtual:false, _instanceDate:undefined, completed:false, completedDates:[]},
+        buildDetachedInstanceEvent(ev, { id: newId }),
       ]);
       setTimeout(()=>setEditingId(newId),0);
     }
@@ -270,6 +336,64 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
     ev.attributes.forEach(attr=>onUpdateStat(attr, ev.xpAmount));
     if (ev.recurrence==='none'||!ev.recurrence) setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completed:true}:e));
     else setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completedDates:[...(e.completedDates||[]),ev._instanceDate]}:e));
+  };
+
+  const markBonusTaskComplete = (ev, task) => {
+    if (isBonusTaskCompleted(task, ev)) return;
+    task.attributes.forEach((attr) => onUpdateStat(attr, task.xpAmount));
+    if (ev.recurrence === 'none' || !ev.recurrence) {
+      setCalendarEvents((prev) => prev.map((calendarEvent) => {
+        if (calendarEvent.id !== ev.id) return calendarEvent;
+        const normalizedEvent = normalizeEvent(calendarEvent);
+        return {
+          ...normalizedEvent,
+          bonusTasks: normalizedEvent.bonusTasks.map((bonusTask, index) => {
+            const normalizedTask = normalizeBonusTask(bonusTask, index);
+            return normalizedTask.id === task.id ? { ...normalizedTask, completed: true } : normalizedTask;
+          }),
+        };
+      }));
+      setForm((currentForm) => ({
+        ...currentForm,
+        bonusTasks: (currentForm.bonusTasks || []).map((bonusTask, index) => {
+          const normalizedTask = normalizeBonusTask(bonusTask, index);
+          return normalizedTask.id === task.id ? { ...normalizedTask, completed: true } : normalizedTask;
+        }),
+      }));
+      return;
+    }
+
+    setCalendarEvents((prev) => prev.map((calendarEvent) => {
+      if (calendarEvent.id !== ev.id) return calendarEvent;
+      const normalizedEvent = normalizeEvent(calendarEvent);
+      return {
+        ...normalizedEvent,
+        bonusTasks: normalizedEvent.bonusTasks.map((bonusTask, index) => {
+          const normalizedTask = normalizeBonusTask(bonusTask, index);
+          if (normalizedTask.id !== task.id) return normalizedTask;
+          return {
+            ...normalizedTask,
+            completedDates: [...(normalizedTask.completedDates || []), ev._instanceDate],
+          };
+        }),
+      };
+    }));
+    setForm((currentForm) => ({
+      ...currentForm,
+      bonusTasks: (currentForm.bonusTasks || []).map((bonusTask, index) => {
+        const normalizedTask = normalizeBonusTask(bonusTask, index);
+        if (normalizedTask.id !== task.id) return normalizedTask;
+        return {
+          ...normalizedTask,
+          completedDates: [...(normalizedTask.completedDates || []), ev._instanceDate],
+        };
+      }),
+    }));
+  };
+
+  const completeBonusTask = (ev, task, e) => {
+    e.stopPropagation();
+    markBonusTaskComplete(ev, task);
   };
 
   // ─── Drag & Drop ─────────────────────────────────────────────────────────────
@@ -307,17 +431,27 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
         // Moving a recurring instance to a different date — detach and save as one-off
         setCalendarEvents(prev => [
           ...prev.map(e => e.id === ev.id ? { ...e, _exceptDates: [...(e._exceptDates || []), ev._instanceDate] } : e),
-          { ...ev, id: Date.now(), date, recurrence: 'none', _isVirtual: false, _instanceDate: undefined,
-            startHour: newStartH, startMin: newStartM, endHour: newEndH, endMin: newEndM,
-            completed: false, completedDates: [] },
+          buildDetachedInstanceEvent(ev, {
+            id: Date.now(),
+            date,
+            startHour: newStartH,
+            startMin: newStartM,
+            endHour: newEndH,
+            endMin: newEndM,
+          }),
         ]);
       } else if (ev.recurrence !== 'none' && ev._isVirtual) {
         // Same date, just retime — detach this instance
         setCalendarEvents(prev => [
           ...prev.map(e => e.id === ev.id ? { ...e, _exceptDates: [...(e._exceptDates || []), ev._instanceDate] } : e),
-          { ...ev, id: Date.now(), date, recurrence: 'none', _isVirtual: false, _instanceDate: undefined,
-            startHour: newStartH, startMin: newStartM, endHour: newEndH, endMin: newEndM,
-            completed: false, completedDates: [] },
+          buildDetachedInstanceEvent(ev, {
+            id: Date.now(),
+            date,
+            startHour: newStartH,
+            startMin: newStartM,
+            endHour: newEndH,
+            endMin: newEndM,
+          }),
         ]);
       } else {
         setCalendarEvents(prev => prev.map(e => e.id === ev.id
@@ -344,6 +478,35 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
     setNewSubEvent('');
   };
   const removeSubEvent = (id) => setForm(f => ({ ...f, subEvents: f.subEvents.filter(s => s.id !== id) }));
+  const toggleNewBonusTaskAttr = (key) => setNewBonusTask((current) => ({
+    ...current,
+    attributes: current.attributes.includes(key)
+      ? current.attributes.filter((attr) => attr !== key)
+      : [...current.attributes, key],
+  }));
+  const addBonusTask = () => {
+    const trimmedTitle = newBonusTask.title.trim();
+    if (!trimmedTitle || !newBonusTask.attributes.length) return;
+    setForm((currentForm) => ({
+      ...currentForm,
+      bonusTasks: [
+        ...(currentForm.bonusTasks || []),
+        normalizeBonusTask({
+          id: Date.now(),
+          title: trimmedTitle,
+          xpAmount: Number(newBonusTask.xpAmount) || 10,
+          attributes: newBonusTask.attributes,
+          completed: false,
+          completedDates: [],
+        }),
+      ],
+    }));
+    setNewBonusTask(defaultBonusTaskForm());
+  };
+  const removeBonusTask = (id) => setForm((currentForm) => ({
+    ...currentForm,
+    bonusTasks: (currentForm.bonusTasks || []).filter((task) => task.id !== id),
+  }));
 
   // ─── Template CRUD ───────────────────────────────────────────────────────────
   const openTmplCreate = () => { setTmplForm(defaultTmplForm()); setTmplModal('create'); };
@@ -362,6 +525,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
   for (const ev of expandedEvents) { if (byDate[ev._instanceDate]!==undefined) byDate[ev._instanceDate].push(ev); }
   const columnedByDate = {};
   for (const dk of activeDateKeys) columnedByDate[dk] = buildColumns(byDate[dk]);
+  const editingEvent = modal === 'edit' ? calendarEvents.find((ev) => ev.id === editingId) : null;
 
   // ─── Time Grid (Day / Week) ──────────────────────────────────────────────────
   const renderTimeGrid = (dates) => (
@@ -446,6 +610,26 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
                             {ev.subEvents.map(se=>(
                               <div key={se.id} className="cal-event-subevent">{se.title}</div>
                             ))}
+                          </div>
+                        )}
+                        {height>88&&ev.bonusTasks?.length>0&&(
+                          <div className="cal-event-bonus-list">
+                            {ev.bonusTasks.slice(0, height > 140 ? ev.bonusTasks.length : 2).map((task, taskIndex)=>{
+                              const normalizedTask = normalizeBonusTask(task, taskIndex);
+                              const bonusDone = isBonusTaskCompleted(normalizedTask, ev);
+                              return (
+                                <button
+                                  key={normalizedTask.id}
+                                  type="button"
+                                  className={`cal-event-bonus ${bonusDone?'cal-event-bonus--done':''}`}
+                                  onClick={(e)=>completeBonusTask(ev, normalizedTask, e)}
+                                  title={bonusDone ? 'Completed bonus task' : `Complete bonus task: ${normalizedTask.title}`}
+                                >
+                                  <span className="cal-event-bonus-check">{bonusDone?'✓':'○'}</span>
+                                  <span className="cal-event-bonus-label">{normalizedTask.title}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -659,6 +843,66 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
                     onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addSubEvent();}}}
                   />
                   <button type="button" className="cal-btn cal-btn--ghost cal-subevent-add-btn" onClick={addSubEvent}>Add</button>
+                </div>
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Bonus Tasks</label>
+                <div className="cal-bonus-list">
+                  {(form.bonusTasks||[]).map((task, index)=>{
+                    const normalizedTask = normalizeBonusTask(task, index);
+                    const bonusDone = editingEvent
+                      ? isBonusTaskCompleted(normalizedTask, normalizeEvent(editingEvent))
+                      : Boolean(normalizedTask.completed);
+                    return (
+                    <div key={normalizedTask.id ?? `bonus-task-${index}`} className={`cal-bonus-row ${bonusDone?'cal-bonus-row--done':''}`}>
+                      {modal==='edit' && editingEvent && (
+                        <button
+                          type="button"
+                          className={`cal-bonus-check ${bonusDone?'cal-bonus-check--done':''}`}
+                          onClick={()=>markBonusTaskComplete(normalizeEvent(editingEvent), normalizedTask)}
+                          disabled={bonusDone}
+                          title={bonusDone ? 'Bonus task completed' : `Mark ${normalizedTask.title} complete`}
+                        >
+                          {bonusDone?'✓':'○'}
+                        </button>
+                      )}
+                      <div className="cal-bonus-main">
+                        <span className="cal-bonus-name">{normalizedTask.title}</span>
+                        <span className="cal-bonus-meta">+{normalizedTask.xpAmount} XP to {normalizedTask.attributes.map((attr)=>STAT_META[attr]?.label || attr).join(', ')}</span>
+                      </div>
+                      <button type="button" className="cal-subevent-del" onClick={()=>removeBonusTask(normalizedTask.id)}>✕</button>
+                    </div>
+                  )})}
+                </div>
+                <div className="cal-bonus-builder">
+                  <div className="cal-field-row">
+                    <div className="cal-field">
+                      <label className="cal-label">Task</label>
+                      <input
+                        className="cal-input"
+                        placeholder="e.g. Floss"
+                        value={newBonusTask.title}
+                        onChange={(e)=>setNewBonusTask((current)=>({...current,title:e.target.value}))}
+                        onKeyDown={(e)=>{if(e.key==='Enter'){e.preventDefault();addBonusTask();}}}
+                      />
+                    </div>
+                    <div className="cal-field">
+                      <label className="cal-label">XP</label>
+                      <input
+                        className="cal-input cal-input--xp"
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={newBonusTask.xpAmount}
+                        onChange={(e)=>setNewBonusTask((current)=>({...current,xpAmount:e.target.value}))}
+                      />
+                    </div>
+                  </div>
+                  <div className="cal-field">
+                    <label className="cal-label">Reward Attributes</label>
+                    {renderAttrPills(newBonusTask.attributes, toggleNewBonusTaskAttr)}
+                  </div>
+                  <button type="button" className="cal-btn cal-btn--ghost cal-bonus-add-btn" disabled={!newBonusTask.title.trim() || !newBonusTask.attributes.length} onClick={addBonusTask}>Add Bonus Task</button>
                 </div>
               </div>
               <div className="cal-field">
