@@ -459,7 +459,6 @@ function App() {
       <Navbar
         activePage={currentPage}
         onNavigate={setCurrentPage}
-        onOpenMentor={() => setMentorOpen(true)}
         userEmail={user.name}
         userLevel={user.level}
         userXp={user.xp}

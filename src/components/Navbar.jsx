@@ -1,7 +1,7 @@
 import React from 'react';
 import './Navbar.css';
 
-const Navbar = ({ activePage, onNavigate, onOpenMentor, userEmail, userLevel, userXp, userXpCap }) => {
+const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap }) => {
   return (
     <>
       <nav className="navbar-container">
@@ -36,12 +36,6 @@ const Navbar = ({ activePage, onNavigate, onOpenMentor, userEmail, userLevel, us
               onClick={() => onNavigate('timer')}
             >
               Timer
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => onOpenMentor?.()}
-            >
-              Mentor
             </button>
             <button
               className={`nav-link ${activePage === 'calendar' ? 'active' : ''}`}

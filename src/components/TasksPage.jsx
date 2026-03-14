@@ -760,7 +760,11 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
                     <span
                       key={a}
                       className="habit-attribute-badge"
-                      style={{ color: STAT_META[a]?.color ?? '#555' }}
+                      style={{
+                        color: STAT_META[a]?.color ?? '#555',
+                        borderColor: `${STAT_META[a]?.color ?? '#555'}55`,
+                        background: `${STAT_META[a]?.color ?? '#555'}18`,
+                      }}
                     >{STAT_META[a]?.label ?? a}</span>
                   ))}
                 </div>
