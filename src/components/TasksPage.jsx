@@ -572,6 +572,9 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
   const [gainedAttributes, setGainedAttributes] = useState([]);
   const [gainedHabitXp, setGainedHabitXp] = useState(10);
   const [editingHabit, setEditingHabit] = useState(null); // habit object being edited
+  const [habitView, setHabitView] = useState('week');
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
 
   const allAttrs = Object.keys(STAT_META);
 
@@ -583,24 +586,67 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
     );
   };
 
-  const getDaysOfWeek = () => {
+  const getWeekDays = (offset) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const day = today.getDay();
     const diff = day === 0 ? -6 : 1 - day;
     const monday = new Date(today);
-    monday.setDate(today.getDate() + diff);
-    const days = [];
-    for (let i = 0; i < 7; i++) {
+    monday.setDate(today.getDate() + diff + (offset * 7));
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      days.push(d);
-    }
-    return days;
+      return d;
+    });
   };
 
-  const days = getDaysOfWeek();
-  const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const getMonthDays = (offset) => {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const d = new Date(first);
+      d.setDate(i + 1);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    });
+  };
+
+  const activeOffset = habitView === 'week' ? weekOffset : monthOffset;
+  const days = habitView === 'week' ? getWeekDays(weekOffset) : getMonthDays(monthOffset);
+
+  const periodLabel = habitView === 'week'
+    ? (() => {
+        const start = days[0];
+        const end = days[days.length - 1];
+        const startMonth = start.toLocaleDateString(undefined, { month: 'short' });
+        const endMonth = end.toLocaleDateString(undefined, { month: 'short' });
+        if (startMonth === endMonth) {
+          return `${startMonth} ${start.getDate()}–${end.getDate()}, ${end.getFullYear()}`;
+        }
+        return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${end.getFullYear()}`;
+      })()
+    : (() => {
+        const first = days[0];
+        return first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      })();
+
+  const goToPreviousPeriod = () => {
+    if (habitView === 'week') {
+      setWeekOffset(prev => prev - 1);
+      return;
+    }
+    setMonthOffset(prev => prev - 1);
+  };
+
+  const goToNextPeriod = () => {
+    if (activeOffset >= 0) return;
+    if (habitView === 'week') {
+      setWeekOffset(prev => prev + 1);
+      return;
+    }
+    setMonthOffset(prev => prev + 1);
+  };
 
   const handleAddHabit = (e) => {
     e.preventDefault();
@@ -717,16 +763,64 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
     <div className="habit-section">
       <h1 className="section-page-title">HABITS</h1>
       <div className="habit-card">
-        {/* Header row */}
-        <div className="habit-grid-row habit-header-row">
-          <div className="habit-label-col" />
-          <div className="habit-days-col">
-            {DAY_LABELS.map(d => (
-              <div key={d} className="day-header">{d}</div>
-            ))}
+        <div className="habit-view-controls">
+          <div className="habit-view-toggle-group" role="tablist" aria-label="Habit view">
+            <button
+              type="button"
+              className={`habit-view-btn ${habitView === 'week' ? 'active' : ''}`}
+              onClick={() => setHabitView('week')}
+            >
+              Week View
+            </button>
+            <button
+              type="button"
+              className={`habit-view-btn ${habitView === 'month' ? 'active' : ''}`}
+              onClick={() => setHabitView('month')}
+            >
+              Month View
+            </button>
           </div>
-          <div className="habit-meta-col" />
+
+          <div className="habit-period-nav">
+            <button type="button" className="habit-period-btn" onClick={goToPreviousPeriod} aria-label="Previous period">
+              ←
+            </button>
+            <span className="habit-period-label">{periodLabel}</span>
+            <button
+              type="button"
+              className="habit-period-btn"
+              onClick={goToNextPeriod}
+              aria-label="Next period"
+              disabled={activeOffset >= 0}
+            >
+              →
+            </button>
+          </div>
         </div>
+
+        {/* Header row (week only) */}
+        {habitView === 'week' && (
+          <div className="habit-grid-row habit-header-row">
+            <div className="habit-label-col" />
+            <div className="habit-days-col">
+              {days.map((date) => {
+                const dateStr = localDateStr(date);
+                const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+                return (
+                  <div
+                    key={dateStr}
+                    className="day-header"
+                    title={date.toLocaleDateString()}
+                  >
+                    <span className="day-header-main">{weekday}</span>
+                    <span className="day-header-sub">{date.getDate()}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="habit-meta-col" />
+          </div>
+        )}
 
         {/* Habit rows */}
         {habits.map(habit => {
@@ -769,19 +863,39 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
                   ))}
                 </div>
               </div>
-              <div className="habit-days-col">
-                {days.map((date, i) => {
-                  const dateStr = localDateStr(date);
-                  const isCompleted = !!habit.history[dateStr];
-                  return (
-                    <div
-                      key={i}
-                      className={`habit-circle ${isCompleted ? 'filled' : ''}`}
-                      onClick={() => toggleHabitDate(habit.id, date)}
-                    />
-                  );
-                })}
-              </div>
+              {habitView === 'week' ? (
+                <div className="habit-days-col">
+                  {days.map((date) => {
+                    const dateStr = localDateStr(date);
+                    const isCompleted = !!habit.history[dateStr];
+                    return (
+                      <div
+                        key={dateStr}
+                        className={`habit-circle ${isCompleted ? 'filled' : ''}`}
+                        onClick={() => toggleHabitDate(habit.id, date)}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="habit-days-col month month-grid">
+                  {days.map((date) => {
+                    const dateStr = localDateStr(date);
+                    const isCompleted = !!habit.history[dateStr];
+                    return (
+                      <button
+                        type="button"
+                        key={dateStr}
+                        className="month-day-cell"
+                        onClick={() => toggleHabitDate(habit.id, date)}
+                        title={date.toLocaleDateString()}
+                      >
+                        <span className={`habit-circle month ${isCompleted ? 'filled' : ''}`} />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="habit-meta-col">
                 <div className="habit-streak-badge" title="Current streak">
                   <img src={flameIcon} alt="streak" className="habit-flame-icon" />

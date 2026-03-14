@@ -727,6 +727,93 @@
   gap: 0.75rem;
 }
 
+.habit-view-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.habit-view-toggle-group {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.habit-view-btn {
+  background: #262626;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: #a3a3a3;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.32rem 0.72rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'League Spartan', sans-serif;
+}
+
+.habit-view-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+.habit-view-btn.active {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #0d0d0d;
+}
+
+.habit-period-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #202020;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.2rem 0.35rem;
+}
+
+.habit-period-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #262626;
+  color: #d4d4d4;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.habit-period-btn:hover:not(:disabled) {
+  background: #303030;
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+}
+
+.habit-period-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.habit-period-label {
+  color: #d4d4d4;
+  font-size: 0.78rem;
+  font-weight: 700;
+  min-width: 162px;
+  text-align: center;
+}
+
 .habit-grid-row {
   display: flex;
   align-items: center;
@@ -817,10 +904,28 @@
 
 .habit-days-col {
   display: flex;
-  gap: 8px;
+  gap: 0;
   flex: 1;
   overflow-x: auto;
   padding-bottom: 2px;
+}
+
+.habit-days-col.month {
+  display: grid;
+  grid-template-columns: repeat(8, 18px);
+  grid-template-rows: repeat(4, 18px);
+  gap: 2px;
+  justify-content: start;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.habit-days-col.month-header {
+  align-items: center;
+}
+
+.habit-days-col.month-grid {
+  align-items: center;
 }
 
 .habit-days-col::-webkit-scrollbar { height: 3px; }
@@ -829,12 +934,33 @@
 
 .day-header {
   width: 36px;
-  text-align: center;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #fbbf24;
-  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
   flex-shrink: 0;
+}
+
+.day-header.month-weekday {
+  width: auto;
+  min-height: 18px;
+  text-align: center;
+}
+
+.day-header-main {
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.day-header-sub {
+  color: #a3a3a3;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .habit-circle {
@@ -846,6 +972,27 @@
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
+}
+
+.habit-circle.month {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+.month-day-cell {
+  width: 18px;
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.month-day-cell {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .habit-circle:hover {
