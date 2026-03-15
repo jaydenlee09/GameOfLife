@@ -29,6 +29,44 @@ const toDateKey = (date) => {
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
+const parseDateKey = (dateKey) => {
+  const [y, m, d] = String(dateKey || '').split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return { y, m, d };
+};
+const buildDayEventTargetMs = (dateKey, timeHHMM) => {
+  const parts = parseDateKey(dateKey);
+  if (!parts) return null;
+  let hour = 23;
+  let minute = 59;
+  if (typeof timeHHMM === 'string' && /^\d{2}:\d{2}$/.test(timeHHMM)) {
+    const [h, m] = timeHHMM.split(':').map(Number);
+    if (Number.isFinite(h) && Number.isFinite(m)) {
+      hour = Math.min(23, Math.max(0, h));
+      minute = Math.min(59, Math.max(0, m));
+    }
+  }
+  return new Date(parts.y, parts.m - 1, parts.d, hour, minute, 0, 0).getTime();
+};
+const fmtRemaining = (targetMs, nowMs) => {
+  if (!targetMs || !nowMs) return '';
+  const diffMs = targetMs - nowMs;
+  if (diffMs <= 0) return 'Passed';
+  const totalMins = Math.max(0, Math.ceil(diffMs / 60000));
+  const days = Math.floor(totalMins / (60 * 24));
+  const hours = Math.floor((totalMins - days * 24 * 60) / 60);
+  const mins = totalMins % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+};
+
+const daysUntil = (targetMs, nowMs) => {
+  if (!targetMs || !nowMs) return null;
+  const diff = targetMs - nowMs;
+  if (diff <= 0) return 0;
+  return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+};
 const getMondayOfWeek = (date) => {
   const d = new Date(date);
   const day = d.getDay();
@@ -169,10 +207,21 @@ const toTimeInput = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart
 const parseTimeInput = (val) => { const [h,m] = val.split(':'); return { h: parseInt(h,10), m: parseInt(m,10) }; };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function CalendarPage({ calendarEvents, setCalendarEvents, quickEvents, setQuickEvents, onUpdateStat }) {
+export default function CalendarPage({
+  calendarEvents,
+  setCalendarEvents,
+  calendarDayEvents = {},
+  setCalendarDayEvents,
+  quickEvents,
+  setQuickEvents,
+  onUpdateStat,
+}) {
   const [view, setView] = useState('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [modal, setModal] = useState(null);
+  const [dayEventModal, setDayEventModal] = useState(null); // { mode: 'create'|'edit', dateKey, id? }
+  const [dayEventForm, setDayEventForm] = useState({ title: '', time: '', color: '#fbbf24' });
+  const [dayEventErr, setDayEventErr] = useState('');
   const [form, setForm] = useState(defaultForm());
   const [editingId, setEditingId] = useState(null);
   const [editScope, setEditScope] = useState(null);
@@ -185,13 +234,22 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
   const [draggingTemplate, setDraggingTemplate] = useState(null);
   const [draggingEvent, setDraggingEvent] = useState(null); // { ev, offsetSlots }
   const [currentMinute, setCurrentMinute] = useState(() => { const n = new Date(); return n.getHours()*60+n.getMinutes(); });
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const gridRef = useRef(null);
   const todayKey = toDateKey(new Date());
 
   useEffect(() => {
-    const id = setInterval(() => { const n = new Date(); setCurrentMinute(n.getHours()*60+n.getMinutes()); }, 60000);
+    const id = setInterval(() => {
+      const n = new Date();
+      setCurrentMinute(n.getHours() * 60 + n.getMinutes());
+      setNowMs(n.getTime());
+    }, 60000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, [view, anchor]);
 
   useEffect(() => {
     if (gridRef.current) {
@@ -261,7 +319,65 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
     setModal('edit');
   };
 
+  const openDayEventCreate = (dateKey) => {
+    setDayEventErr('');
+    setDayEventForm({ title: '', time: '', color: '#fbbf24' });
+    setDayEventModal({ mode: 'create', dateKey });
+  };
+
+  const openDayEventEdit = (dateKey, item) => {
+    if (!dateKey || !item?.id) return;
+    setDayEventErr('');
+    setDayEventForm({
+      title: item.title || '',
+      time: item.time || '',
+      color: item.color || '#fbbf24',
+    });
+    setDayEventModal({ mode: 'edit', dateKey, id: item.id });
+  };
+
+  const closeDayEventModal = () => {
+    setDayEventModal(null);
+    setDayEventErr('');
+    setDayEventForm({ title: '', time: '', color: '#fbbf24' });
+  };
+
   const closeModal = () => { setModal(null); setEditingId(null); setEditScope(null); setDeleteScope(null); setNewSubEvent(''); setNewBonusTask(defaultBonusTaskForm()); };
+
+  const saveDayEvent = () => {
+    const dateKey = dayEventModal?.dateKey;
+    const title = dayEventForm.title.trim();
+    if (!dateKey) return;
+    if (!title) { setDayEventErr('Title is required.'); return; }
+    const time = (dayEventForm.time || '').trim();
+    const color = (dayEventForm.color || '#fbbf24').trim();
+    if (typeof setCalendarDayEvents === 'function') {
+      setCalendarDayEvents((prev) => {
+        const base = prev && typeof prev === 'object' ? prev : {};
+        const next = { ...base };
+        const existing = Array.isArray(next[dateKey]) ? next[dateKey] : [];
+
+        if (dayEventModal?.mode === 'edit' && dayEventModal?.id) {
+          next[dateKey] = existing.map((evt) =>
+            evt.id === dayEventModal.id
+              ? { ...evt, title, time: time || null, color }
+              : evt
+          );
+        } else {
+          const newItem = {
+            id: Date.now(),
+            title,
+            time: time || null,
+            color,
+            createdAtMs: Date.now(),
+          };
+          next[dateKey] = [...existing, newItem];
+        }
+        return next;
+      });
+    }
+    closeDayEventModal();
+  };
 
   const buildEventFromForm = (id) => ({
     id: id || Date.now(), title: form.title.trim(), date: form.date,
@@ -416,7 +532,6 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
     e.preventDefault();
     if (draggingEvent) {
       const { ev, startSlot } = draggingEvent;
-      const offsetSlots = slot - startSlot;
       const durationSlots = (minsEndFromEvent(ev) - minsFromEvent(ev)) / 15;
       let newStartSlot = slot;
       let newEndSlot = newStartSlot + durationSlots;
@@ -527,24 +642,84 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
   for (const dk of activeDateKeys) columnedByDate[dk] = buildColumns(byDate[dk]);
   const editingEvent = modal === 'edit' ? calendarEvents.find((ev) => ev.id === editingId) : null;
 
+  const upcomingDayEvents = (() => {
+    const entries = [];
+    const obj = calendarDayEvents && typeof calendarDayEvents === 'object' ? calendarDayEvents : {};
+    for (const [dateKey, items] of Object.entries(obj)) {
+      if (!Array.isArray(items)) continue;
+      for (const item of items) {
+        const targetMs = buildDayEventTargetMs(dateKey, item?.time);
+        if (!targetMs) continue;
+        if (targetMs < nowMs) continue;
+        entries.push({
+          dateKey,
+          id: item?.id,
+          title: item?.title || 'Untitled',
+          time: item?.time || null,
+          color: item?.color || '#fbbf24',
+          targetMs,
+        });
+      }
+    }
+    entries.sort((a, b) => a.targetMs - b.targetMs);
+    return entries.slice(0, 6);
+  })();
+
   // ─── Time Grid (Day / Week) ──────────────────────────────────────────────────
   const renderTimeGrid = (dates) => (
     <div className="cal-grid-wrapper">
-      <div className="cal-day-header-row" style={{ gridTemplateColumns: `64px repeat(${dates.length}, 1fr)` }}>
+      <div className="cal-day-header-row" style={{ gridTemplateColumns: `64px repeat(${dates.length}, minmax(0, 1fr))` }}>
         <div className="cal-time-gutter-header" />
         {dates.map((d,i) => {
           const dk = toDateKey(d);
           const isToday = dk === todayKey;
+          const dayReminders = Array.isArray(calendarDayEvents?.[dk]) ? calendarDayEvents[dk] : [];
+          const soonest = (() => {
+            const candidates = dayReminders
+              .map((evt) => {
+                const targetMs = buildDayEventTargetMs(dk, evt?.time);
+                return targetMs ? { evt, targetMs } : null;
+              })
+              .filter(Boolean)
+              .filter((x) => x.targetMs >= nowMs)
+              .sort((a, b) => a.targetMs - b.targetMs);
+            return candidates[0] || null;
+          })();
+          const soonestRemaining = soonest ? fmtRemaining(soonest.targetMs, nowMs) : '';
           return (
             <div key={i} className={`cal-day-header ${isToday?'cal-day-header--today':''}`}>
               <span className="cal-day-name">{DAYS_LABEL[d.getDay()]}</span>
               <span className={`cal-day-num ${isToday?'cal-day-num--today':''}`}>{d.getDate()}</span>
+              <button
+                type="button"
+                className="cal-dayevents-mini"
+                onClick={(e)=>{
+                  e.stopPropagation();
+                  if (soonest?.evt) openDayEventEdit(dk, soonest.evt);
+                  else openDayEventCreate(dk);
+                }}
+                title={soonest?.evt ? 'Edit next event' : 'Add an event'}
+              >
+                {!soonest?.evt ? (
+                  <>
+                    <span className="cal-dayevents-mini-label">＋ Add event</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="cal-dayevents-mini-top">
+                      <span className="cal-dayevents-mini-dot" style={{ '--mini-color': soonest.evt.color || '#fbbf24' }} />
+                      <span className="cal-dayevents-mini-title">{soonest.evt.title || 'Untitled'}</span>
+                    </span>
+                    <span className="cal-dayevents-mini-meta">{soonestRemaining}</span>
+                  </>
+                )}
+              </button>
             </div>
           );
         })}
       </div>
       <div className="cal-scroll-area" ref={gridRef}>
-        <div className="cal-time-grid" style={{ height: TOTAL_HEIGHT, gridTemplateColumns: `64px repeat(${dates.length}, 1fr)` }}>
+        <div className="cal-time-grid" style={{ height: TOTAL_HEIGHT, gridTemplateColumns: `64px repeat(${dates.length}, minmax(0, 1fr))` }}>
           <div className="cal-time-gutter">
             {Array.from({length:24},(_,h)=>(
               <div key={h} className="cal-hour-cell" style={{height: SLOT_HEIGHT*4}}>
@@ -662,10 +837,49 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
             const isToday=dk===todayKey;
             const inMonth=d.getMonth()===currentMonth;
             const dayEvs=columnedByDate[dk]||[];
+            const dayReminders = Array.isArray(calendarDayEvents?.[dk]) ? calendarDayEvents[dk] : [];
             return (
               <div key={i} className={`cal-month-cell ${isToday?'cal-month-cell--today':''} ${!inMonth?'cal-month-cell--out':''}`}
                 onClick={()=>{setAnchor(d);setView('day');}}>
                 <div className={`cal-month-daynum ${isToday?'cal-month-daynum--today':''}`}>{d.getDate()}</div>
+
+                <button
+                  type="button"
+                  className="cal-month-dayevents"
+                  onClick={(e)=>{e.stopPropagation();openDayEventCreate(dk);}}
+                  title="Add an event"
+                >
+                  <div className="cal-month-dayevents-head">
+                    <span className="cal-month-dayevents-label">Events</span>
+                    <span className="cal-month-dayevents-add">＋</span>
+                  </div>
+                  <div className="cal-month-dayevents-list">
+                    {dayReminders.length===0 && (
+                      <div className="cal-month-dayevents-empty">Click to add</div>
+                    )}
+                    {dayReminders.slice(0,2).map((evt)=>{
+                      const targetMs = buildDayEventTargetMs(dk, evt.time);
+                      const color = evt.color || '#fbbf24';
+                      return (
+                        <button
+                          key={evt.id}
+                          type="button"
+                          className="cal-month-dayevent"
+                          style={{ '--dayev-color': color }}
+                          onClick={(e)=>{e.stopPropagation();openDayEventEdit(dk, evt);}}
+                          title="Edit event"
+                        >
+                          <span className="cal-month-dayevent-title">{evt.title}</span>
+                          <span className="cal-month-dayevent-remaining">{fmtRemaining(targetMs, nowMs)}</span>
+                        </button>
+                      );
+                    })}
+                    {dayReminders.length>2 && (
+                      <div className="cal-month-dayevents-more">+{dayReminders.length-2} more</div>
+                    )}
+                  </div>
+                </button>
+
                 <div className="cal-month-events">
                   {dayEvs.slice(0,3).map((ev,ei)=>{
                     const done=isInstanceCompleted(ev);
@@ -696,7 +910,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
       {sidebarOpen&&(
         <div className="cal-sidebar-content">
           <div className="cal-sidebar-header">
-            <span className="cal-sidebar-title">Quick Events</span>
+            <span className="cal-sidebar-title">Quick Time Blocks</span>
             <button className="cal-sidebar-add-btn" onClick={openTmplCreate} title="Add template">＋</button>
           </div>
           <p className="cal-sidebar-hint">Drag onto the calendar to place</p>
@@ -723,6 +937,39 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
               </div>
             ))}
             {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click ＋ to add one.</p>}
+          </div>
+
+          <div className="cal-sidebar-divider" />
+
+          <div className="cal-sidebar-header">
+            <span className="cal-sidebar-title">Upcoming Events</span>
+          </div>
+          <p className="cal-sidebar-hint">Deadlines & reminders</p>
+          <div className="cal-sidebar-list cal-sidebar-list--events">
+            {upcomingDayEvents.map((evt) => {
+              const d = daysUntil(evt.targetMs, nowMs);
+              const meta = d === 0 ? 'Today' : `${d}d`;
+              return (
+                <button
+                  key={`${evt.dateKey}-${evt.id}`}
+                  type="button"
+                  className="cal-upcoming-item"
+                  style={{ '--up-color': evt.color }}
+                  onClick={() => openDayEventEdit(evt.dateKey, evt)}
+                  title="Edit event"
+                >
+                  <span className="cal-upcoming-dot" />
+                  <span className="cal-upcoming-main">
+                    <span className="cal-upcoming-title">{evt.title}</span>
+                    <span className="cal-upcoming-sub">{evt.dateKey}{evt.time ? ` • ${evt.time}` : ''}</span>
+                  </span>
+                  <span className="cal-upcoming-meta">{meta}</span>
+                </button>
+              );
+            })}
+            {upcomingDayEvents.length === 0 && (
+              <p className="cal-sidebar-empty">No upcoming events.</p>
+            )}
           </div>
         </div>
       )}
@@ -790,13 +1037,13 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
         <div className="cal-modal-overlay" onClick={closeModal}>
           <div className="cal-modal" onClick={e=>e.stopPropagation()}>
             <div className="cal-modal-header">
-              <h3>{modal==='create'?'New Event':'Edit Event'}</h3>
+              <h3>{modal==='create'?'New Time Block':'Edit Time Block'}</h3>
               <button className="cal-modal-close" onClick={closeModal}>✕</button>
             </div>
             <div className="cal-modal-body">
               <div className="cal-field">
                 <label className="cal-label">Title</label>
-                <input className="cal-input" placeholder="Event title…" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} autoFocus />
+                <input className="cal-input" placeholder="Time block title…" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} autoFocus />
               </div>
               <div className="cal-field">
                 <label className="cal-label">Date</label>
@@ -825,7 +1072,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
                 {renderRecurBtns(form.recurrence, r=>setForm(f=>({...f,recurrence:r})))}
               </div>
               <div className="cal-field">
-                <label className="cal-label">Sub-Events</label>
+                <label className="cal-label">Sub-Blocks</label>
                 <div className="cal-subevents-list">
                   {(form.subEvents||[]).map(se=>(
                     <div key={se.id} className="cal-subevent-row">
@@ -914,7 +1161,7 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
             <div className="cal-modal-footer">
               <button className="cal-btn cal-btn--ghost" onClick={closeModal}>Cancel</button>
               <button className="cal-btn cal-btn--primary" disabled={!isFormValid()} onClick={modal==='create'?saveEvent:()=>updateEvent('all')}>
-                {modal==='create'?'Add Event':'Save Changes'}
+                {modal==='create'?'Add Time Block':'Save Changes'}
               </button>
             </div>
           </div>
@@ -925,12 +1172,12 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
       {editScope?.show&&(
         <div className="cal-modal-overlay" onClick={()=>setEditScope(null)}>
           <div className="cal-scope-modal" onClick={e=>e.stopPropagation()}>
-            <h4>Edit recurring event</h4>
-            <p>Which events do you want to change?</p>
+            <h4>Edit recurring time block</h4>
+            <p>Which time blocks do you want to change?</p>
             <div className="cal-scope-btns">
-              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this')}>This event only</button>
-              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this-forward')}>This &amp; future events</button>
-              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('all')}>All events</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this')}>This time block only</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this-forward')}>This &amp; future blocks</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('all')}>All blocks</button>
             </div>
             <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setEditScope(null)}>Cancel</button>
           </div>
@@ -941,12 +1188,12 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
       {deleteScope?.show&&(
         <div className="cal-modal-overlay" onClick={()=>setDeleteScope(null)}>
           <div className="cal-scope-modal" onClick={e=>e.stopPropagation()}>
-            <h4>Delete recurring event</h4>
-            <p>Which events do you want to delete?</p>
+            <h4>Delete recurring time block</h4>
+            <p>Which time blocks do you want to delete?</p>
             <div className="cal-scope-btns">
-              <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this')}>This event only</button>
-              <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this-forward')}>This &amp; future events</button>
-              <button className="cal-btn cal-btn--danger" onClick={()=>handleDeleteScope('all')}>All events</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this')}>This time block only</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this-forward')}>This &amp; future blocks</button>
+              <button className="cal-btn cal-btn--danger" onClick={()=>handleDeleteScope('all')}>All blocks</button>
             </div>
             <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setDeleteScope(null)}>Cancel</button>
           </div>
@@ -997,6 +1244,69 @@ export default function CalendarPage({ calendarEvents, setCalendarEvents, quickE
               <button className="cal-btn cal-btn--ghost" onClick={closeTmplModal}>Cancel</button>
               <button className="cal-btn cal-btn--primary" disabled={!tmplForm.title.trim()} onClick={tmplModal==='create'?saveTmpl:updateTmpl}>
                 {tmplModal==='create'?'Add Template':'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Day Event Modal ── */}
+      {dayEventModal?.dateKey&&(
+        <div className="cal-modal-overlay" onClick={closeDayEventModal}>
+          <div className="cal-modal" onClick={e=>e.stopPropagation()}>
+            <div className="cal-modal-header">
+              <h3>{dayEventModal.mode === 'edit' ? 'Edit Event' : 'New Event'}</h3>
+              <button className="cal-modal-close" onClick={closeDayEventModal}>✕</button>
+            </div>
+            <div className="cal-modal-body">
+              <div className="cal-field">
+                <label className="cal-label">Date</label>
+                <input className="cal-input" type="date" value={dayEventModal.dateKey} disabled />
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Title</label>
+                <input
+                  className="cal-input"
+                  placeholder="e.g. Assignment due…"
+                  value={dayEventForm.title}
+                  onChange={(e)=>{setDayEventErr('');setDayEventForm(f=>({...f,title:e.target.value}));}}
+                  onKeyDown={(e)=>{if(e.key==='Enter'){e.preventDefault();saveDayEvent();}}}
+                  autoFocus
+                />
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Time (optional)</label>
+                <input
+                  className="cal-input"
+                  type="time"
+                  value={dayEventForm.time}
+                  onChange={(e)=>setDayEventForm(f=>({...f,time:e.target.value}))}
+                />
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Tag color</label>
+                <div className="cal-color-row">
+                  {['#fbbf24','#f87171','#4ade80','#38bdf8','#c084fc','#fb923c','#f472b6','#a3e635'].map(c=>{
+                    const active = dayEventForm.color === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`cal-color-swatch ${active?'cal-color-swatch--active':''}`}
+                        style={{background:c}}
+                        onClick={()=>setDayEventForm(f=>({...f,color:c}))}
+                        title={active ? 'Selected' : 'Select color'}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            {dayEventErr&&<p className="cal-modal-err">{dayEventErr}</p>}
+            <div className="cal-modal-footer">
+              <button className="cal-btn cal-btn--ghost" onClick={closeDayEventModal}>Cancel</button>
+              <button className="cal-btn cal-btn--primary" disabled={!dayEventForm.title.trim()} onClick={saveDayEvent}>
+                {dayEventModal.mode === 'edit' ? 'Save Changes' : 'Add Event'}
               </button>
             </div>
           </div>

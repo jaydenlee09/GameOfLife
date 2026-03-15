@@ -147,7 +147,7 @@ const normalizeChallengePayload = (payload, validStats) => {
 const friendlyLabel = (type, payload) => {
   if (type === 'create_task') return `Create task: ${payload.text}`;
   if (type === 'create_calendar_event') return `Add calendar block: ${payload.title}`;
-  if (type === 'create_quick_event_template') return `Create quick template: ${payload.title}`;
+  if (type === 'create_quick_event_template') return `Create time block template: ${payload.title}`;
   if (type === 'create_challenge') return `Create challenge: ${payload.text}`;
   return 'Unknown action';
 };
@@ -239,7 +239,7 @@ export const applyMentorAction = (action, { setTodos, setCalendarEvents, setQuic
       color: action.payload.color,
     };
     setQuickEvents((prev) => [...prev, nextTemplate]);
-    return { ok: true, message: `Created template: ${nextTemplate.title}` };
+    return { ok: true, message: `Created time block template: ${nextTemplate.title}` };
   }
 
   if (action.type === 'create_challenge') {

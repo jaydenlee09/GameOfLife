@@ -7,8 +7,8 @@ const makeMessageId = () => `msg_${Date.now()}_${Math.floor(Math.random() * 1_00
 
 const prettyActionType = (type) => {
   if (type === 'create_task') return 'Create Task';
-  if (type === 'create_calendar_event') return 'Add Calendar Block';
-  if (type === 'create_quick_event_template') return 'Create Quick Template';
+  if (type === 'create_calendar_event') return 'Add Time Block';
+  if (type === 'create_quick_event_template') return 'Create Time Block Template';
   if (type === 'create_challenge') return 'Create Challenge';
   return type;
 };

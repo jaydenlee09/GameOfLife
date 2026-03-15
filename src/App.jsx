@@ -164,6 +164,17 @@ function App() {
   }, [quickEvents]);
   // ─────────────────────────────────────────────────────────────────────────────
 
+  // ─── Calendar Day Events (deadlines / reminders) ─────────────────────────────
+  const [calendarDayEvents, setCalendarDayEvents] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_calendarDayEvents');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gameOfLife_calendarDayEvents', JSON.stringify(calendarDayEvents));
+  }, [calendarDayEvents]);
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // ─── Commitment Archive ───────────────────────────────────────────────────
   const [commitmentArchive, setCommitmentArchive] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_commitmentArchive');
@@ -435,6 +446,8 @@ function App() {
           <CalendarPage
             calendarEvents={calendarEvents}
             setCalendarEvents={setCalendarEvents}
+            calendarDayEvents={calendarDayEvents}
+            setCalendarDayEvents={setCalendarDayEvents}
             quickEvents={quickEvents}
             setQuickEvents={setQuickEvents}
             onUpdateStat={updateStat}
