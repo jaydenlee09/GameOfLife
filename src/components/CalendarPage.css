@@ -10,6 +10,12 @@
   overflow: hidden;
 }
 
+/* Ensure lucide icons inherit currentColor stroke */
+.cal-page svg {
+  stroke: currentColor;
+  fill: none;
+}
+
 /* ─── Header ──────────────────────────────────────────────────────────────────── */
 .cal-header {
   display: flex;
@@ -74,6 +80,8 @@
 }
 .cal-sidebar-toggle:hover { background: #333; color: #fff; }
 
+.cal-sidebar-toggle svg { display: block; }
+
 .cal-sidebar-content { display: flex; flex-direction: column; flex: 1; padding: 10px 10px 10px; padding-top: 40px; min-height: 0; overflow: hidden; }
 
 .cal-sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
@@ -85,6 +93,8 @@
   display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.15s;
 }
 .cal-sidebar-add-btn:hover { background: rgba(251,191,36,0.2); }
+
+.cal-sidebar-add-btn svg { display: block; }
 
 .cal-sidebar-hint { font-size: 0.62rem; font-weight: 900; color: #404040; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px; }
 .cal-sidebar-empty { font-size: 0.7rem; font-weight: 900; color: #404040; text-align: center; margin-top: 20px; line-height: 1.6; }
@@ -170,11 +180,13 @@
 .cal-tmpl-actions { display: flex; flex-direction: column; gap: 3px; }
 .cal-tmpl-btn {
   width: 18px; height: 18px; border-radius: 4px; border: none; background: transparent;
-  color: #404040; font-size: 0.65rem; cursor: pointer; display: flex;
+  color: #a3a3a3; font-size: 0.65rem; cursor: pointer; display: flex;
   align-items: center; justify-content: center; padding: 0; transition: all 0.12s;
 }
-.cal-tmpl-btn:hover { background: #333; color: #a3a3a3; }
+.cal-tmpl-btn:hover { background: #333; color: #e5e5e5; }
 .cal-tmpl-btn--del:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+
+.cal-tmpl-btn svg { display: block; }
 
 /* ─── Grid Wrapper (Day/Week) ────────────────────────────────────────────────── */
 .cal-grid-wrapper { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
@@ -212,7 +224,8 @@
   max-width: 100%;
 }
 .cal-dayevents-mini:hover { filter: brightness(1.08); border-color: rgba(251,191,36,0.25); }
-.cal-dayevents-mini-label { font-size: 0.58rem; font-weight: 900; color: #a3a3a3; text-transform: uppercase; letter-spacing: 1.2px; }
+.cal-dayevents-mini-label { font-size: 0.58rem; font-weight: 900; color: #a3a3a3; text-transform: uppercase; letter-spacing: 1.2px; display: inline-flex; align-items: center; gap: 6px; }
+.cal-dayevents-mini-label svg { display: block; }
 .cal-dayevents-mini-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .cal-dayevents-mini-dot {
   width: 7px;
@@ -318,7 +331,8 @@
 }
 
 .cal-event-actions { position: absolute; bottom: 0; right: 0; display: flex; gap: 1px; padding: 1px 3px; justify-content: flex-end; opacity: 0; transition: opacity 0.15s; background: rgba(0,0,0,0.55); border-radius: 0 0 6px 0; z-index: 4; }
-.cal-event-btn { width: 18px; height: 18px; border-radius: 3px; border: none; background: transparent; color: #525252; font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.1s; }
+.cal-event-btn { width: 18px; height: 18px; border-radius: 3px; border: none; background: transparent; color: #a3a3a3; font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.1s; }
+.cal-event-btn svg { display: block; }
 .cal-event-complete:hover, .cal-event-complete--done { color: #4ade80; background: rgba(74,222,128,0.12); }
 .cal-event-delete:hover { color: #f87171; background: rgba(248,113,113,0.12); }
 
@@ -371,7 +385,8 @@
 
 .cal-month-dayevents-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cal-month-dayevents-label { font-size: 0.6rem; font-weight: 900; color: #525252; text-transform: uppercase; letter-spacing: 1.3px; }
-.cal-month-dayevents-add { font-size: 0.85rem; font-weight: 900; color: #fbbf24; line-height: 1; }
+.cal-month-dayevents-add { font-size: 0.85rem; font-weight: 900; color: #fbbf24; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.cal-month-dayevents-add svg { display: block; }
 
 .cal-month-dayevents-list { display: flex; flex-direction: column; gap: 3px; }
 .cal-month-dayevents-empty { font-size: 0.62rem; font-weight: 900; color: #404040; text-transform: uppercase; letter-spacing: 0.3px; }

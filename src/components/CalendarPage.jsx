@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import STAT_META from './statMeta';
 import './CalendarPage.css';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SLOT_HEIGHT = 16;
@@ -905,13 +906,15 @@ export default function CalendarPage({
   const renderSidebar = () => (
     <div className={`cal-sidebar ${sidebarOpen?'cal-sidebar--open':'cal-sidebar--closed'}`}>
       <button className="cal-sidebar-toggle" onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?'Collapse':'Expand'}>
-        {sidebarOpen?'‹':'›'}
+        {sidebarOpen ? <ChevronLeft size={14} strokeWidth={3} /> : <ChevronRight size={14} strokeWidth={3} />}
       </button>
       {sidebarOpen&&(
         <div className="cal-sidebar-content">
           <div className="cal-sidebar-header">
             <span className="cal-sidebar-title">Quick Time Blocks</span>
-            <button className="cal-sidebar-add-btn" onClick={openTmplCreate} title="Add template">＋</button>
+            <button className="cal-sidebar-add-btn" onClick={openTmplCreate} title="Add template" aria-label="Add template">
+              <Plus size={14} strokeWidth={3} />
+            </button>
           </div>
           <p className="cal-sidebar-hint">Drag onto the calendar to place</p>
           <div className="cal-sidebar-list">
@@ -931,13 +934,21 @@ export default function CalendarPage({
                   )}
                 </div>
                 <div className="cal-tmpl-actions">
-                  <button className="cal-tmpl-btn" onClick={()=>openTmplEdit(tmpl)} title="Edit">✏</button>
-                  <button className="cal-tmpl-btn cal-tmpl-btn--del" onClick={()=>deleteTmpl(tmpl.id)} title="Delete">✕</button>
+                  <button className="cal-tmpl-btn" onClick={()=>openTmplEdit(tmpl)} title="Edit" aria-label="Edit template">
+                    <Pencil size={13} strokeWidth={3} />
+                  </button>
+                  <button className="cal-tmpl-btn cal-tmpl-btn--del" onClick={()=>deleteTmpl(tmpl.id)} title="Delete" aria-label="Delete template">
+                    <Trash2 size={13} strokeWidth={3} />
+                  </button>
                 </div>
               </div>
             ))}
-            {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click ＋ to add one.</p>}
+            {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click the + button to add one.</p>}
           </div>
+                    <span className="cal-dayevents-mini-label">
+                      <Plus size={12} strokeWidth={3} />
+                      Add event
+                    </span>
 
           <div className="cal-sidebar-divider" />
 
@@ -1144,6 +1155,9 @@ export default function CalendarPage({
                         onChange={(e)=>setNewBonusTask((current)=>({...current,xpAmount:e.target.value}))}
                       />
                     </div>
+                    <span className="cal-month-dayevents-add" aria-hidden="true">
+                      <Plus size={14} strokeWidth={3} />
+                    </span>
                   </div>
                   <div className="cal-field">
                     <label className="cal-label">Reward Attributes</label>
@@ -1164,6 +1178,9 @@ export default function CalendarPage({
                 {modal==='create'?'Add Time Block':'Save Changes'}
               </button>
             </div>
+                        <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete" aria-label="Delete">
+                          <Trash2 size={13} strokeWidth={3} />
+                        </button>
           </div>
         </div>
       )}
@@ -1178,7 +1195,16 @@ export default function CalendarPage({
               <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this')}>This time block only</button>
               <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('this-forward')}>This &amp; future blocks</button>
               <button className="cal-btn cal-btn--ghost" onClick={()=>handleEditScopeSelect('all')}>All blocks</button>
+              <button className="cal-modal-close" onClick={closeModal} aria-label="Close">
+                <X size={16} strokeWidth={3} />
+              </button>
             </div>
+                                  <button type="button" className="cal-subevent-del" onClick={()=>removeSubEvent(se.id)} aria-label="Remove">
+                                    <X size={14} strokeWidth={3} />
+                                  </button>
+                                  <button type="button" className="cal-subevent-del" onClick={()=>removeBonusTask(normalizedTask.id)} aria-label="Remove">
+                                    <X size={14} strokeWidth={3} />
+                                  </button>
             <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setEditScope(null)}>Cancel</button>
           </div>
         </div>
@@ -1194,6 +1220,9 @@ export default function CalendarPage({
               <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this')}>This time block only</button>
               <button className="cal-btn cal-btn--ghost" onClick={()=>handleDeleteScope('this-forward')}>This &amp; future blocks</button>
               <button className="cal-btn cal-btn--danger" onClick={()=>handleDeleteScope('all')}>All blocks</button>
+              <button className="cal-modal-close" onClick={closeTmplModal} aria-label="Close">
+                <X size={16} strokeWidth={3} />
+              </button>
             </div>
             <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setDeleteScope(null)}>Cancel</button>
           </div>
@@ -1207,6 +1236,9 @@ export default function CalendarPage({
             <div className="cal-modal-header">
               <h3>{tmplModal==='create'?'New Template':'Edit Template'}</h3>
               <button className="cal-modal-close" onClick={closeTmplModal}>✕</button>
+              <button className="cal-modal-close" onClick={closeDayEventModal} aria-label="Close">
+                <X size={16} strokeWidth={3} />
+              </button>
             </div>
             <div className="cal-modal-body">
               <div className="cal-field">

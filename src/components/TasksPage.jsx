@@ -19,6 +19,7 @@ const XP_BY_TIMEFRAME = {
   tomorrow: 30,
   'this-week': 50,
   'this-month': 100,
+  'this-year': 500,
 };
 
 const TIMEFRAME_LABELS = {
@@ -26,6 +27,7 @@ const TIMEFRAME_LABELS = {
   tomorrow: 'Tomorrow',
   'this-week': 'This Week',
   'this-month': 'This Month',
+  'this-year': 'This Year',
 };
 
 // ─── Add Task Modal ───────────────────────────────────────────────────────────
@@ -195,7 +197,7 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
     );
   }
 
-  const canHaveSubtasks = task.timeFrame === 'this-week' || task.timeFrame === 'this-month';
+  const canHaveSubtasks = task.timeFrame === 'this-week' || task.timeFrame === 'this-month' || task.timeFrame === 'this-year';
   const liveTask = todos.find(t => t.id === task.id) || task;
   const subtasks = liveTask.subtasks || [];
   const completedCount = subtasks.filter(s => s.completed).length;
@@ -380,13 +382,17 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
     setGainedXp(task.xp);
     const cats = task.categories || (task.category ? [task.category] : []);
     setGainedCategories(cats);
-    setTodos(todos.filter(t => t.id !== pendingTaskId));
+    if (task.goalId) {
+      setTodos(prev => prev.map(t => t.id === pendingTaskId ? { ...t, completed: true } : t));
+    } else {
+      setTodos(prev => prev.filter(t => t.id !== pendingTaskId));
+    }
     // Split XP evenly across all selected attributes
     if (cats.length > 0) {
       const xpEach = Math.floor(task.xp / cats.length);
       cats.forEach(cat => onUpdateStat(cat, xpEach));
     }
-    if (selectedTask?.id === pendingTaskId) setSelectedTask(null);
+    if (!task.goalId && selectedTask?.id === pendingTaskId) setSelectedTask(null);
     setShowConfirmModal(false);
     setPendingTaskId(null);
     setTimeout(() => setShowXpModal(true), 300);
@@ -413,11 +419,31 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
     setEditingText('');
   };
 
+  // Local-time period keys (used to scope goal-linked tasks to "This Week/Month/Year")
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const getLocalWeekKey = () => {
+    const d = new Date();
+    const day = d.getDay(); // 0 Sun .. 6 Sat
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  };
+  const getLocalMonthKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+  };
+  const getLocalYearKey = () => String(new Date().getFullYear());
+
+  const currentWeekKey = getLocalWeekKey();
+  const currentMonthKey = getLocalMonthKey();
+  const currentYearKey = getLocalYearKey();
+
   const grouped = {
     today: todos.filter(t => t.timeFrame === 'today' || !t.timeFrame),
     tomorrow: todos.filter(t => t.timeFrame === 'tomorrow'),
-    'this-week': todos.filter(t => t.timeFrame === 'this-week'),
-    'this-month': todos.filter(t => t.timeFrame === 'this-month'),
+    'this-week': todos.filter(t => t.timeFrame === 'this-week' && (!t.goalPeriodKey || t.goalPeriodKey === currentWeekKey)),
+    'this-month': todos.filter(t => t.timeFrame === 'this-month' && (!t.goalPeriodKey || t.goalPeriodKey === currentMonthKey)),
+    'this-year': todos.filter(t => t.timeFrame === 'this-year' && (!t.goalPeriodKey || t.goalPeriodKey === currentYearKey)),
   };
 
   const renderGroup = (timeFrame, label) => {
@@ -475,6 +501,7 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
         {renderGroup('tomorrow', 'Tomorrow')}
         {renderGroup('this-week', 'This Week')}
         {renderGroup('this-month', 'This Month')}
+        {renderGroup('this-year', 'This Year')}
         <button className="add-task-btn" onClick={() => setShowAddModal(true)}>
           <span>+</span> Add a new task
         </button>

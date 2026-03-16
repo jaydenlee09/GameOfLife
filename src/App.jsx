@@ -14,6 +14,7 @@ import CHALLENGES_POOL from './utils/challengesMeta'
 import CalendarPage from './components/CalendarPage'
 import MentorAssistant from './components/MentorAssistant'
 import { applyMentorAction } from './utils/mentorActions'
+import GoalsPage from './components/GoalsPage'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('statistics');
@@ -300,6 +301,16 @@ function App() {
     setChallenges(prev => prev.filter(c => c.id !== challengeId));
   };
 
+  // ─── Goals ───────────────────────────────────────────────────────────────
+  const [goals, setGoals] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_goals_v1');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gameOfLife_goals_v1', JSON.stringify(goals));
+  }, [goals]);
+
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('gameOfLife_user');
     return savedUser ? JSON.parse(savedUser) : {
@@ -451,6 +462,15 @@ function App() {
             quickEvents={quickEvents}
             setQuickEvents={setQuickEvents}
             onUpdateStat={updateStat}
+          />
+        );
+      case 'goals':
+        return (
+          <GoalsPage
+            goals={goals}
+            setGoals={setGoals}
+            todos={todos}
+            setTodos={setTodos}
           />
         );
       default:
