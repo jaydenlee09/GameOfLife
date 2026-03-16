@@ -16,7 +16,6 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const XP_BY_TIMEFRAME = {
   today: 20,
-  tomorrow: 30,
   'this-week': 50,
   'this-month': 100,
   'this-year': 500,
@@ -24,7 +23,6 @@ const XP_BY_TIMEFRAME = {
 
 const TIMEFRAME_LABELS = {
   today: 'Today',
-  tomorrow: 'Tomorrow',
   'this-week': 'This Week',
   'this-month': 'This Month',
   'this-year': 'This Year',
@@ -39,6 +37,7 @@ const AddTaskModal = ({ onClose, onAdd }) => {
   const [text, setText] = useState('');
   const [timeFrame, setTimeFrame] = useState('today');
   const [categories, setCategories] = useState(['discipline']);
+  const [dueDate, setDueDate] = useState('');
 
   const toggleCategory = (attr) => {
     setCategories(prev =>
@@ -60,6 +59,7 @@ const AddTaskModal = ({ onClose, onAdd }) => {
       completed: false,
       notes: '',
       subtasks: [],
+      dueDate: dueDate || null,
     });
     onClose();
   };
@@ -93,6 +93,16 @@ const AddTaskModal = ({ onClose, onAdd }) => {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="modal-field-group">
+            <label className="modal-label">Due Date <span className="modal-label-hint">(optional)</span></label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="modal-text-input"
+            />
           </div>
 
           <div className="modal-field-group">
@@ -206,6 +216,15 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
     setTodos(todos.map(t => t.id === task.id ? { ...t, notes: e.target.value } : t));
   };
 
+  const handleDueDateChange = (e) => {
+    const next = e.target.value;
+    setTodos(todos.map(t => t.id === task.id ? { ...t, dueDate: next || null } : t));
+  };
+
+  const clearDueDate = () => {
+    setTodos(todos.map(t => t.id === task.id ? { ...t, dueDate: null } : t));
+  };
+
   const handleAddSubtask = (e) => {
     e.preventDefault();
     if (!newSubtask.trim()) return;
@@ -271,6 +290,23 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
           value={liveTask.notes || ''}
           onChange={handleNotesChange}
         />
+
+        <div className="detail-field-group">
+          <label className="detail-field-label">Due Date</label>
+          <div className="detail-due-controls">
+            <input
+              type="date"
+              className="detail-date-input"
+              value={liveTask.dueDate || ''}
+              onChange={handleDueDateChange}
+            />
+            {liveTask.dueDate && (
+              <button type="button" className="detail-clear-btn" onClick={clearDueDate}>
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {canHaveSubtasks && (
@@ -309,7 +345,7 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
       <div className="detail-footer">
         <span className="detail-xp-badge">+{liveTask.xp}XP</span>
         <span className="detail-timeframe-badge">
-          TIME-FRAME: {TIMEFRAME_LABELS[liveTask.timeFrame]}
+          TIME-FRAME: {TIMEFRAME_LABELS[liveTask.timeFrame] || TIMEFRAME_LABELS.today}
         </span>
       </div>
 
@@ -346,23 +382,10 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
 
-  // Rollover: move 'tomorrow' tasks to 'today' at midnight
+  // Migration: if any old tasks are tagged "tomorrow", move them into "today"
   React.useEffect(() => {
-    const rolloverTomorrow = () => {
-      setTodos(prev =>
-        prev.map(t =>
-          t.timeFrame === 'tomorrow' ? { ...t, timeFrame: 'today' } : t
-        )
-      );
-    };
-    const now = new Date();
-    const msUntilMidnight =
-      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0) - now;
-    const timeout = setTimeout(() => {
-      rolloverTomorrow();
-    }, msUntilMidnight);
-    return () => clearTimeout(timeout);
-  }, []);
+    setTodos(prev => prev.map(t => (t.timeFrame === 'tomorrow' ? { ...t, timeFrame: 'today' } : t)));
+  }, [setTodos]);
 
   const handleAddTodo = (newTodo) => {
     setTodos([...todos, newTodo]);
@@ -421,6 +444,11 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
 
   // Local-time period keys (used to scope goal-linked tasks to "This Week/Month/Year")
   const pad2 = (n) => String(n).padStart(2, '0');
+  const getLocalDateKey = (offsetDays = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  };
   const getLocalWeekKey = () => {
     const d = new Date();
     const day = d.getDay(); // 0 Sun .. 6 Sat
@@ -437,10 +465,10 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
   const currentWeekKey = getLocalWeekKey();
   const currentMonthKey = getLocalMonthKey();
   const currentYearKey = getLocalYearKey();
+  const todayKey = getLocalDateKey(0);
 
   const grouped = {
     today: todos.filter(t => t.timeFrame === 'today' || !t.timeFrame),
-    tomorrow: todos.filter(t => t.timeFrame === 'tomorrow'),
     'this-week': todos.filter(t => t.timeFrame === 'this-week' && (!t.goalPeriodKey || t.goalPeriodKey === currentWeekKey)),
     'this-month': todos.filter(t => t.timeFrame === 'this-month' && (!t.goalPeriodKey || t.goalPeriodKey === currentMonthKey)),
     'this-year': todos.filter(t => t.timeFrame === 'this-year' && (!t.goalPeriodKey || t.goalPeriodKey === currentYearKey)),
@@ -451,44 +479,55 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
     return (
       <div className="task-group" key={timeFrame}>
         <div className="task-group-header">
-          <span className={`task-group-title${timeFrame === 'tomorrow' ? ' tomorrow' : ''}`}>{label}</span>
+          <span className="task-group-title">{label}</span>
           <span className="task-group-count">{items.length}</span>
         </div>
-        {items.map(todo => (
-          <div
-            key={todo.id}
-            className={`task-item ${selectedTask?.id === todo.id ? 'selected' : ''}`}
-            onClick={() => setSelectedTask(todo)}
-          >
+        {items.map((todo) => {
+          const isOverdue = !!todo.dueDate && !todo.completed && todo.dueDate < todayKey;
+          return (
             <div
-              className={`task-checkbox ${todo.completed ? 'checked' : ''}`}
-              onClick={(e) => checkOffTodo(todo.id, e)}
-            />
-            {editingTaskId === todo.id ? (
-              <input
-                className="task-text task-text-edit"
-                value={editingText}
-                autoFocus
-                onChange={(e) => setEditingText(e.target.value)}
-                onBlur={() => saveTaskEdit(todo.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveTaskEdit(todo.id);
-                  if (e.key === 'Escape') { setEditingTaskId(null); setEditingText(''); }
-                }}
-                onClick={(e) => e.stopPropagation()}
+              key={todo.id}
+              className={`task-item ${selectedTask?.id === todo.id ? 'selected' : ''}`}
+              onClick={() => setSelectedTask(todo)}
+            >
+              <div
+                className={`task-checkbox ${todo.completed ? 'checked' : ''}`}
+                onClick={(e) => checkOffTodo(todo.id, e)}
               />
-            ) : (
-              <span
-                className={`task-text ${todo.completed ? 'completed-text' : ''}`}
-                onDoubleClick={(e) => startEditTask(todo, e)}
-              >
-                {todo.text}
-              </span>
-            )}
-            <span className="task-xp-badge">+{todo.xp || XP_BY_TIMEFRAME[timeFrame] || 20}XP</span>
-            <span className="task-delete" onClick={(e) => deleteTodo(todo.id, e)}>×</span>
-          </div>
-        ))}
+              {editingTaskId === todo.id ? (
+                <input
+                  className="task-text task-text-edit"
+                  value={editingText}
+                  autoFocus
+                  onChange={(e) => setEditingText(e.target.value)}
+                  onBlur={() => saveTaskEdit(todo.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveTaskEdit(todo.id);
+                    if (e.key === 'Escape') { setEditingTaskId(null); setEditingText(''); }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className={`task-text ${todo.completed ? 'completed-text' : ''}`}
+                  onDoubleClick={(e) => startEditTask(todo, e)}
+                >
+                  {todo.text}
+                </span>
+              )}
+              {todo.dueDate && (
+                <span
+                  className={`task-due-badge ${isOverdue ? 'overdue' : ''}`}
+                  title={isOverdue ? `Overdue (due ${todo.dueDate})` : `Due ${todo.dueDate}`}
+                >
+                  Due {todo.dueDate}
+                </span>
+              )}
+              <span className="task-xp-badge">+{todo.xp || XP_BY_TIMEFRAME[timeFrame] || 20}XP</span>
+              <span className="task-delete" onClick={(e) => deleteTodo(todo.id, e)}>×</span>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -498,7 +537,6 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
       <h1 className="section-page-title">TO-DO</h1>
       <div className="todo-card">
         {renderGroup('today', 'Today')}
-        {renderGroup('tomorrow', 'Tomorrow')}
         {renderGroup('this-week', 'This Week')}
         {renderGroup('this-month', 'This Month')}
         {renderGroup('this-year', 'This Year')}

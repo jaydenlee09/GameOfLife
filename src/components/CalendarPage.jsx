@@ -455,62 +455,83 @@ export default function CalendarPage({
     else setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completedDates:[...(e.completedDates||[]),ev._instanceDate]}:e));
   };
 
-  const markBonusTaskComplete = (ev, task) => {
-    if (isBonusTaskCompleted(task, ev)) return;
-    task.attributes.forEach((attr) => onUpdateStat(attr, task.xpAmount));
-    if (ev.recurrence === 'none' || !ev.recurrence) {
+  const setBonusTaskCompletion = (ev, task, shouldBeCompleted) => {
+    const normalizedEvent = normalizeEvent(ev);
+    const normalizedTask = normalizeBonusTask(task);
+    const isRecurring = !(normalizedEvent.recurrence === 'none' || !normalizedEvent.recurrence);
+    const instanceDate = normalizedEvent._instanceDate || normalizedEvent.date;
+
+    if (!instanceDate) return;
+
+    const currentlyCompleted = isBonusTaskCompleted(normalizedTask, { ...normalizedEvent, _instanceDate: instanceDate });
+    if (currentlyCompleted === shouldBeCompleted) return;
+
+    const xpDelta = shouldBeCompleted ? normalizedTask.xpAmount : -normalizedTask.xpAmount;
+    normalizedTask.attributes.forEach((attr) => onUpdateStat(attr, xpDelta));
+
+    if (!isRecurring) {
       setCalendarEvents((prev) => prev.map((calendarEvent) => {
-        if (calendarEvent.id !== ev.id) return calendarEvent;
-        const normalizedEvent = normalizeEvent(calendarEvent);
+        if (calendarEvent.id !== normalizedEvent.id) return calendarEvent;
+        const stored = normalizeEvent(calendarEvent);
         return {
-          ...normalizedEvent,
-          bonusTasks: normalizedEvent.bonusTasks.map((bonusTask, index) => {
-            const normalizedTask = normalizeBonusTask(bonusTask, index);
-            return normalizedTask.id === task.id ? { ...normalizedTask, completed: true } : normalizedTask;
+          ...stored,
+          bonusTasks: stored.bonusTasks.map((bonusTask, index) => {
+            const bt = normalizeBonusTask(bonusTask, index);
+            return bt.id === normalizedTask.id ? { ...bt, completed: shouldBeCompleted } : bt;
           }),
         };
       }));
       setForm((currentForm) => ({
         ...currentForm,
         bonusTasks: (currentForm.bonusTasks || []).map((bonusTask, index) => {
-          const normalizedTask = normalizeBonusTask(bonusTask, index);
-          return normalizedTask.id === task.id ? { ...normalizedTask, completed: true } : normalizedTask;
+          const bt = normalizeBonusTask(bonusTask, index);
+          return bt.id === normalizedTask.id ? { ...bt, completed: shouldBeCompleted } : bt;
         }),
       }));
       return;
     }
 
     setCalendarEvents((prev) => prev.map((calendarEvent) => {
-      if (calendarEvent.id !== ev.id) return calendarEvent;
-      const normalizedEvent = normalizeEvent(calendarEvent);
+      if (calendarEvent.id !== normalizedEvent.id) return calendarEvent;
+      const stored = normalizeEvent(calendarEvent);
       return {
-        ...normalizedEvent,
-        bonusTasks: normalizedEvent.bonusTasks.map((bonusTask, index) => {
-          const normalizedTask = normalizeBonusTask(bonusTask, index);
-          if (normalizedTask.id !== task.id) return normalizedTask;
-          return {
-            ...normalizedTask,
-            completedDates: [...(normalizedTask.completedDates || []), ev._instanceDate],
-          };
+        ...stored,
+        bonusTasks: stored.bonusTasks.map((bonusTask, index) => {
+          const bt = normalizeBonusTask(bonusTask, index);
+          if (bt.id !== normalizedTask.id) return bt;
+          const existingDates = Array.isArray(bt.completedDates) ? bt.completedDates : [];
+          const nextDates = shouldBeCompleted
+            ? existingDates.includes(instanceDate) ? existingDates : [...existingDates, instanceDate]
+            : existingDates.filter((d) => d !== instanceDate);
+          return { ...bt, completedDates: nextDates };
         }),
       };
     }));
     setForm((currentForm) => ({
       ...currentForm,
       bonusTasks: (currentForm.bonusTasks || []).map((bonusTask, index) => {
-        const normalizedTask = normalizeBonusTask(bonusTask, index);
-        if (normalizedTask.id !== task.id) return normalizedTask;
-        return {
-          ...normalizedTask,
-          completedDates: [...(normalizedTask.completedDates || []), ev._instanceDate],
-        };
+        const bt = normalizeBonusTask(bonusTask, index);
+        if (bt.id !== normalizedTask.id) return bt;
+        const existingDates = Array.isArray(bt.completedDates) ? bt.completedDates : [];
+        const nextDates = shouldBeCompleted
+          ? existingDates.includes(instanceDate) ? existingDates : [...existingDates, instanceDate]
+          : existingDates.filter((d) => d !== instanceDate);
+        return { ...bt, completedDates: nextDates };
       }),
     }));
   };
 
+  const toggleBonusTaskCompletion = (ev, task) => {
+    const normalizedEvent = normalizeEvent(ev);
+    const normalizedTask = normalizeBonusTask(task);
+    const instanceDate = normalizedEvent._instanceDate || normalizedEvent.date;
+    const done = isBonusTaskCompleted(normalizedTask, { ...normalizedEvent, _instanceDate: instanceDate });
+    setBonusTaskCompletion({ ...normalizedEvent, _instanceDate: instanceDate }, normalizedTask, !done);
+  };
+
   const completeBonusTask = (ev, task, e) => {
     e.stopPropagation();
-    markBonusTaskComplete(ev, task);
+    toggleBonusTaskCompletion(ev, task);
   };
 
   // ─── Drag & Drop ─────────────────────────────────────────────────────────────
@@ -799,7 +820,7 @@ export default function CalendarPage({
                                   type="button"
                                   className={`cal-event-bonus ${bonusDone?'cal-event-bonus--done':''}`}
                                   onClick={(e)=>completeBonusTask(ev, normalizedTask, e)}
-                                  title={bonusDone ? 'Completed bonus task' : `Complete bonus task: ${normalizedTask.title}`}
+                                  title={bonusDone ? `Uncheck bonus task: ${normalizedTask.title}` : `Complete bonus task: ${normalizedTask.title}`}
                                 >
                                   <span className="cal-event-bonus-check">{bonusDone?'✓':'○'}</span>
                                   <span className="cal-event-bonus-label">{normalizedTask.title}</span>
@@ -1108,8 +1129,11 @@ export default function CalendarPage({
                 <div className="cal-bonus-list">
                   {(form.bonusTasks||[]).map((task, index)=>{
                     const normalizedTask = normalizeBonusTask(task, index);
-                    const bonusDone = editingEvent
-                      ? isBonusTaskCompleted(normalizedTask, normalizeEvent(editingEvent))
+                    const completionEvent = editingEvent
+                      ? { ...normalizeEvent(editingEvent), _instanceDate: form.date }
+                      : null;
+                    const bonusDone = completionEvent
+                      ? isBonusTaskCompleted(normalizedTask, completionEvent)
                       : Boolean(normalizedTask.completed);
                     return (
                     <div key={normalizedTask.id ?? `bonus-task-${index}`} className={`cal-bonus-row ${bonusDone?'cal-bonus-row--done':''}`}>
@@ -1117,9 +1141,8 @@ export default function CalendarPage({
                         <button
                           type="button"
                           className={`cal-bonus-check ${bonusDone?'cal-bonus-check--done':''}`}
-                          onClick={()=>markBonusTaskComplete(normalizeEvent(editingEvent), normalizedTask)}
-                          disabled={bonusDone}
-                          title={bonusDone ? 'Bonus task completed' : `Mark ${normalizedTask.title} complete`}
+                          onClick={()=>toggleBonusTaskCompletion(completionEvent, normalizedTask)}
+                          title={bonusDone ? `Uncheck ${normalizedTask.title}` : `Mark ${normalizedTask.title} complete`}
                         >
                           {bonusDone?'✓':'○'}
                         </button>

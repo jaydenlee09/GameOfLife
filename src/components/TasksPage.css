@@ -152,6 +152,25 @@
   caret-color: #fbbf24;
 }
 
+.task-due-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #a3a3a3;
+  background: #1f1f1f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+.task-due-badge.overdue {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.10);
+}
+
 .task-xp-badge {
   font-size: 0.8rem;
   font-weight: 900;
@@ -565,6 +584,60 @@
 
 .detail-notes::placeholder {
   color: #444;
+}
+
+.detail-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.detail-field-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #a3a3a3;
+}
+
+.detail-due-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.detail-date-input {
+  background: #262626;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.55rem 0.75rem;
+  outline: none;
+}
+
+.detail-date-input:focus {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.detail-clear-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  color: #a3a3a3;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.detail-clear-btn:hover {
+  background: #2e2e2e;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 
 /* Sub-tasks */
