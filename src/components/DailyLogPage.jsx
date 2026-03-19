@@ -45,6 +45,7 @@ const EMPTY_ENTRY = () => ({
   proud: ['', '', ''],
   improve: ['', '', ''],
   learned: '',
+  notes: '',
   videoName: null,
   commitment: '',
 });
@@ -293,6 +294,7 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked }) => {
               entry.proud?.some(v => v.trim()) ||
               entry.improve?.some(v => v.trim()) ||
               entry.learned?.trim() ||
+              entry.notes?.trim() ||
               entry.videoName;
 
             return (
@@ -404,6 +406,18 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked }) => {
               value={currentEntry.learned || ''}
               onChange={e => updateField('learned', e.target.value)}
               rows={4}
+            />
+          </div>
+
+          {/* ── Additional Notes ── */}
+          <div className="log-section">
+            <h3 className="log-section-title">📝 Additional Notes</h3>
+            <textarea
+              className="notes-textarea"
+              placeholder="Anything else you want to remember about today?"
+              value={currentEntry.notes || ''}
+              onChange={e => updateField('notes', e.target.value)}
+              rows={5}
             />
           </div>
 
