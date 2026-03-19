@@ -171,6 +171,12 @@
   background: rgba(239, 68, 68, 0.10);
 }
 
+.task-due-badge.soon {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.30);
+  background: rgba(239, 68, 68, 0.06);
+}
+
 .task-xp-badge {
   font-size: 0.8rem;
   font-weight: 900;

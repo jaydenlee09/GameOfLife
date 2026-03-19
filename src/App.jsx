@@ -432,7 +432,6 @@ function App() {
       case 'tasks':
         return (
           <TasksPage 
-            onAddXp={addXp} 
             onUpdateStat={updateStat}
             todos={todos}
             setTodos={setTodos}

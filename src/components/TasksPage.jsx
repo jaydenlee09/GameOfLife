@@ -372,7 +372,7 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
 };
 
 // ─── Todo List ────────────────────────────────────────────────────────────────
-const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSelectedTask }) => {
+const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showXpModal, setShowXpModal] = useState(false);
@@ -381,6 +381,45 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
   const [gainedCategories, setGainedCategories] = useState([]);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
+
+  const DUE_SOON_MS = 3 * 24 * 60 * 60 * 1000;
+
+  const parseDueDateKeyToEndOfDay = (dueDateKey) => {
+    if (!dueDateKey || typeof dueDateKey !== 'string') return null;
+    const parts = dueDateKey.split('-').map(Number);
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts;
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 23, 59, 59, 999);
+  };
+
+  const formatAbsDuration = (ms) => {
+    const absMs = Math.abs(ms);
+    const totalMinutes = Math.max(1, Math.ceil(absMs / 60000));
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+    const minutes = totalMinutes % 60;
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const getDueBadgeInfo = (dueDateKey, isCompleted) => {
+    const dueEnd = parseDueDateKeyToEndOfDay(dueDateKey);
+    if (!dueEnd) return null;
+    const remainingMs = dueEnd.getTime() - new Date().getTime();
+    const isOverdue = !isCompleted && remainingMs < 0;
+    const isSoon = !isCompleted && remainingMs >= 0 && remainingMs <= DUE_SOON_MS;
+    const duration = formatAbsDuration(remainingMs);
+
+    return {
+      text: remainingMs < 0 ? `Overdue by ${duration}` : `${duration} left`,
+      isOverdue,
+      isSoon,
+      title: remainingMs < 0 ? `Overdue (due ${dueDateKey})` : `Due ${dueDateKey}`,
+    };
+  };
 
   // Migration: if any old tasks are tagged "tomorrow", move them into "today"
   React.useEffect(() => {
@@ -444,11 +483,6 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
 
   // Local-time period keys (used to scope goal-linked tasks to "This Week/Month/Year")
   const pad2 = (n) => String(n).padStart(2, '0');
-  const getLocalDateKey = (offsetDays = 0) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  };
   const getLocalWeekKey = () => {
     const d = new Date();
     const day = d.getDay(); // 0 Sun .. 6 Sat
@@ -465,7 +499,6 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
   const currentWeekKey = getLocalWeekKey();
   const currentMonthKey = getLocalMonthKey();
   const currentYearKey = getLocalYearKey();
-  const todayKey = getLocalDateKey(0);
 
   const grouped = {
     today: todos.filter(t => t.timeFrame === 'today' || !t.timeFrame),
@@ -483,7 +516,7 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
           <span className="task-group-count">{items.length}</span>
         </div>
         {items.map((todo) => {
-          const isOverdue = !!todo.dueDate && !todo.completed && todo.dueDate < todayKey;
+          const dueBadge = todo.dueDate ? getDueBadgeInfo(todo.dueDate, todo.completed) : null;
           return (
             <div
               key={todo.id}
@@ -515,12 +548,12 @@ const TodoList = ({ onAddXp, onUpdateStat, todos, setTodos, selectedTask, setSel
                   {todo.text}
                 </span>
               )}
-              {todo.dueDate && (
+              {dueBadge && (
                 <span
-                  className={`task-due-badge ${isOverdue ? 'overdue' : ''}`}
-                  title={isOverdue ? `Overdue (due ${todo.dueDate})` : `Due ${todo.dueDate}`}
+                  className={`task-due-badge ${dueBadge.isOverdue ? 'overdue' : dueBadge.isSoon ? 'soon' : ''}`}
+                  title={dueBadge.title}
                 >
-                  Due {todo.dueDate}
+                  {dueBadge.text}
                 </span>
               )}
               <span className="task-xp-badge">+{todo.xp || XP_BY_TIMEFRAME[timeFrame] || 20}XP</span>
@@ -1324,7 +1357,7 @@ const HabitGraph = ({ habits }) => {
 };
 
 // ─── Tasks Page ───────────────────────────────────────────────────────────────
-const TasksPage = ({ onAddXp, onUpdateStat, todos, setTodos, habits, setHabits }) => {
+const TasksPage = ({ onUpdateStat, todos, setTodos, habits, setHabits }) => {
   const [selectedTask, setSelectedTask] = useState(null);
 
   const liveSelectedTask = selectedTask
@@ -1336,7 +1369,6 @@ const TasksPage = ({ onAddXp, onUpdateStat, todos, setTodos, habits, setHabits }
       <div className="tasks-layout">
         <div className="tasks-main-column">
           <TodoList
-            onAddXp={onAddXp}
             onUpdateStat={onUpdateStat}
             todos={todos}
             setTodos={setTodos}
