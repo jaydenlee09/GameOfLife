@@ -1,7 +1,45 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './DailyLogPage.css';
 import EMOTIONS from '../utils/logMeta';
 import { saveVideo, getVideo, deleteVideo } from '../utils/videoDB';
+
+// ─── Emotion Trend Chart ───────────────────────────────────────────────────────
+const EmotionTrend = ({ logs }) => {
+  const counts = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const map = {};
+    for (const [dateKey, entry] of Object.entries(logs)) {
+      if (new Date(dateKey + 'T00:00:00') < cutoff) continue;
+      for (const eid of (entry.emotions || [])) {
+        map[eid] = (map[eid] || 0) + 1;
+      }
+    }
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  }, [logs]);
+
+  if (counts.length === 0) return null;
+  const max = counts[0][1];
+
+  return (
+    <div className="emotion-trend">
+      <span className="emotion-trend-title">30-DAY MOOD</span>
+      {counts.map(([eid, count]) => {
+        const em = EMOTIONS.find(e => e.id === eid);
+        if (!em) return null;
+        return (
+          <div key={eid} className="emotion-trend-row">
+            <span className="emotion-trend-emoji">{em.emoji}</span>
+            <div className="emotion-trend-bar-bg">
+              <div className="emotion-trend-bar-fill" style={{ width: `${(count / max) * 100}%`, background: em.color || '#fbbf24' }} />
+            </div>
+            <span className="emotion-trend-count">{count}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -322,6 +360,7 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked }) => {
             );
           })}
         </div>
+        <EmotionTrend logs={logs} />
       </aside>
 
       {/* ── Right Panel: Log Form ── */}

@@ -609,3 +609,45 @@
     font-size: 1.1rem;
   }
 }
+
+/* ─── Emotion Trend Chart ────────────────────────────────────────────────── */
+.emotion-trend {
+  margin-top: auto;
+  padding: 1rem;
+  border-top: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.emotion-trend-title {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #525252;
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+.emotion-trend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.emotion-trend-emoji { font-size: 0.85rem; min-width: 20px; }
+.emotion-trend-bar-bg {
+  flex: 1;
+  height: 5px;
+  background: #2a2a2a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.emotion-trend-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.emotion-trend-count {
+  font-size: 0.65rem;
+  color: #737373;
+  min-width: 16px;
+  text-align: right;
+}

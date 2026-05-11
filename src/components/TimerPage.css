@@ -478,3 +478,79 @@
     font-size: 3.8rem;
   }
 }
+
+/* ─── Today Summary ──────────────────────────────────────────────────────── */
+.timer-today-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(251,191,36,0.07);
+  border: 1px solid rgba(251,191,36,0.18);
+  border-radius: 10px;
+}
+.timer-today-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #737373;
+  text-transform: uppercase;
+}
+.timer-today-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fbbf24;
+  flex: 1;
+}
+.timer-today-sub {
+  font-size: 0.75rem;
+  color: #737373;
+}
+
+/* ─── History Section ────────────────────────────────────────────────────── */
+.timer-history-section {
+  max-width: 1000px;
+  margin: 2rem auto 0;
+  background: #1c1c1c;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #2a2a2a;
+}
+.timer-history-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #737373;
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+}
+.timer-history-chart {
+  margin-bottom: 1rem;
+}
+.timer-sessions-list {
+  border-top: 1px solid #2a2a2a;
+  padding-top: 0.75rem;
+}
+.timer-sessions-header {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #525252;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.timer-session-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #232323;
+  font-size: 0.8rem;
+}
+.timer-session-item:last-child { border-bottom: none; }
+.timer-session-dur  { font-weight: 700; color: #fff; min-width: 36px; }
+.timer-session-stat { font-weight: 600; flex: 1; }
+.timer-session-xp   { color: #fbbf24; font-weight: 700; min-width: 50px; }
+.timer-session-time { color: #525252; min-width: 55px; text-align: right; }

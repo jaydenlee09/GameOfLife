@@ -252,7 +252,7 @@ const DetailPanel = ({ task, todos, setTodos, onUpdateStat }) => {
 
     const parentCats = parentTask?.categories || (parentTask?.category ? [parentTask.category] : []);
     if (!wasCompleted && parentCats.length > 0) {
-      parentCats.forEach(cat => onUpdateStat(cat, 10));
+      parentCats.forEach(cat => onUpdateStat(cat, 10, { source: 'subtask', label: subtask.text }));
       setSubtaskXpModal({ subtaskText: subtask.text, categories: parentCats });
     }
   };
@@ -452,7 +452,7 @@ const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask
     // Split XP evenly across all selected attributes
     if (cats.length > 0) {
       const xpEach = Math.floor(task.xp / cats.length);
-      cats.forEach(cat => onUpdateStat(cat, xpEach));
+      cats.forEach(cat => onUpdateStat(cat, xpEach, { source: 'task', label: task.text }));
     }
     if (!task.goalId && selectedTask?.id === pendingTaskId) setSelectedTask(null);
     setShowConfirmModal(false);
@@ -786,11 +786,11 @@ const HabitTracker = ({ onUpdateStat, habits, setHabits }) => {
       if (newHistory[dateStr]) {
         const xp = calcStreakXp(newHistory, dateStr);
         delete newHistory[dateStr];
-        attrs.forEach(attr => onUpdateStat(attr, -xp));
+        attrs.forEach(attr => onUpdateStat(attr, -xp, { source: 'habit', label: habit.text }));
       } else {
         newHistory[dateStr] = true;
         const xp = calcStreakXp(newHistory, dateStr);
-        attrs.forEach(attr => onUpdateStat(attr, xp));
+        attrs.forEach(attr => onUpdateStat(attr, xp, { source: 'habit', label: habit.text }));
         setGainedAttributes(attrs);
         setGainedHabitXp(xp);
         setShowStatModal(true);

@@ -158,12 +158,6 @@ const formatGoalPeriodLabel = (goal) => {
   return '';
 };
 
-const timeFrameForGoalPeriod = (period) => {
-  if (period === 'weekly') return 'this-week';
-  if (period === 'monthly') return 'this-month';
-  return 'this-year';
-};
-
 const XP_BY_TIMEFRAME = {
   today: 20,
   'this-week': 50,
@@ -406,7 +400,35 @@ const GoalTaskModal = ({ goal, periodLabel, onClose, onAddTask }) => {
   );
 };
 
-const GoalsPage = ({ goals = [], setGoals, todos = [], setTodos }) => {
+const MilestoneSection = ({ goal, onAdd, onToggle, onRemove }) => {
+  const [input, setInput] = useState('');
+  const milestones = goal.milestones || [];
+  return (
+    <div className="gp-milestones">
+      <span className="gp-milestones-label">MILESTONES</span>
+      {milestones.map(m => (
+        <div key={m.id} className={`gp-milestone-row ${m.completed ? 'done' : ''}`}>
+          <input type="checkbox" checked={m.completed} onChange={() => onToggle(goal.id, m.id)} className="gp-milestone-check" />
+          <span className="gp-milestone-text">{m.text}</span>
+          {m.completed && <span className="gp-milestone-xp">+20 XP</span>}
+          <button className="gp-milestone-del" onClick={() => onRemove(goal.id, m.id)}>✕</button>
+        </div>
+      ))}
+      <div className="gp-milestone-add">
+        <input
+          className="gp-milestone-input"
+          placeholder="Add milestone..."
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { onAdd(goal.id, input); setInput(''); } }}
+        />
+        <button className="gp-milestone-add-btn" onClick={() => { onAdd(goal.id, input); setInput(''); }} disabled={!input.trim()}>+</button>
+      </div>
+    </div>
+  );
+};
+
+const GoalsPage = ({ goals = [], setGoals, todos = [], setTodos, onUpdateStat }) => {
   const [period, setPeriod] = useState('weekly');
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [modal, setModal] = useState(null); // { type: 'add-goal'|'edit-goal'|'add-task', goalId? }
@@ -459,6 +481,43 @@ const GoalsPage = ({ goals = [], setGoals, todos = [], setTodos }) => {
 
   const upsertGoal = (goalId, patch) => {
     setGoals(prev => prev.map(g => g.id === goalId ? { ...g, ...patch, updatedAt: Date.now() } : g));
+  };
+
+  const addMilestone = (goalId, text) => {
+    if (!text.trim()) return;
+    setGoals(prev => prev.map(g => {
+      if (g.id !== goalId) return g;
+      return { ...g, milestones: [...(g.milestones || []), { id: Date.now().toString(), text: text.trim(), completed: false, completedAt: null }], updatedAt: Date.now() };
+    }));
+  };
+
+  const toggleMilestone = (goalId, milestoneId) => {
+    setGoals(prev => prev.map(g => {
+      if (g.id !== goalId) return g;
+      const updated = (g.milestones || []).map(m => {
+        if (m.id !== milestoneId) return m;
+        const nowComplete = !m.completed;
+        if (nowComplete && onUpdateStat) {
+          const attrs = g.attributes?.length ? g.attributes : ['discipline'];
+          const xpEach = Math.floor(20 / attrs.length);
+          attrs.forEach(attr => onUpdateStat(attr, xpEach, { source: 'manual', label: `Milestone: ${m.text}` }));
+        }
+        return { ...m, completed: nowComplete, completedAt: nowComplete ? Date.now() : null };
+      });
+      return { ...g, milestones: updated, updatedAt: Date.now() };
+    }));
+  };
+
+  const removeMilestone = (goalId, milestoneId) => {
+    setGoals(prev => prev.map(g => g.id !== goalId ? g : { ...g, milestones: (g.milestones || []).filter(m => m.id !== milestoneId), updatedAt: Date.now() }));
+  };
+
+  const computeGoalCompletion = (goal, linkedTasks) => {
+    const total = linkedTasks.length;
+    const completedCount = linkedTasks.filter(t => t.completed).length;
+    const derivedComplete = total > 0 && completedCount === total;
+    const isComplete = typeof goal?.completed === 'boolean' ? goal.completed : derivedComplete;
+    return { total, completedCount, derivedComplete, isComplete };
   };
 
   const deleteGoal = (goalId) => {
@@ -554,10 +613,8 @@ const GoalsPage = ({ goals = [], setGoals, todos = [], setTodos }) => {
         <div className="gp-grid">
           {goalsForPeriod.map((goal) => {
             const linkedTasks = tasksForGoal(goal.id);
-            const total = linkedTasks.length;
-            const completed = linkedTasks.filter(t => t.completed).length;
-            const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-            const isComplete = total > 0 && completed === total;
+            const { total, completedCount, isComplete } = computeGoalCompletion(goal, linkedTasks);
+            const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
 
             return (
               <div key={goal.id} className={`gp-card ${isComplete ? 'gp-card--complete' : ''}`}>
@@ -571,12 +628,21 @@ const GoalsPage = ({ goals = [], setGoals, todos = [], setTodos }) => {
                 </div>
 
                 <div className="gp-card-title-row">
-                  <h3 className="gp-card-title">{goal.title}</h3>
+                  <div className="gp-card-title-left">
+                    <input
+                      className="gp-goal-checkbox"
+                      type="checkbox"
+                      checked={isComplete}
+                      onChange={() => upsertGoal(goal.id, { completed: !isComplete })}
+                      aria-label={isComplete ? 'Mark goal incomplete' : 'Mark goal complete'}
+                    />
+                    <h3 className="gp-card-title">{goal.title}</h3>
+                  </div>
                   {isComplete && <span className="gp-complete-badge">COMPLETE</span>}
                 </div>
 
                 <div className="gp-progress-line">
-                  <span className="gp-progress-nums">Tasks: {completed} / {total}</span>
+                  <span className="gp-progress-nums">Tasks: {completedCount} / {total}</span>
                   <span className="gp-progress-pct">{pct}%</span>
                 </div>
 
@@ -598,6 +664,13 @@ const GoalsPage = ({ goals = [], setGoals, todos = [], setTodos }) => {
                 {goal.notes?.trim() && (
                   <div className="gp-notes">{goal.notes}</div>
                 )}
+
+                <MilestoneSection
+                  goal={goal}
+                  onAdd={addMilestone}
+                  onToggle={toggleMilestone}
+                  onRemove={removeMilestone}
+                />
               </div>
             );
           })}

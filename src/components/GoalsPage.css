@@ -272,12 +272,33 @@
   gap: 10px;
 }
 
+.gp-card-title-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.gp-goal-checkbox {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #4ade80;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .gp-card-title {
   margin: 0;
   color: #fff;
   font-weight: 900;
   font-size: 1.05rem;
   line-height: 1.25;
+}
+
+.gp-card--complete .gp-card-title {
+  color: #e5e5e5;
+  text-decoration: line-through;
 }
 
 .gp-complete-badge {
@@ -677,3 +698,75 @@
     min-width: 0;
   }
 }
+
+/* ─── Milestones ─────────────────────────────────────────────────────────── */
+.gp-milestones {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.gp-milestones-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #525252;
+  text-transform: uppercase;
+  margin-bottom: 0.15rem;
+}
+.gp-milestone-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: #d4d4d4;
+}
+.gp-milestone-row.done { color: #525252; text-decoration: line-through; }
+.gp-milestone-check { accent-color: #fbbf24; cursor: pointer; }
+.gp-milestone-text  { flex: 1; }
+.gp-milestone-xp    { font-size: 0.65rem; color: #4ade80; font-weight: 700; }
+.gp-milestone-del {
+  background: none;
+  border: none;
+  color: #404040;
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  border-radius: 3px;
+  transition: color 0.15s;
+}
+.gp-milestone-del:hover { color: #f87171; }
+.gp-milestone-add { display: flex; gap: 0.4rem; margin-top: 0.2rem; }
+.gp-milestone-input {
+  flex: 1;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 7px;
+  color: #fff;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.gp-milestone-input:focus { border-color: #fbbf24; }
+.gp-milestone-input::placeholder { color: #404040; }
+.gp-milestone-add-btn {
+  background: rgba(251,191,36,0.1);
+  border: 1px solid rgba(251,191,36,0.25);
+  color: #fbbf24;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gp-milestone-add-btn:hover:not(:disabled) { background: rgba(251,191,36,0.2); }
+.gp-milestone-add-btn:disabled { opacity: 0.35; cursor: default; }
