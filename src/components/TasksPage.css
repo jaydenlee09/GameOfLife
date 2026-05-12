@@ -1597,4 +1597,110 @@
   .tasks-main-column {
     width: 100%;
   }
+
+  /* ── Habits mobile layout ───────────────────────────────────────────── */
+
+  .habit-card {
+    padding: 1rem;
+  }
+
+  /* Stack each habit row: [name | meta] on top, [circles] below */
+  .habit-grid-row {
+    display: grid;
+    grid-template-areas:
+      "label meta"
+      "days  days";
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 0.4rem 0.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .habit-grid-row:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  /* Hide the header row with day labels — circles are self-explanatory */
+  .habit-header-row {
+    display: none;
+  }
+
+  .habit-label-col {
+    grid-area: label;
+    width: auto;
+  }
+
+  .habit-name-display {
+    max-width: none;
+    font-size: 0.95rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .habit-meta-col {
+    grid-area: meta;
+    margin-left: 0;
+    flex-shrink: 0;
+    gap: 5px;
+  }
+
+  /* Circles row spans full width */
+  .habit-days-col {
+    grid-area: days;
+    justify-content: space-between;
+    overflow-x: visible;
+    width: 100%;
+    gap: 2px;
+  }
+
+  /* Bigger, finger-friendly circles */
+  .habit-circle {
+    width: 38px;
+    height: 38px;
+    flex: 1;
+    max-width: 44px;
+    min-width: 30px;
+  }
+
+  .day-header {
+    width: auto;
+    flex: 1;
+    max-width: 44px;
+    min-width: 30px;
+  }
+
+  /* Month view: full-width grid */
+  .habit-days-col.month {
+    grid-template-columns: repeat(8, 1fr);
+    width: 100%;
+    gap: 3px;
+  }
+
+  .habit-circle.month {
+    width: 100%;
+    height: 28px;
+  }
+
+  .month-day-cell {
+    width: 100%;
+    min-height: 28px;
+  }
+
+  .habit-attribute-badges {
+    margin-top: 2px;
+  }
+
+  .habit-period-label {
+    min-width: 100px;
+    font-size: 0.72rem;
+  }
+
+  .habit-period-btn {
+    width: 32px;
+    height: 32px;
+  }
 }
