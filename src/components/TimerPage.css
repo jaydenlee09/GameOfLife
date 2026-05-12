@@ -554,3 +554,41 @@
 .timer-session-stat { font-weight: 600; flex: 1; }
 .timer-session-xp   { color: #fbbf24; font-weight: 700; min-width: 50px; }
 .timer-session-time { color: #525252; min-width: 55px; text-align: right; }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .timer-page-container {
+    padding: 1rem;
+    height: auto;
+  }
+
+  .timer-layout {
+    gap: 1rem;
+  }
+
+  .timer-main-card {
+    padding: 1.5rem 1rem;
+  }
+
+  .section-page-title {
+    font-size: 1.4rem;
+    margin-bottom: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .timer-ring-wrapper {
+    width: 210px;
+    height: 210px;
+    align-self: center;
+  }
+
+  .timer-display {
+    font-size: 2.8rem;
+  }
+
+  .timer-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

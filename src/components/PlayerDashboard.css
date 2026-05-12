@@ -915,17 +915,25 @@ body {
 @media (max-width: 900px) {
   .player-dashboard {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto;
     height: auto;
-    overflow-y: auto;
+    overflow: visible;
+    padding: 1rem;
+    gap: 1rem;
   }
-  
+
+  .dashboard-heatmap-row {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
   .center-column {
     order: -1;
-    height: 40vh;
+    height: auto;
+    min-height: 280px;
     padding-bottom: 0;
   }
-  
+
   .character-container,
   .character-image {
     max-height: 100%;
@@ -933,6 +941,36 @@ body {
 
   .dashboard-column {
     min-height: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 768px) {
+  .heatmap-grid {
+    grid-template-columns: repeat(16, 1fr);
+  }
+
+  .heatmap-card {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .player-dashboard {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .heatmap-grid {
+    grid-template-columns: repeat(12, 1fr);
+  }
+
+  .attributes-list {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-card {
+    padding: 14px 16px;
   }
 }
 

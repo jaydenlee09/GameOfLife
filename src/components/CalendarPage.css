@@ -542,3 +542,37 @@
 .cal-scope-btns { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
 .cal-scope-btns .cal-btn { width: 100%; text-align: center; }
 .cal-scope-cancel { width: 100%; font-size: 0.7rem; opacity: 0.6; }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .cal-page {
+    height: auto;
+    overflow: visible;
+    min-height: calc(100dvh - 60px);
+  }
+
+  .cal-body {
+    flex-direction: column;
+    overflow: visible;
+    min-height: 0;
+  }
+
+  .cal-main {
+    overflow: visible;
+    flex: none;
+  }
+
+  .cal-sidebar {
+    display: none;
+  }
+
+  .cal-header {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .cal-header-left {
+    gap: 8px;
+  }
+}

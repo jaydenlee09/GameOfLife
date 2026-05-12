@@ -234,3 +234,125 @@
   color: rgba(255, 255, 255, 0.8);
   transform: rotate(45deg);
 }
+
+/* ─── Mobile: hide desktop sidebar ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+}
+
+/* ─── Mobile drawer (hidden on desktop) ────────────────────────────────── */
+.mobile-drawer-backdrop {
+  display: none;
+}
+
+.mobile-drawer {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1100;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    animation: backdropFadeIn 0.2s ease;
+  }
+
+  @keyframes backdropFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .mobile-drawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 60px;
+    left: 0;
+    right: 0;
+    max-height: 82dvh;
+    background: #0d0d0d;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 20px 20px 0 0;
+    z-index: 1110;
+    overflow: hidden;
+    animation: drawerSlideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  @keyframes drawerSlideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  .mobile-drawer-close {
+    position: absolute;
+    top: 0.85rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.07);
+    border: none;
+    color: rgba(255, 255, 255, 0.45);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-family: inherit;
+  }
+
+  .mobile-drawer-close:hover {
+    background: rgba(255, 255, 255, 0.13);
+    color: #fff;
+  }
+
+  .mobile-drawer-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem 1.25rem 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .mobile-drawer-nav {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 0.75rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .mobile-drawer-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-drawer-nav .sidebar-link {
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    gap: 0.6rem;
+    justify-content: flex-start;
+  }
+
+  .mobile-drawer-nav .sidebar-link.active {
+    background: rgba(251, 191, 36, 0.1);
+  }
+
+  /* Hide active bar inside grid drawer (doesn't fit 2-col layout) */
+  .mobile-drawer-nav .sidebar-link-active-bar {
+    display: none;
+  }
+
+  .mobile-drawer .sidebar-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0.75rem 1rem 1rem;
+  }
+}

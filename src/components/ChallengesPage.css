@@ -550,3 +550,21 @@
   .cp-cards-grid { grid-template-columns: 1fr; }
   .cp-page-header { flex-direction: column; align-items: flex-start; }
 }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .cp-page {
+    padding: 1rem 1rem 5rem;
+    gap: 1.5rem;
+  }
+
+  .cp-page-title {
+    font-size: 1.6rem;
+  }
+
+  .cp-page-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

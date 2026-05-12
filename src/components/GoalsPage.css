@@ -770,3 +770,25 @@
 }
 .gp-milestone-add-btn:hover:not(:disabled) { background: rgba(251,191,36,0.2); }
 .gp-milestone-add-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .gp-page {
+    padding: 1rem 1rem 5rem;
+  }
+
+  .gp-page-title {
+    font-size: 1.6rem;
+  }
+
+  .gp-page-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .gp-controls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}

@@ -255,3 +255,14 @@
 @media (max-width: 800px) {
   .rewards-layout { grid-template-columns: 1fr; }
 }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .rewards-page {
+    padding: 1rem 1rem 5rem;
+  }
+
+  .rewards-layout {
+    grid-template-columns: 1fr;
+  }
+}

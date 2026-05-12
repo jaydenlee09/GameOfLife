@@ -25,7 +25,7 @@ const getRankGradient = (level) => {
   return 'linear-gradient(90deg, #ef4444, #fbbf24, #ef4444)';
 };
 
-function StatIcon() {
+export function StatIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="9" width="3" height="6" rx="1" fill="currentColor" opacity="0.6"/>
@@ -35,7 +35,7 @@ function StatIcon() {
   );
 }
 
-function TaskIcon() {
+export function TaskIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="1" width="14" height="14" rx="3" stroke="currentColor" strokeWidth="1.5"/>
@@ -44,7 +44,7 @@ function TaskIcon() {
   );
 }
 
-function BoltIcon() {
+export function BoltIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <path d="M9 1L3 9H8L7 15L13 7H8L9 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -52,7 +52,7 @@ function BoltIcon() {
   );
 }
 
-function LogIcon() {
+export function LogIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
@@ -61,7 +61,7 @@ function LogIcon() {
   );
 }
 
-function TimerIcon() {
+export function TimerIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <circle cx="8" cy="9" r="6" stroke="currentColor" strokeWidth="1.5"/>
@@ -72,7 +72,7 @@ function TimerIcon() {
   );
 }
 
-function CalIcon() {
+export function CalIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
@@ -85,7 +85,7 @@ function CalIcon() {
   );
 }
 
-function TargetIcon() {
+export function TargetIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
@@ -95,7 +95,7 @@ function TargetIcon() {
   );
 }
 
-function HeartIcon() {
+export function HeartIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.5 3 2 4.75 2C6.1 2 7.25 2.8 8 4C8.75 2.8 9.9 2 11.25 2C13 2 14.5 3.5 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
@@ -103,7 +103,7 @@ function HeartIcon() {
   );
 }
 
-function ReviewIcon() {
+export function ReviewIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
@@ -113,7 +113,7 @@ function ReviewIcon() {
   );
 }
 
-function TrophyIcon() {
+export function TrophyIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <path d="M5 1H11V7C11 9.2 9.7 11 8 11C6.3 11 5 9.2 5 7V1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
@@ -124,64 +124,6 @@ function TrophyIcon() {
   );
 }
 
-const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, onOpenDataModal }) => {
-  const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
-  const rankGrad = getRankGradient(userLevel ?? 1);
-
-  return (
-    <aside className="sidebar">
-      {/* Brand */}
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-dot" />
-        <span className="sidebar-brand-text">GameOfLife</span>
-      </div>
-
-      {/* Nav */}
-      <nav className="sidebar-nav">
-        {NAV_LINKS.map(({ id, label, icon }) => (
-          <button
-            key={id}
-            className={`sidebar-link ${activePage === id ? 'active' : ''}`}
-            onClick={() => onNavigate(id)}
-          >
-            <span className="sidebar-link-icon">{icon}</span>
-            <span className="sidebar-link-label">{label}</span>
-            {activePage === id && <span className="sidebar-link-active-bar" />}
-          </button>
-        ))}
-      </nav>
-
-      {/* Footer: XP + user */}
-      <div className="sidebar-footer">
-        <div className="sidebar-xp-section">
-          <div className="sidebar-xp-header">
-            <span className="sidebar-xp-level">LVL {userLevel ?? 1}</span>
-            <span className="sidebar-xp-count">{userXp ?? 0} / {userXpCap ?? 100}</span>
-          </div>
-          <div className="sidebar-xp-track">
-            <div
-              className="sidebar-xp-fill"
-              style={{ width: `${pct}%`, background: rankGrad }}
-            />
-          </div>
-        </div>
-
-        <div className="sidebar-user">
-          <div className="sidebar-avatar">
-            {(userEmail || 'P').charAt(0).toUpperCase()}
-          </div>
-          <span className="sidebar-username">{userEmail || 'Player'}</span>
-          {onOpenDataModal && (
-            <button className="sidebar-gear" onClick={onOpenDataModal} title="Data & Shortcuts">
-              <GearIcon />
-            </button>
-          )}
-        </div>
-      </div>
-    </aside>
-  );
-};
-
 function GearIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -190,5 +132,98 @@ function GearIcon() {
     </svg>
   );
 }
+
+const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose }) => {
+  const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
+  const rankGrad = getRankGradient(userLevel ?? 1);
+
+  const SidebarFooter = () => (
+    <div className="sidebar-footer">
+      <div className="sidebar-xp-section">
+        <div className="sidebar-xp-header">
+          <span className="sidebar-xp-level">LVL {userLevel ?? 1}</span>
+          <span className="sidebar-xp-count">{userXp ?? 0} / {userXpCap ?? 100}</span>
+        </div>
+        <div className="sidebar-xp-track">
+          <div
+            className="sidebar-xp-fill"
+            style={{ width: `${pct}%`, background: rankGrad }}
+          />
+        </div>
+      </div>
+
+      <div className="sidebar-user">
+        <div className="sidebar-avatar">
+          {(userEmail || 'P').charAt(0).toUpperCase()}
+        </div>
+        <span className="sidebar-username">{userEmail || 'Player'}</span>
+        {onOpenDataModal && (
+          <button className="sidebar-gear" onClick={onOpenDataModal} title="Data & Shortcuts">
+            <GearIcon />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-dot" />
+          <span className="sidebar-brand-text">GameOfLife</span>
+        </div>
+
+        <nav className="sidebar-nav">
+          {NAV_LINKS.map(({ id, label, icon }) => (
+            <button
+              key={id}
+              className={`sidebar-link ${activePage === id ? 'active' : ''}`}
+              onClick={() => onNavigate(id)}
+            >
+              <span className="sidebar-link-icon">{icon}</span>
+              <span className="sidebar-link-label">{label}</span>
+              {activePage === id && <span className="sidebar-link-active-bar" />}
+            </button>
+          ))}
+        </nav>
+
+        <SidebarFooter />
+      </aside>
+
+      {/* Mobile drawer — only rendered when open to avoid event interception */}
+      {isMobileMenuOpen && (
+        <>
+          <div className="mobile-drawer-backdrop" onClick={onMobileMenuClose} />
+
+          <div className="mobile-drawer">
+            <button className="mobile-drawer-close" onClick={onMobileMenuClose}>✕</button>
+
+            <div className="mobile-drawer-brand">
+              <div className="sidebar-brand-dot" />
+              <span className="sidebar-brand-text">GameOfLife</span>
+            </div>
+
+            <nav className="mobile-drawer-nav">
+              {NAV_LINKS.map(({ id, label, icon }) => (
+                <button
+                  key={id}
+                  className={`sidebar-link ${activePage === id ? 'active' : ''}`}
+                  onClick={() => onNavigate(id)}
+                >
+                  <span className="sidebar-link-icon">{icon}</span>
+                  <span className="sidebar-link-label">{label}</span>
+                </button>
+              ))}
+            </nav>
+
+            <SidebarFooter />
+          </div>
+        </>
+      )}
+    </>
+  );
+};
 
 export default Navbar;

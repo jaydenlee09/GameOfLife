@@ -124,3 +124,14 @@
   .review-layout { grid-template-columns: 1fr; }
   .review-stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .review-page {
+    padding: 1rem 1rem 5rem;
+  }
+
+  .review-layout {
+    grid-template-columns: 1fr;
+  }
+}

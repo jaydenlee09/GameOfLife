@@ -83,6 +83,19 @@ const computeDailyScore = (habits, xpLog, pomodoroSessions, logs, commitmentArch
 
 // ─── Productivity Heatmap ─────────────────────────────────────────────────────
 const ProductivityHeatmap = ({ xpLog }) => {
+  const [visibleWeeks, setVisibleWeeks] = useState(53);
+
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth <= 480) setVisibleWeeks(12);
+      else if (window.innerWidth <= 768) setVisibleWeeks(16);
+      else setVisibleWeeks(53);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
   const cells = useMemo(() => {
     const map = {};
     for (const e of xpLog) {
@@ -97,8 +110,8 @@ const ProductivityHeatmap = ({ xpLog }) => {
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       result.push({ key, xp: map[key] || 0, date: d });
     }
-    return result;
-  }, [xpLog]);
+    return result.slice(-(visibleWeeks * 7));
+  }, [xpLog, visibleWeeks]);
 
   const getColor = (xp) => {
     if (xp === 0)   return '#1a1a1a';

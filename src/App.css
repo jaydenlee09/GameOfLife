@@ -57,3 +57,85 @@
 .achievement-toast-body    { display: flex; flex-direction: column; gap: 2px; }
 .achievement-toast-title   { font-size: 0.65rem; font-weight: 700; letter-spacing: 1px; color: #fbbf24; text-transform: uppercase; }
 .achievement-toast-label   { font-size: 0.82rem; font-weight: 600; color: #fff; }
+
+/* ─── Bottom Navigation Bar (mobile only) ───────────────────────────────── */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #0d0d0d;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  z-index: 9000;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 6px 2px;
+  font-family: inherit;
+  transition: color 0.18s ease;
+  border-radius: 0;
+}
+
+.bottom-nav-item.active {
+  color: #fbbf24;
+}
+
+.bottom-nav-item:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+  border-color: transparent;
+}
+
+.bottom-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.bottom-nav-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.bottom-nav-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* ─── Mobile breakpoint ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .content-container {
+    padding-left: 0;
+    padding-bottom: 60px;
+    height: auto;
+    min-height: 100svh;
+  }
+
+  .bottom-nav {
+    display: flex;
+  }
+
+  .achievement-toast {
+    bottom: calc(60px + 0.75rem);
+    max-width: calc(100vw - 2rem);
+  }
+}

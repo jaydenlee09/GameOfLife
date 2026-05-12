@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
 import PlayerDashboard from './components/PlayerDashboard'
-import Navbar from './components/Navbar'
+import Navbar, { StatIcon, TaskIcon, TimerIcon, LogIcon, TargetIcon } from './components/Navbar'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
 import LevelUpModal from './components/LevelUpModal'
@@ -31,6 +31,12 @@ const getLocalDateKey = (offsetDays = 0) => {
 function App() {
   const [currentPage, setCurrentPage] = useState('statistics');
   const [mentorOpen, setMentorOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+    setMobileMenuOpen(false);
+  };
 
   // ─── Core Data ────────────────────────────────────────────────────────────────
   const [todos, setTodos] = useState(() => {
@@ -530,12 +536,14 @@ function App() {
     <div className="app-container">
       <Navbar
         activePage={currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         userEmail={user.name}
         userLevel={user.level}
         userXp={user.xp}
         userXpCap={xpCapForLevel(user.level)}
         onOpenDataModal={() => setDataModalOpen(true)}
+        isMobileMenuOpen={mobileMenuOpen}
+        onMobileMenuClose={() => setMobileMenuOpen(false)}
       />
       <div className="content-container">
         {renderPage()}
@@ -586,6 +594,39 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Mobile bottom navigation bar */}
+      <nav className="bottom-nav">
+        {[
+          { id: 'statistics', label: 'Stats',   icon: <StatIcon /> },
+          { id: 'tasks',      label: 'Tasks',   icon: <TaskIcon /> },
+          { id: 'timer',      label: 'Timer',   icon: <TimerIcon /> },
+          { id: 'daily-log',  label: 'Log',     icon: <LogIcon /> },
+          { id: 'goals',      label: 'Goals',   icon: <TargetIcon /> },
+        ].map(({ id, label, icon }) => (
+          <button
+            key={id}
+            className={`bottom-nav-item${currentPage === id ? ' active' : ''}`}
+            onClick={() => handleNavigate(id)}
+          >
+            <span className="bottom-nav-icon">{icon}</span>
+            <span className="bottom-nav-label">{label}</span>
+          </button>
+        ))}
+        <button
+          className={`bottom-nav-item${mobileMenuOpen ? ' active' : ''}`}
+          onClick={() => setMobileMenuOpen(o => !o)}
+        >
+          <span className="bottom-nav-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="3" cy="8" r="1.5" fill="currentColor"/>
+              <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+              <circle cx="13" cy="8" r="1.5" fill="currentColor"/>
+            </svg>
+          </span>
+          <span className="bottom-nav-label">More</span>
+        </button>
+      </nav>
     </div>
   );
 }

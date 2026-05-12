@@ -330,3 +330,14 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mentor-fab {
+    bottom: calc(60px + 0.75rem);
+    right: 0.75rem;
+    height: 46px;
+    font-size: 0.82rem;
+    padding: 0 0.85rem;
+  }
+}
