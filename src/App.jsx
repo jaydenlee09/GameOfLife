@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
+import { useAuth } from './context/AuthContext'
+import { loadAllUserData, saveDataKey, migrateLocalStorageToFirestore } from './services/firestoreService'
 import PlayerDashboard from './components/PlayerDashboard'
 import Navbar, { StatIcon, TaskIcon, TimerIcon, LogIcon, TargetIcon } from './components/Navbar'
 import TasksPage from './components/TasksPage'
@@ -29,6 +31,9 @@ const getLocalDateKey = (offsetDays = 0) => {
 };
 
 function App() {
+  const { firebaseUser, signOut } = useAuth();
+  const cloudSyncEnabled = useRef(false);
+
   const [currentPage, setCurrentPage] = useState('statistics');
   const [mentorOpen, setMentorOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -167,23 +172,83 @@ function App() {
   const [achievementToast, setAchievementToast] = useState(null);
 
   // ─── Persistence Effects ───────────────────────────────────────────────────────
-  useEffect(() => { localStorage.setItem('gameOfLife_todos', JSON.stringify(todos)); }, [todos]);
-  useEffect(() => { localStorage.setItem('gameOfLife_habits', JSON.stringify(habits)); }, [habits]);
-  useEffect(() => { localStorage.setItem('gameOfLife_logs', JSON.stringify(logs)); }, [logs]);
-  useEffect(() => { localStorage.setItem('gameOfLife_chatHistory', JSON.stringify(chatHistory)); }, [chatHistory]);
-  useEffect(() => { localStorage.setItem('gameOfLife_calendarEvents', JSON.stringify(calendarEvents)); }, [calendarEvents]);
-  useEffect(() => { localStorage.setItem('gameOfLife_quickEvents', JSON.stringify(quickEvents)); }, [quickEvents]);
-  useEffect(() => { localStorage.setItem('gameOfLife_calendarDayEvents', JSON.stringify(calendarDayEvents)); }, [calendarDayEvents]);
-  useEffect(() => { localStorage.setItem('gameOfLife_commitmentArchive', JSON.stringify(commitmentArchive)); }, [commitmentArchive]);
-  useEffect(() => { localStorage.setItem('gameOfLife_challenges_v2', JSON.stringify(challenges)); }, [challenges]);
-  useEffect(() => { localStorage.setItem('gameOfLife_goals_v1', JSON.stringify(goals)); }, [goals]);
-  useEffect(() => { localStorage.setItem('gameOfLife_user', JSON.stringify(user)); }, [user]);
-  useEffect(() => { localStorage.setItem('gameOfLife_xpLog', JSON.stringify(xpLog)); }, [xpLog]);
-  useEffect(() => { localStorage.setItem('gameOfLife_pomodoroSessions', JSON.stringify(pomodoroSessions)); }, [pomodoroSessions]);
-  useEffect(() => { localStorage.setItem('gameOfLife_achievements', JSON.stringify(achievements)); }, [achievements]);
-  useEffect(() => { localStorage.setItem('gameOfLife_healthLog', JSON.stringify(healthLog)); }, [healthLog]);
-  useEffect(() => { localStorage.setItem('gameOfLife_weeklyReviews', JSON.stringify(weeklyReviews)); }, [weeklyReviews]);
-  useEffect(() => { localStorage.setItem('gameOfLife_rewards', JSON.stringify(rewards)); }, [rewards]);
+  const persist = (key, value) => {
+    localStorage.setItem(key, JSON.stringify(value));
+    if (cloudSyncEnabled.current && firebaseUser) saveDataKey(firebaseUser.uid, key, value);
+  };
+
+  useEffect(() => { persist('gameOfLife_todos', todos); }, [todos]);
+  useEffect(() => { persist('gameOfLife_habits', habits); }, [habits]);
+  useEffect(() => { persist('gameOfLife_logs', logs); }, [logs]);
+  useEffect(() => { persist('gameOfLife_chatHistory', chatHistory); }, [chatHistory]);
+  useEffect(() => { persist('gameOfLife_calendarEvents', calendarEvents); }, [calendarEvents]);
+  useEffect(() => { persist('gameOfLife_quickEvents', quickEvents); }, [quickEvents]);
+  useEffect(() => { persist('gameOfLife_calendarDayEvents', calendarDayEvents); }, [calendarDayEvents]);
+  useEffect(() => { persist('gameOfLife_commitmentArchive', commitmentArchive); }, [commitmentArchive]);
+  useEffect(() => { persist('gameOfLife_challenges_v2', challenges); }, [challenges]);
+  useEffect(() => { persist('gameOfLife_goals_v1', goals); }, [goals]);
+  useEffect(() => { persist('gameOfLife_user', user); }, [user]);
+  useEffect(() => { persist('gameOfLife_xpLog', xpLog); }, [xpLog]);
+  useEffect(() => { persist('gameOfLife_pomodoroSessions', pomodoroSessions); }, [pomodoroSessions]);
+  useEffect(() => { persist('gameOfLife_achievements', achievements); }, [achievements]);
+  useEffect(() => { persist('gameOfLife_healthLog', healthLog); }, [healthLog]);
+  useEffect(() => { persist('gameOfLife_weeklyReviews', weeklyReviews); }, [weeklyReviews]);
+  useEffect(() => { persist('gameOfLife_rewards', rewards); }, [rewards]);
+
+  // ─── Firestore Load & Migration ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!firebaseUser) return;
+    cloudSyncEnabled.current = false;
+
+    loadAllUserData(firebaseUser.uid).then(data => {
+      if (data) {
+        if (data.gameOfLife_todos) setTodos(data.gameOfLife_todos);
+        if (data.gameOfLife_habits) setHabits(data.gameOfLife_habits);
+        if (data.gameOfLife_logs) setLogs(data.gameOfLife_logs);
+        if (data.gameOfLife_chatHistory) setChatHistory(data.gameOfLife_chatHistory);
+        if (data.gameOfLife_calendarEvents) setCalendarEvents(data.gameOfLife_calendarEvents);
+        if (data.gameOfLife_quickEvents) setQuickEvents(data.gameOfLife_quickEvents);
+        if (data.gameOfLife_calendarDayEvents) setCalendarDayEvents(data.gameOfLife_calendarDayEvents);
+        if (data.gameOfLife_commitmentArchive) setCommitmentArchive(data.gameOfLife_commitmentArchive);
+        if (data.gameOfLife_challenges_v2) setChallenges(data.gameOfLife_challenges_v2);
+        if (data.gameOfLife_goals_v1) setGoals(data.gameOfLife_goals_v1);
+        if (data.gameOfLife_user) setUser(data.gameOfLife_user);
+        if (data.gameOfLife_xpLog) setXpLog(data.gameOfLife_xpLog);
+        if (data.gameOfLife_pomodoroSessions) setPomodoroSessions(data.gameOfLife_pomodoroSessions);
+        if (data.gameOfLife_achievements) setAchievements(data.gameOfLife_achievements);
+        if (data.gameOfLife_healthLog) setHealthLog(data.gameOfLife_healthLog);
+        if (data.gameOfLife_weeklyReviews) setWeeklyReviews(data.gameOfLife_weeklyReviews);
+        if (data.gameOfLife_rewards) setRewards(data.gameOfLife_rewards);
+      } else {
+        // First login — migrate whatever exists in localStorage to the cloud
+        migrateLocalStorageToFirestore(firebaseUser.uid, {
+          gameOfLife_todos: todos,
+          gameOfLife_habits: habits,
+          gameOfLife_logs: logs,
+          gameOfLife_chatHistory: chatHistory,
+          gameOfLife_calendarEvents: calendarEvents,
+          gameOfLife_quickEvents: quickEvents,
+          gameOfLife_calendarDayEvents: calendarDayEvents,
+          gameOfLife_commitmentArchive: commitmentArchive,
+          gameOfLife_challenges_v2: challenges,
+          gameOfLife_goals_v1: goals,
+          gameOfLife_user: user,
+          gameOfLife_xpLog: xpLog,
+          gameOfLife_pomodoroSessions: pomodoroSessions,
+          gameOfLife_achievements: achievements,
+          gameOfLife_healthLog: healthLog,
+          gameOfLife_weeklyReviews: weeklyReviews,
+          gameOfLife_rewards: rewards,
+        }).catch(console.error);
+      }
+      // Enable cloud sync only after initial load (prevents overwriting cloud with stale local data)
+      setTimeout(() => { cloudSyncEnabled.current = true; }, 500);
+    }).catch(err => {
+      console.error('Failed to load from Firestore, using local data', err);
+      cloudSyncEnabled.current = true;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebaseUser]);
 
   // ─── XP Logging ───────────────────────────────────────────────────────────────
   const logXpEvent = useCallback((stat, amount, source = 'manual', label = '') => {
@@ -544,6 +609,8 @@ function App() {
         onOpenDataModal={() => setDataModalOpen(true)}
         isMobileMenuOpen={mobileMenuOpen}
         onMobileMenuClose={() => setMobileMenuOpen(false)}
+        firebaseUser={firebaseUser}
+        onSignOut={signOut}
       />
       <div className="content-container">
         {renderPage()}

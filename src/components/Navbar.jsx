@@ -124,6 +124,16 @@ export function TrophyIcon() {
   );
 }
 
+function SignOutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <path d="M6 2H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      <path d="M10 10l3-2.5L10 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M13 7.5H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 function GearIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -133,7 +143,7 @@ function GearIcon() {
   );
 }
 
-const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose }) => {
+const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose, firebaseUser, onSignOut }) => {
   const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
   const rankGrad = getRankGradient(userLevel ?? 1);
 
@@ -153,15 +163,38 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
       </div>
 
       <div className="sidebar-user">
-        <div className="sidebar-avatar">
-          {(userEmail || 'P').charAt(0).toUpperCase()}
-        </div>
-        <span className="sidebar-username">{userEmail || 'Player'}</span>
-        {onOpenDataModal && (
-          <button className="sidebar-gear" onClick={onOpenDataModal} title="Data & Shortcuts">
-            <GearIcon />
-          </button>
+        {firebaseUser?.photoURL ? (
+          <img
+            src={firebaseUser.photoURL}
+            alt="avatar"
+            className="sidebar-avatar"
+            style={{ borderRadius: '50%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div className="sidebar-avatar">
+            {(userEmail || 'P').charAt(0).toUpperCase()}
+          </div>
         )}
+        <span className="sidebar-username" title={firebaseUser?.email || userEmail}>
+          {userEmail || firebaseUser?.displayName || 'Player'}
+        </span>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {onOpenDataModal && (
+            <button className="sidebar-gear" onClick={onOpenDataModal} title="Data & Shortcuts">
+              <GearIcon />
+            </button>
+          )}
+          {onSignOut && (
+            <button
+              className="sidebar-gear"
+              onClick={onSignOut}
+              title="Sign out"
+              style={{ opacity: 0.7 }}
+            >
+              <SignOutIcon />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
