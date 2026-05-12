@@ -2,16 +2,16 @@ import React from 'react';
 import './Navbar.css';
 
 const NAV_LINKS = [
-  { id: 'statistics', label: 'Statistics' },
-  { id: 'tasks',      label: 'Tasks'      },
-  { id: 'challenges', label: 'Challenges' },
-  { id: 'daily-log',  label: 'Daily Log'  },
-  { id: 'timer',      label: 'Timer'      },
-  { id: 'calendar',   label: 'Calendar'   },
-  { id: 'goals',      label: 'Goals'      },
-  { id: 'health',     label: 'Health'     },
-  { id: 'review',     label: 'Review'     },
-  { id: 'rewards',    label: 'Rewards'    },
+  { id: 'statistics', label: 'Statistics',  icon: <StatIcon /> },
+  { id: 'tasks',      label: 'Tasks',       icon: <TaskIcon /> },
+  { id: 'challenges', label: 'Challenges',  icon: <BoltIcon /> },
+  { id: 'daily-log',  label: 'Daily Log',   icon: <LogIcon /> },
+  { id: 'timer',      label: 'Timer',       icon: <TimerIcon /> },
+  { id: 'calendar',   label: 'Calendar',    icon: <CalIcon /> },
+  { id: 'goals',      label: 'Goals',       icon: <TargetIcon /> },
+  { id: 'health',     label: 'Health',      icon: <HeartIcon /> },
+  { id: 'review',     label: 'Review',      icon: <ReviewIcon /> },
+  { id: 'rewards',    label: 'Rewards',     icon: <TrophyIcon /> },
 ];
 
 const getRankGradient = (level) => {
@@ -25,44 +25,170 @@ const getRankGradient = (level) => {
   return 'linear-gradient(90deg, #ef4444, #fbbf24, #ef4444)';
 };
 
+function StatIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="9" width="3" height="6" rx="1" fill="currentColor" opacity="0.6"/>
+      <rect x="6" y="5" width="3" height="10" rx="1" fill="currentColor" opacity="0.8"/>
+      <rect x="11" y="1" width="3" height="14" rx="1" fill="currentColor"/>
+    </svg>
+  );
+}
+
+function TaskIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="1" width="14" height="14" rx="3" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M4.5 8L7 10.5L11.5 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function BoltIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M9 1L3 9H8L7 15L13 7H8L9 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function LogIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M5 5H11M5 8H11M5 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function TimerIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="9" r="6" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M8 9V5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M6 1H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M13.5 4L12.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function CalIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M1 7H15" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M5 1V4M11 1V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="5.5" cy="10.5" r="1" fill="currentColor"/>
+      <circle cx="8.5" cy="10.5" r="1" fill="currentColor"/>
+      <circle cx="11.5" cy="10.5" r="1" fill="currentColor"/>
+    </svg>
+  );
+}
+
+function TargetIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
+      <circle cx="8" cy="8" r="4" stroke="currentColor" strokeWidth="1.5"/>
+      <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+    </svg>
+  );
+}
+
+function HeartIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.5 3 2 4.75 2C6.1 2 7.25 2.8 8 4C8.75 2.8 9.9 2 11.25 2C13 2 14.5 3.5 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function ReviewIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M5 7H9M7 5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function TrophyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M5 1H11V7C11 9.2 9.7 11 8 11C6.3 11 5 9.2 5 7V1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <path d="M5 3H2.5C2.5 3 2 6 4.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M11 3H13.5C13.5 3 14 6 11.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M8 11V14M5 14H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, onOpenDataModal }) => {
   const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
+  const rankGrad = getRankGradient(userLevel ?? 1);
 
   return (
-    <>
-      <nav className="navbar-container">
-        <div className="navbar-pill">
-          <div className="navbar-links">
-            {NAV_LINKS.map(({ id, label }) => (
-              <button
-                key={id}
-                className={`nav-link ${activePage === id ? 'active' : ''}`}
-                onClick={() => onNavigate(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="navbar-profile">
-            <span className="profile-email">{userEmail || 'Player'}</span>
-            {onOpenDataModal && (
-              <button className="navbar-gear" onClick={onOpenDataModal} title="Data & Shortcuts">⚙</button>
-            )}
-          </div>
-        </div>
+    <aside className="sidebar">
+      {/* Brand */}
+      <div className="sidebar-brand">
+        <div className="sidebar-brand-dot" />
+        <span className="sidebar-brand-text">GameOfLife</span>
+      </div>
+
+      {/* Nav */}
+      <nav className="sidebar-nav">
+        {NAV_LINKS.map(({ id, label, icon }) => (
+          <button
+            key={id}
+            className={`sidebar-link ${activePage === id ? 'active' : ''}`}
+            onClick={() => onNavigate(id)}
+          >
+            <span className="sidebar-link-icon">{icon}</span>
+            <span className="sidebar-link-label">{label}</span>
+            {activePage === id && <span className="sidebar-link-active-bar" />}
+          </button>
+        ))}
       </nav>
 
-      {/* Floating XP pill with progress bar */}
-      <div className="xp-pill">
-        <span className="xp-pill-level">LVL {userLevel ?? 1}</span>
-        <span className="xp-pill-divider" />
-        <div className="xp-pill-bar-wrap">
-          <div className="xp-pill-bar-fill" style={{ width: `${pct}%`, background: getRankGradient(userLevel ?? 1) }} />
+      {/* Footer: XP + user */}
+      <div className="sidebar-footer">
+        <div className="sidebar-xp-section">
+          <div className="sidebar-xp-header">
+            <span className="sidebar-xp-level">LVL {userLevel ?? 1}</span>
+            <span className="sidebar-xp-count">{userXp ?? 0} / {userXpCap ?? 100}</span>
+          </div>
+          <div className="sidebar-xp-track">
+            <div
+              className="sidebar-xp-fill"
+              style={{ width: `${pct}%`, background: rankGrad }}
+            />
+          </div>
         </div>
-        <span className="xp-pill-text">{userXp ?? 0} / {userXpCap ?? 100}</span>
+
+        <div className="sidebar-user">
+          <div className="sidebar-avatar">
+            {(userEmail || 'P').charAt(0).toUpperCase()}
+          </div>
+          <span className="sidebar-username">{userEmail || 'Player'}</span>
+          {onOpenDataModal && (
+            <button className="sidebar-gear" onClick={onOpenDataModal} title="Data & Shortcuts">
+              <GearIcon />
+            </button>
+          )}
+        </div>
       </div>
-    </>
+    </aside>
   );
 };
+
+function GearIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <path d="M6.3 1.5L5.7 3.1C5.2 3.3 4.7 3.6 4.3 4L2.6 3.6L1.5 5.5L2.8 6.6C2.7 7 2.7 7.3 2.8 7.7L1.5 8.8L2.6 10.7L4.3 10.3C4.7 10.6 5.2 10.9 5.7 11.1L6.3 12.8H8.7L9.3 11.1C9.8 10.9 10.3 10.6 10.7 10.3L12.4 10.7L13.5 8.8L12.2 7.7C12.3 7.3 12.3 7 12.2 6.6L13.5 5.5L12.4 3.6L10.7 4C10.3 3.6 9.8 3.3 9.3 3.1L8.7 1.5H6.3Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      <circle cx="7.5" cy="7.2" r="2" stroke="currentColor" strokeWidth="1.2"/>
+    </svg>
+  );
+}
 
 export default Navbar;

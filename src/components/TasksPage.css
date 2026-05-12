@@ -86,6 +86,213 @@
   border: 1px solid rgba(255,255,255,0.08);
 }
 
+/* ─── 7-Day Strip ────────────────────────────────────────────────────────── */
+.day-strip {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.day-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.day-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 0.6rem 0.85rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+  position: relative;
+  min-width: 56px;
+}
+
+.day-pill:hover:not(.active) {
+  background: #262626;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.day-pill.active {
+  background: #fbbf24;
+  border-color: #fbbf24;
+}
+
+.day-pill.is-today:not(.active) {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.day-pill-abbrev {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #6b6b6b;
+  transition: color 0.18s;
+}
+
+.day-pill.is-today:not(.active) .day-pill-abbrev {
+  color: #fbbf24;
+}
+
+.day-pill.active .day-pill-abbrev {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.day-pill-num {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #d4d4d4;
+  line-height: 1;
+  transition: color 0.18s;
+}
+
+.day-pill.active .day-pill-num {
+  color: #000;
+}
+
+.day-pill.is-today:not(.active) .day-pill-num {
+  color: #fff;
+}
+
+.day-pill-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #fbbf24;
+  color: #000;
+  font-size: 0.6rem;
+  font-weight: 900;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #111;
+  transition: background 0.18s, color 0.18s;
+}
+
+.day-pill.active .day-pill-count {
+  background: #000;
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
+
+/* ─── Day Empty State ────────────────────────────────────────────────────── */
+.day-empty-state {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: #555;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* ─── Schedule Quick Buttons (in AddTaskModal) ──────────────────────────── */
+.schedule-quick-btns {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.schedule-quick-btn {
+  background: #262626;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  color: #a3a3a3;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.3rem 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.schedule-quick-btn:hover:not(.active) {
+  background: #2e2e2e;
+  color: #fff;
+}
+
+.schedule-quick-btn.active {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: #a78bfa;
+  color: #a78bfa;
+}
+
+/* ─── Upcoming Section ───────────────────────────────────────────────────── */
+.upcoming-section {
+  margin: 0.25rem 0;
+}
+
+.upcoming-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0 0.5rem 0;
+}
+
+.upcoming-divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(167, 139, 250, 0.2);
+}
+
+.upcoming-divider-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #a78bfa;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.upcoming-date-title {
+  color: #a78bfa !important;
+  font-size: 0.9rem !important;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.upcoming-dot {
+  font-size: 0.5rem;
+  color: #a78bfa;
+  opacity: 0.7;
+}
+
+.upcoming-task-item {
+  opacity: 0.65;
+  border-style: dashed !important;
+}
+
+.upcoming-task-item:hover {
+  opacity: 0.85;
+}
+
+.upcoming-checkbox {
+  border-color: #3d3d55 !important;
+  border-style: dashed !important;
+  border-radius: 50% !important;
+}
+
+.upcoming-task-text {
+  color: #a3a3a3 !important;
+  font-style: italic;
+}
+
+.upcoming-xp {
+  opacity: 0.45;
+}
+
 /* ─── Task Items ─────────────────────────────────────────────────────────── */
 .task-item {
   display: flex;

@@ -13,6 +13,16 @@ import {
   Legend,
 } from 'recharts';
 
+// ─── Date Helpers (used by AddTaskModal and TodoList) ─────────────────────────
+const toLocalDateStr = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const addDays = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return toLocalDateStr(d);
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const XP_BY_TIMEFRAME = {
   today: 20,
@@ -38,6 +48,8 @@ const AddTaskModal = ({ onClose, onAdd }) => {
   const [timeFrame, setTimeFrame] = useState('today');
   const [categories, setCategories] = useState(['discipline']);
   const [dueDate, setDueDate] = useState('');
+  const todayStr = toLocalDateStr();
+  const [scheduledDate, setScheduledDate] = useState(todayStr);
 
   const toggleCategory = (attr) => {
     setCategories(prev =>
@@ -60,6 +72,7 @@ const AddTaskModal = ({ onClose, onAdd }) => {
       notes: '',
       subtasks: [],
       dueDate: dueDate || null,
+      scheduledDate: (timeFrame === 'today' && scheduledDate && scheduledDate !== todayStr) ? scheduledDate : null,
     });
     onClose();
   };
@@ -94,6 +107,39 @@ const AddTaskModal = ({ onClose, onAdd }) => {
               ))}
             </div>
           </div>
+
+          {timeFrame === 'today' && (
+            <div className="modal-field-group">
+              <label className="modal-label">Schedule For</label>
+              <div className="schedule-quick-btns">
+                {[
+                  { label: 'Today', offset: 0 },
+                  { label: 'Tomorrow', offset: 1 },
+                  { label: '+2 Days', offset: 2 },
+                  { label: '+3 Days', offset: 3 },
+                ].map(({ label, offset }) => {
+                  const val = addDays(offset);
+                  return (
+                    <button
+                      key={offset}
+                      type="button"
+                      className={`schedule-quick-btn ${scheduledDate === val ? 'active' : ''}`}
+                      onClick={() => setScheduledDate(val)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="date"
+                value={scheduledDate}
+                min={todayStr}
+                onChange={(e) => setScheduledDate(e.target.value || todayStr)}
+                className="modal-text-input"
+              />
+            </div>
+          )}
 
           <div className="modal-field-group">
             <label className="modal-label">Due Date <span className="modal-label-hint">(optional)</span></label>
@@ -381,6 +427,7 @@ const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask
   const [gainedCategories, setGainedCategories] = useState([]);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [dayFilter, setDayFilter] = useState(null); // null = show all, or a dateStr like "2026-05-12"
 
   const DUE_SOON_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -499,12 +546,109 @@ const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask
   const currentWeekKey = getLocalWeekKey();
   const currentMonthKey = getLocalMonthKey();
   const currentYearKey = getLocalYearKey();
+  const todayStr = toLocalDateStr();
 
   const grouped = {
-    today: todos.filter(t => t.timeFrame === 'today' || !t.timeFrame),
+    today: todos.filter(t => {
+      const isToday = t.timeFrame === 'today' || !t.timeFrame;
+      if (!isToday) return false;
+      const sd = t.scheduledDate;
+      return !sd || sd <= todayStr;
+    }),
     'this-week': todos.filter(t => t.timeFrame === 'this-week' && (!t.goalPeriodKey || t.goalPeriodKey === currentWeekKey)),
     'this-month': todos.filter(t => t.timeFrame === 'this-month' && (!t.goalPeriodKey || t.goalPeriodKey === currentMonthKey)),
     'this-year': todos.filter(t => t.timeFrame === 'this-year' && (!t.goalPeriodKey || t.goalPeriodKey === currentYearKey)),
+  };
+
+  // Tasks scheduled for a future date — shown below "Today" until their date arrives
+  const upcomingTasks = todos.filter(t => {
+    const isToday = t.timeFrame === 'today' || !t.timeFrame;
+    if (!isToday) return false;
+    return t.scheduledDate && t.scheduledDate > todayStr;
+  });
+
+  const upcomingByDate = upcomingTasks.reduce((acc, t) => {
+    if (!acc[t.scheduledDate]) acc[t.scheduledDate] = [];
+    acc[t.scheduledDate].push(t);
+    return acc;
+  }, {});
+
+  const upcomingSortedDates = Object.keys(upcomingByDate).sort();
+
+  const getScheduledLabel = (dateStr) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(dateStr + 'T00:00:00');
+    const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays <= 6) return `${target.toLocaleDateString(undefined, { weekday: 'long' })} · in ${diffDays} days`;
+    return target.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  // 7-day pill strip data
+  const dayPills = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dateStr = toLocalDateStr(d);
+    const isToday = i === 0;
+    const count = isToday ? grouped.today.length : (upcomingByDate[dateStr] || []).length;
+    return {
+      dateStr,
+      abbrev: isToday ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' }),
+      dateNum: d.getDate(),
+      isToday,
+      count,
+    };
+  });
+
+  // Tasks shown when a specific day is filtered
+  const filteredDayTasks = dayFilter
+    ? (dayFilter === todayStr ? grouped.today : (upcomingByDate[dayFilter] || []))
+    : null;
+
+  const renderTaskItem = (todo, opts = {}) => {
+    const dueBadge = todo.dueDate ? getDueBadgeInfo(todo.dueDate, todo.completed) : null;
+    const isUpcoming = opts.upcoming;
+    return (
+      <div
+        key={todo.id}
+        className={`task-item ${isUpcoming ? 'upcoming-task-item' : ''} ${selectedTask?.id === todo.id ? 'selected' : ''}`}
+        onClick={() => setSelectedTask(todo)}
+      >
+        <div
+          className={`task-checkbox ${isUpcoming ? 'upcoming-checkbox' : ''} ${todo.completed ? 'checked' : ''}`}
+          onClick={(e) => !isUpcoming && checkOffTodo(todo.id, e)}
+        />
+        {editingTaskId === todo.id ? (
+          <input
+            className="task-text task-text-edit"
+            value={editingText}
+            autoFocus
+            onChange={(e) => setEditingText(e.target.value)}
+            onBlur={() => saveTaskEdit(todo.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveTaskEdit(todo.id);
+              if (e.key === 'Escape') { setEditingTaskId(null); setEditingText(''); }
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            className={`task-text ${isUpcoming ? 'upcoming-task-text' : ''} ${todo.completed ? 'completed-text' : ''}`}
+            onDoubleClick={(e) => !isUpcoming && startEditTask(todo, e)}
+          >
+            {todo.text}
+          </span>
+        )}
+        {dueBadge && (
+          <span className={`task-due-badge ${dueBadge.isOverdue ? 'overdue' : dueBadge.isSoon ? 'soon' : ''}`} title={dueBadge.title}>
+            {dueBadge.text}
+          </span>
+        )}
+        <span className={`task-xp-badge ${isUpcoming ? 'upcoming-xp' : ''}`}>+{todo.xp || 20}XP</span>
+        <span className="task-delete" onClick={(e) => deleteTodo(todo.id, e)}>×</span>
+      </div>
+    );
   };
 
   const renderGroup = (timeFrame, label) => {
@@ -568,11 +712,74 @@ const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask
   return (
     <div className="todo-section">
       <h1 className="section-page-title">TO-DO</h1>
+
+      {/* ── 7-Day Strip ─────────────────────────────────────────────────── */}
+      <div className="day-strip">
+        {dayPills.map(({ dateStr, abbrev, dateNum, isToday, count }) => (
+          <button
+            key={dateStr}
+            type="button"
+            className={`day-pill ${dayFilter === dateStr ? 'active' : ''} ${isToday ? 'is-today' : ''}`}
+            onClick={() => setDayFilter(prev => prev === dateStr ? null : dateStr)}
+          >
+            <span className="day-pill-abbrev">{abbrev}</span>
+            <span className="day-pill-num">{dateNum}</span>
+            {count > 0 && <span className="day-pill-count">{count}</span>}
+          </button>
+        ))}
+      </div>
+
       <div className="todo-card">
-        {renderGroup('today', 'Today')}
-        {renderGroup('this-week', 'This Week')}
-        {renderGroup('this-month', 'This Month')}
-        {renderGroup('this-year', 'This Year')}
+        {dayFilter ? (
+          /* ── Filtered Day View ──────────────────────────────────────── */
+          <div className="task-group">
+            <div className="task-group-header">
+              <span className="task-group-title">
+                {dayFilter === todayStr ? 'Today' : getScheduledLabel(dayFilter)}
+              </span>
+              <span className="task-group-count">{filteredDayTasks.length}</span>
+            </div>
+            {filteredDayTasks.length === 0 ? (
+              <div className="day-empty-state">No tasks scheduled for this day</div>
+            ) : (
+              filteredDayTasks.map(todo =>
+                renderTaskItem(todo, { upcoming: dayFilter !== todayStr })
+              )
+            )}
+          </div>
+        ) : (
+          /* ── Full View ──────────────────────────────────────────────── */
+          <>
+            {renderGroup('today', 'Today')}
+
+            {upcomingSortedDates.length > 0 && (
+              <div className="upcoming-section">
+                <div className="upcoming-divider">
+                  <div className="upcoming-divider-line" />
+                  <span className="upcoming-divider-label">Upcoming</span>
+                  <div className="upcoming-divider-line" />
+                </div>
+                {upcomingSortedDates.map(dateStr => (
+                  <div className="task-group" key={dateStr}>
+                    <div className="task-group-header">
+                      <span className="task-group-title upcoming-date-title">
+                        <span className="upcoming-dot">◆</span>
+                        {getScheduledLabel(dateStr)}
+                      </span>
+                      <span className="task-group-count">{upcomingByDate[dateStr].length}</span>
+                    </div>
+                    {upcomingByDate[dateStr].map(todo => renderTaskItem(todo, { upcoming: true }))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {renderGroup('this-week', 'This Week')}
+            {renderGroup('this-month', 'This Month')}
+            {renderGroup('this-year', 'This Year')}
+          </>
+        )}
+
         <button className="add-task-btn" onClick={() => setShowAddModal(true)}>
           <span>+</span> Add a new task
         </button>

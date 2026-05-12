@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './PlayerDashboard.css';
-import characterFull from '../assets/character_full.png';
 import STAT_META from './statMeta';
 import { getRankForLevel } from '../utils/rankMeta';
 import RANKS from '../utils/rankMeta';
@@ -142,7 +141,7 @@ const AttributeRadar = ({ stats }) => {
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={250}>
       <RadarChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
         <PolarGrid stroke="#2a2a2a" />
         <PolarAngleAxis dataKey="stat" tick={{ fill: '#737373', fontSize: 11 }} />
@@ -483,26 +482,24 @@ const PlayerDashboard = ({
 
       {/* ── CENTER COLUMN ──────────────────────────────────────────────────── */}
       <div className="dashboard-column center-column">
-        <div className="rank-badge-display">
-          <img src={rank.badge} alt={rank.name} className="rank-badge-img" />
-          <span className="rank-name-label" style={{ color: rank.color }}>{rank.name.toUpperCase()}</span>
-        </div>
-        <div className="character-container">
-          <img src={characterFull} alt="Character" className="character-image" />
+        <div className="dashboard-card rank-radar-unified">
+          <div className="rank-badge-display">
+            <img src={rank.badge} alt={rank.name} className="rank-badge-img" />
+            <span className="rank-name-label" style={{ color: rank.color }}>{rank.name.toUpperCase()}</span>
+          </div>
           {onOpenFocusMode && (
             <button className="focus-mode-btn" onClick={onOpenFocusMode} title="Alt+F">
               🎯 Focus Mode
             </button>
           )}
+          {user.stats && (
+            <>
+              <div className="rank-radar-divider" />
+              <p className="radar-section-label">ATTRIBUTE OVERVIEW</p>
+              <AttributeRadar stats={user.stats} />
+            </>
+          )}
         </div>
-
-        {/* Radar Chart */}
-        {user.stats && (
-          <div className="dashboard-card radar-card">
-            <h3 className="section-title">ATTRIBUTE OVERVIEW</h3>
-            <AttributeRadar stats={user.stats} />
-          </div>
-        )}
       </div>
 
       {/* ── RIGHT COLUMN ───────────────────────────────────────────────────── */}
