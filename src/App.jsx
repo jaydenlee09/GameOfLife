@@ -170,39 +170,12 @@ function App() {
     const todayKey = getLocalDateKey(0);
     const candidates = [];
 
-    // Timed calendar events
-    for (const ev of calendarEvents) {
-      if (!ev.date || ev.completed) continue;
-      const evDate = new Date(`${ev.date}T00:00:00`);
-      const evTime = new Date(`${ev.date}T${String(ev.startHour ?? 0).padStart(2,'0')}:${String(ev.startMin ?? 0).padStart(2,'0')}:00`);
-      if (evTime > now) {
-        candidates.push({ ...ev, _ts: evTime.getTime(), _kind: 'timed' });
-      }
-      // Recurring: also check next 14 days
-      if (ev.recurrence === 'daily' || ev.recurrence === 'weekly') {
-        for (let i = 1; i <= 14; i++) {
-          const d = new Date(now);
-          d.setDate(d.getDate() + i);
-          if (ev.recurrence === 'weekly' && d.getDay() !== evDate.getDay()) continue;
-          const dKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-          if (ev._exceptDates?.includes(dKey)) continue;
-          const t = new Date(`${dKey}T${String(ev.startHour ?? 0).padStart(2,'0')}:${String(ev.startMin ?? 0).padStart(2,'0')}:00`);
-          candidates.push({ ...ev, date: dKey, _ts: t.getTime(), _kind: 'timed' });
-          break; // only need the nearest occurrence
-        }
-      }
-    }
-
-    // Day events (deadlines/reminders)
     for (const [dateKey, evts] of Object.entries(calendarDayEvents)) {
       if (dateKey < todayKey) continue;
       for (const ev of evts) {
-        let t;
-        if (ev.time) {
-          t = new Date(`${dateKey}T${ev.time}:00`);
-        } else {
-          t = new Date(`${dateKey}T23:59:00`);
-        }
+        const t = ev.time
+          ? new Date(`${dateKey}T${ev.time}:00`)
+          : new Date(`${dateKey}T23:59:00`);
         if (t > now) {
           candidates.push({ ...ev, date: dateKey, _ts: t.getTime(), _kind: 'day' });
         }
@@ -212,7 +185,7 @@ function App() {
     if (candidates.length === 0) return null;
     candidates.sort((a, b) => a._ts - b._ts);
     return candidates[0];
-  }, [calendarEvents, calendarDayEvents]);
+  }, [calendarDayEvents]);
 
   const [eventPopupDismissed, setEventPopupDismissed] = useState(false);
   const prevNearestRef = useRef(null);
