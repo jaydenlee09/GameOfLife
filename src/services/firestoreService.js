@@ -37,12 +37,26 @@ export async function loadAllUserData(uid) {
 }
 
 const debouncers = {};
+const pendingWrites = {}; // { key: { uid, value } }
 
 export function saveDataKey(uid, key, value) {
+  pendingWrites[key] = { uid, value };
   clearTimeout(debouncers[key]);
   debouncers[key] = setTimeout(() => {
+    delete pendingWrites[key];
     setDoc(doc(db, 'users', uid, 'data', key), { value }).catch(console.error);
-  }, 3000);
+  }, 500);
+}
+
+export function flushPendingWrites() {
+  const entries = Object.entries(pendingWrites);
+  if (entries.length === 0) return;
+  for (const [key, { uid, value }] of entries) {
+    clearTimeout(debouncers[key]);
+    delete debouncers[key];
+    delete pendingWrites[key];
+    setDoc(doc(db, 'users', uid, 'data', key), { value }).catch(console.error);
+  }
 }
 
 export async function migrateLocalStorageToFirestore(uid, currentData) {

@@ -121,6 +121,84 @@
   line-height: 1;
 }
 
+/* ─── Event Popup ───────────────────────────────────────────────────────── */
+@keyframes eventPopupIn {
+  from { opacity: 0; transform: translateX(calc(100% + 1.5rem)); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.event-popup {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9998;
+  width: 230px;
+  background: #0f1117;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-left: 3px solid #22d3ee;
+  border-radius: 10px;
+  padding: 0.85rem 1rem 0.9rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(34,211,238,0.08);
+  animation: eventPopupIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.event-popup-close {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.55rem;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.7rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  transition: color 0.15s;
+}
+.event-popup-close:hover { color: rgba(255,255,255,0.7); }
+
+.event-popup-label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #22d3ee;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.event-popup-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.3rem;
+  padding-right: 0.5rem;
+}
+
+.event-popup-meta {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.45);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.event-popup-dot { opacity: 0.4; }
+
+.event-popup-countdown {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #22d3ee;
+  background: rgba(34,211,238,0.08);
+  border-radius: 5px;
+  padding: 0.2rem 0.5rem;
+  display: inline-block;
+}
+
 /* ─── Mobile breakpoint ─────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .content-container {
@@ -137,5 +215,12 @@
   .achievement-toast {
     bottom: calc(60px + 0.75rem);
     max-width: calc(100vw - 2rem);
+  }
+
+  .event-popup {
+    bottom: calc(60px + 0.75rem);
+    right: 0.75rem;
+    width: calc(100vw - 1.5rem);
+    max-width: 320px;
   }
 }

@@ -217,7 +217,7 @@ export default function CalendarPage({
   setQuickEvents,
   onUpdateStat,
 }) {
-  const [view, setView] = useState('week');
+  const [view, setView] = useState(() => window.innerWidth < 768 ? 'day' : 'week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [modal, setModal] = useState(null);
   const [dayEventModal, setDayEventModal] = useState(null); // { mode: 'create'|'edit', dateKey, id? }

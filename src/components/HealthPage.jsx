@@ -7,7 +7,7 @@ const getLocalDateKey = (offsetDays = 0) => {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
-const WORKOUT_TYPES = ['Run', 'Lift', 'HIIT', 'Yoga', 'Walk', 'Swim', 'Cycle', 'Other'];
+const WORKOUT_TYPES = ['Run', 'Lift', 'HIIT', 'Yoga', 'Walk', 'Swim', 'Cycle', 'Basketball', 'Other'];
 
 const calcSleepHours = (bed, wake) => {
   if (!bed || !wake) return null;
@@ -60,7 +60,7 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
     // Award XP if not already awarded today
     if (!today.xpAwarded) {
       entry.xpAwarded = true;
-      if (sleepHours >= 7 && sleepHours <= 9)
+      if (sleepHours >= 8 && sleepHours <= 10)
         onUpdateStat?.('health', 20, { source: 'manual', label: 'Good sleep logged' });
       if (workouts.length > 0) {
         onUpdateStat?.('strength', 15, { source: 'manual', label: 'Workout logged' });
@@ -105,9 +105,9 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
                 <input type="time" className="health-input" value={waketime} onChange={e => setWaketime(e.target.value)} />
               </div>
               {sleepHours !== null && (
-                <div className={`health-sleep-result ${sleepHours >= 7 && sleepHours <= 9 ? 'good' : sleepHours >= 6 ? 'ok' : 'bad'}`}>
+                <div className={`health-sleep-result ${sleepHours >= 8 && sleepHours <= 10 ? 'good' : sleepHours >= 6 ? 'ok' : 'bad'}`}>
                   <span className="health-sleep-hours">{sleepHours}h</span>
-                  <span className="health-sleep-label">{sleepHours >= 7 && sleepHours <= 9 ? '✓ Optimal' : sleepHours >= 6 ? 'Fair' : sleepHours > 9 ? 'Too much' : 'Too little'}</span>
+                  <span className="health-sleep-label">{sleepHours >= 8 && sleepHours <= 10 ? '✓ Optimal' : sleepHours >= 6 ? 'Fair' : sleepHours > 10 ? 'Too much' : 'Too little'}</span>
                 </div>
               )}
             </div>
@@ -188,7 +188,7 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
                 <div key={key} className="health-sleep-bar-col">
                   <div className="health-sleep-bar-wrap">
                     <div
-                      className={`health-sleep-bar-fill ${hours >= 7 && hours <= 9 ? 'good' : hours >= 6 ? 'ok' : hours > 0 ? 'bad' : 'empty'}`}
+                      className={`health-sleep-bar-fill ${hours >= 8 && hours <= 10 ? 'good' : hours >= 6 ? 'ok' : hours > 0 ? 'bad' : 'empty'}`}
                       style={{ height: `${hours > 0 ? (hours / maxSleep) * 100 : 4}%` }}
                     />
                   </div>
@@ -198,7 +198,7 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
               ))}
             </div>
             <div className="health-sleep-legend">
-              <span className="health-legend-dot good" />7–9h optimal
+              <span className="health-legend-dot good" />8–10h optimal
               <span className="health-legend-dot ok" style={{ marginLeft: '0.75rem' }} />6–7h fair
               <span className="health-legend-dot bad" style={{ marginLeft: '0.75rem' }} />&lt;6h
             </div>
@@ -207,7 +207,7 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
           <div className="health-card">
             <h2 className="health-card-title">🏆 XP AWARDS</h2>
             <div className="health-xp-list">
-              <div className="health-xp-item"><span>😴 Sleep 7–9h</span><span className="health-xp-val">+20 Health</span></div>
+              <div className="health-xp-item"><span>😴 Sleep 8–10h</span><span className="health-xp-val">+20 Health</span></div>
               <div className="health-xp-item"><span>💪 Log a workout</span><span className="health-xp-val">+15 Str / +15 Hlt</span></div>
               <div className="health-xp-item"><span>⚡ Energy ≥ 4</span><span className="health-xp-val">+10 Mental</span></div>
             </div>

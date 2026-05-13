@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import './App.css'
 import { useAuth } from './context/AuthContext'
-import { loadAllUserData, saveDataKey, migrateLocalStorageToFirestore } from './services/firestoreService'
+import { loadAllUserData, saveDataKey, flushPendingWrites, migrateLocalStorageToFirestore } from './services/firestoreService'
 import PlayerDashboard from './components/PlayerDashboard'
 import Navbar, { StatIcon, TaskIcon, TimerIcon, LogIcon, TargetIcon } from './components/Navbar'
 import TasksPage from './components/TasksPage'
@@ -163,6 +163,109 @@ function App() {
     const saved = localStorage.getItem('gameOfLife_rewards');
     return saved ? JSON.parse(saved) : { items: [], redemptions: [] };
   });
+
+  // ─── Nearest Upcoming Event ────────────────────────────────────────────────────
+  const nearestEvent = useMemo(() => {
+    const now = new Date();
+    const todayKey = getLocalDateKey(0);
+    const candidates = [];
+
+    // Timed calendar events
+    for (const ev of calendarEvents) {
+      if (!ev.date || ev.completed) continue;
+      const evDate = new Date(`${ev.date}T00:00:00`);
+      const evTime = new Date(`${ev.date}T${String(ev.startHour ?? 0).padStart(2,'0')}:${String(ev.startMin ?? 0).padStart(2,'0')}:00`);
+      if (evTime > now) {
+        candidates.push({ ...ev, _ts: evTime.getTime(), _kind: 'timed' });
+      }
+      // Recurring: also check next 14 days
+      if (ev.recurrence === 'daily' || ev.recurrence === 'weekly') {
+        for (let i = 1; i <= 14; i++) {
+          const d = new Date(now);
+          d.setDate(d.getDate() + i);
+          if (ev.recurrence === 'weekly' && d.getDay() !== evDate.getDay()) continue;
+          const dKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          if (ev._exceptDates?.includes(dKey)) continue;
+          const t = new Date(`${dKey}T${String(ev.startHour ?? 0).padStart(2,'0')}:${String(ev.startMin ?? 0).padStart(2,'0')}:00`);
+          candidates.push({ ...ev, date: dKey, _ts: t.getTime(), _kind: 'timed' });
+          break; // only need the nearest occurrence
+        }
+      }
+    }
+
+    // Day events (deadlines/reminders)
+    for (const [dateKey, evts] of Object.entries(calendarDayEvents)) {
+      if (dateKey < todayKey) continue;
+      for (const ev of evts) {
+        let t;
+        if (ev.time) {
+          t = new Date(`${dateKey}T${ev.time}:00`);
+        } else {
+          t = new Date(`${dateKey}T23:59:00`);
+        }
+        if (t > now) {
+          candidates.push({ ...ev, date: dateKey, _ts: t.getTime(), _kind: 'day' });
+        }
+      }
+    }
+
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => a._ts - b._ts);
+    return candidates[0];
+  }, [calendarEvents, calendarDayEvents]);
+
+  const [eventPopupDismissed, setEventPopupDismissed] = useState(false);
+  const prevNearestRef = useRef(null);
+  useEffect(() => {
+    const id = nearestEvent?._ts ?? null;
+    if (id !== prevNearestRef.current) {
+      setEventPopupDismissed(false);
+      prevNearestRef.current = id;
+    }
+  }, [nearestEvent]);
+
+  const [eventCountdown, setEventCountdown] = useState('');
+  useEffect(() => {
+    const calc = () => {
+      if (!nearestEvent) return setEventCountdown('');
+      const diff = nearestEvent._ts - Date.now();
+      if (diff <= 0) return setEventCountdown('now');
+      const totalMins = Math.floor(diff / 60000);
+      const days = Math.floor(totalMins / 1440);
+      const hrs = Math.floor((totalMins % 1440) / 60);
+      const mins = totalMins % 60;
+      if (days >= 1) setEventCountdown(`in ${days}d ${hrs}h`);
+      else if (hrs >= 1) setEventCountdown(`in ${hrs}h ${mins}m`);
+      else setEventCountdown(`in ${mins}m`);
+    };
+    calc();
+    const id = setInterval(calc, 60000);
+    return () => clearInterval(id);
+  }, [nearestEvent]);
+
+  const formatEventPopupDate = (ev) => {
+    if (!ev?.date) return '';
+    const todayKey = getLocalDateKey(0);
+    const tomorrowKey = getLocalDateKey(1);
+    if (ev.date === todayKey) return 'Today';
+    if (ev.date === tomorrowKey) return 'Tomorrow';
+    const d = new Date(`${ev.date}T12:00:00`);
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const formatEventPopupTime = (ev) => {
+    if (!ev) return '';
+    if (ev._kind === 'day') {
+      if (!ev.time) return 'All day';
+      const [h, m] = ev.time.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+    }
+    const h = ev.startHour ?? 0;
+    const m = ev.startMin ?? 0;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+  };
 
   // ─── UI State ──────────────────────────────────────────────────────────────────
   const [levelUpModal, setLevelUpModal] = useState(null);
@@ -456,6 +559,12 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.level, xpLog.length, pomodoroSessions.length, commitmentArchive.length, challenges]);
 
+  // ─── Flush pending Firestore writes before page unload ────────────────────────
+  useEffect(() => {
+    window.addEventListener('beforeunload', flushPendingWrites);
+    return () => window.removeEventListener('beforeunload', flushPendingWrites);
+  }, []);
+
   // ─── Keyboard Shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
@@ -659,6 +768,20 @@ function App() {
             <span className="achievement-toast-title">Achievement Unlocked!</span>
             <span className="achievement-toast-label">{achievementToast.label} — {achievementToast.desc}</span>
           </div>
+        </div>
+      )}
+
+      {nearestEvent && !eventPopupDismissed && (
+        <div className="event-popup">
+          <button className="event-popup-close" onClick={() => setEventPopupDismissed(true)}>✕</button>
+          <div className="event-popup-label">NEXT EVENT</div>
+          <div className="event-popup-title">{nearestEvent.title}</div>
+          <div className="event-popup-meta">
+            <span>{formatEventPopupDate(nearestEvent)}</span>
+            <span className="event-popup-dot">·</span>
+            <span>{formatEventPopupTime(nearestEvent)}</span>
+          </div>
+          <div className="event-popup-countdown">{eventCountdown}</div>
         </div>
       )}
 
