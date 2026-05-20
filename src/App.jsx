@@ -30,10 +30,10 @@ const getLocalDateKey = (offsetDays = 0) => {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
-const getCurrentMondayKey = () => {
+const getMondayKey = (offsetWeeks = 0) => {
   const d = new Date();
   const day = d.getDay();
-  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day) + offsetWeeks * 7);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
@@ -176,8 +176,8 @@ function App() {
   const [priorityPopupMinimized, setPriorityPopupMinimized] = useState(false);
 
   const currentWeekPriority = useMemo(() => {
-    const mondayKey = getCurrentMondayKey();
-    return weeklyReviews[mondayKey]?.priority?.trim() || null;
+    const lastWeekKey = getMondayKey(-1);
+    return weeklyReviews[lastWeekKey]?.priority?.trim() || null;
   }, [weeklyReviews]);
 
   // ─── Nearest Upcoming Event ────────────────────────────────────────────────────
@@ -204,11 +204,13 @@ function App() {
   }, [calendarDayEvents]);
 
   const [eventPopupDismissed, setEventPopupDismissed] = useState(false);
+  const [eventPopupMinimized, setEventPopupMinimized] = useState(false);
   const prevNearestRef = useRef(null);
   useEffect(() => {
     const id = nearestEvent?._ts ?? null;
     if (id !== prevNearestRef.current) {
       setEventPopupDismissed(false);
+      setEventPopupMinimized(false);
       prevNearestRef.current = id;
     }
   }, [nearestEvent]);
@@ -773,17 +775,26 @@ function App() {
       )}
 
       {nearestEvent && !eventPopupDismissed && (
-        <div className="event-popup">
-          <button className="event-popup-close" onClick={() => setEventPopupDismissed(true)}>✕</button>
-          <div className="event-popup-label">NEXT EVENT</div>
-          <div className="event-popup-title">{nearestEvent.title}</div>
-          <div className="event-popup-meta">
-            <span>{formatEventPopupDate(nearestEvent)}</span>
-            <span className="event-popup-dot">·</span>
-            <span>{formatEventPopupTime(nearestEvent)}</span>
+        eventPopupMinimized ? (
+          <button className="event-popup-mini" onClick={() => setEventPopupMinimized(false)}>
+            🗓 <span>NEXT EVENT</span>
+          </button>
+        ) : (
+          <div className="event-popup">
+            <div className="event-popup-actions">
+              <button className="event-popup-action-btn" onClick={() => setEventPopupMinimized(true)} title="Minimize">▾</button>
+              <button className="event-popup-action-btn" onClick={() => setEventPopupDismissed(true)} title="Dismiss">✕</button>
+            </div>
+            <div className="event-popup-label">NEXT EVENT</div>
+            <div className="event-popup-title">{nearestEvent.title}</div>
+            <div className="event-popup-meta">
+              <span>{formatEventPopupDate(nearestEvent)}</span>
+              <span className="event-popup-dot">·</span>
+              <span>{formatEventPopupTime(nearestEvent)}</span>
+            </div>
+            <div className="event-popup-countdown">{eventCountdown}</div>
           </div>
-          <div className="event-popup-countdown">{eventCountdown}</div>
-        </div>
+        )
       )}
 
       {currentWeekPriority && !priorityPopupDismissed && (
