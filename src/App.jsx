@@ -30,9 +30,17 @@ const getLocalDateKey = (offsetDays = 0) => {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
+const getCurrentMondayKey = () => {
+  const d = new Date();
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
 function App() {
   const { firebaseUser, signOut } = useAuth();
   const cloudSyncEnabled = useRef(false);
+  const [cloudSyncReady, setCloudSyncReady] = useState(false);
 
   const [currentPage, setCurrentPage] = useState('statistics');
   const [mentorOpen, setMentorOpen] = useState(false);
@@ -164,6 +172,14 @@ function App() {
     return saved ? JSON.parse(saved) : { items: [], redemptions: [] };
   });
 
+  const [priorityPopupDismissed, setPriorityPopupDismissed] = useState(false);
+  const [priorityPopupMinimized, setPriorityPopupMinimized] = useState(false);
+
+  const currentWeekPriority = useMemo(() => {
+    const mondayKey = getCurrentMondayKey();
+    return weeklyReviews[mondayKey]?.priority?.trim() || null;
+  }, [weeklyReviews]);
+
   // ─── Nearest Upcoming Event ────────────────────────────────────────────────────
   const nearestEvent = useMemo(() => {
     const now = new Date();
@@ -271,10 +287,19 @@ function App() {
   useEffect(() => { persist('gameOfLife_weeklyReviews', weeklyReviews); }, [weeklyReviews]);
   useEffect(() => { persist('gameOfLife_rewards', rewards); }, [rewards]);
 
+  // Enable cloud sync only after persist effects for the Firestore load have run.
+  // Using state + useEffect guarantees this effect runs AFTER all the persist
+  // effects above in the same React commit, so stale local state can never race
+  // past the guard and overwrite Firestore.
+  useEffect(() => {
+    if (cloudSyncReady) cloudSyncEnabled.current = true;
+  }, [cloudSyncReady]);
+
   // ─── Firestore Load & Migration ────────────────────────────────────────────────
   useEffect(() => {
     if (!firebaseUser) return;
     cloudSyncEnabled.current = false;
+    setCloudSyncReady(false);
 
     loadAllUserData(firebaseUser.uid).then(data => {
       if (data) {
@@ -317,11 +342,13 @@ function App() {
           gameOfLife_rewards: rewards,
         }).catch(console.error);
       }
-      // Enable cloud sync only after initial load (prevents overwriting cloud with stale local data)
-      setTimeout(() => { cloudSyncEnabled.current = true; }, 500);
+      // Signal that Firestore data is ready. The cloudSyncReady useEffect above
+      // will set cloudSyncEnabled=true in the same commit cycle as the persist
+      // effects for this load, ensuring no stale state can be written first.
+      setCloudSyncReady(true);
     }).catch(err => {
       console.error('Failed to load from Firestore, using local data', err);
-      cloudSyncEnabled.current = true;
+      setCloudSyncReady(true);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firebaseUser]);
@@ -632,6 +659,7 @@ function App() {
             quickEvents={quickEvents}
             setQuickEvents={setQuickEvents}
             onUpdateStat={updateStat}
+            todos={todos}
           />
         );
       case 'goals':
@@ -756,6 +784,23 @@ function App() {
           </div>
           <div className="event-popup-countdown">{eventCountdown}</div>
         </div>
+      )}
+
+      {currentWeekPriority && !priorityPopupDismissed && (
+        priorityPopupMinimized ? (
+          <button className="priority-popup-mini" onClick={() => setPriorityPopupMinimized(false)}>
+            🎯 <span>PRIORITY</span>
+          </button>
+        ) : (
+          <div className="priority-popup">
+            <div className="priority-popup-actions">
+              <button className="priority-popup-action-btn" onClick={() => setPriorityPopupMinimized(true)} title="Minimize">▾</button>
+              <button className="priority-popup-action-btn" onClick={() => setPriorityPopupDismissed(true)} title="Dismiss">✕</button>
+            </div>
+            <div className="priority-popup-label">🎯 THIS WEEK'S PRIORITY</div>
+            <div className="priority-popup-text">{currentWeekPriority}</div>
+          </div>
+        )
       )}
 
       {/* Mobile bottom navigation bar */}

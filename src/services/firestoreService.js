@@ -1,5 +1,5 @@
 import { db } from '../firebase/config';
-import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDocFromServer, setDoc, writeBatch } from 'firebase/firestore';
 
 const DATA_KEYS = [
   'gameOfLife_todos',
@@ -22,8 +22,10 @@ const DATA_KEYS = [
 ];
 
 export async function loadAllUserData(uid) {
+  // Always fetch from the server to avoid stale in-memory cache returning
+  // old data when another device has written more recent changes.
   const snapshots = await Promise.all(
-    DATA_KEYS.map(key => getDoc(doc(db, 'users', uid, 'data', key)))
+    DATA_KEYS.map(key => getDocFromServer(doc(db, 'users', uid, 'data', key)))
   );
   const data = {};
   let hasAnyData = false;

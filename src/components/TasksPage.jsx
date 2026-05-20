@@ -43,13 +43,13 @@ const TIMEFRAME_LABELS = {
 const STAT_ATTRIBUTES = Object.keys(STAT_META);
 const STAT_LABELS = Object.fromEntries(Object.entries(STAT_META).map(([k, v]) => [k, v.label]));
 
-const AddTaskModal = ({ onClose, onAdd }) => {
+const AddTaskModal = ({ onClose, onAdd, defaultScheduledDate }) => {
   const [text, setText] = useState('');
   const [timeFrame, setTimeFrame] = useState('today');
   const [categories, setCategories] = useState(['discipline']);
   const [dueDate, setDueDate] = useState('');
   const todayStr = toLocalDateStr();
-  const [scheduledDate, setScheduledDate] = useState(todayStr);
+  const [scheduledDate, setScheduledDate] = useState(defaultScheduledDate || todayStr);
 
   const toggleCategory = (attr) => {
     setCategories(prev =>
@@ -786,7 +786,7 @@ const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask
       </div>
 
       {showAddModal && (
-        <AddTaskModal onClose={() => setShowAddModal(false)} onAdd={handleAddTodo} />
+        <AddTaskModal onClose={() => setShowAddModal(false)} onAdd={handleAddTodo} defaultScheduledDate={dayFilter} />
       )}
       {showConfirmModal && pendingTaskId && (
         <ConfirmModal

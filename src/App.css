@@ -199,6 +199,96 @@
   display: inline-block;
 }
 
+/* ─── Weekly Priority Popup ─────────────────────────────────────────────── */
+@keyframes priorityPopupIn {
+  from { opacity: 0; transform: translateX(calc(-100% - 1.5rem)); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.priority-popup {
+  position: fixed;
+  bottom: 1.5rem;
+  left: calc(220px + 1rem);
+  z-index: 9997;
+  width: 240px;
+  background: #0f1117;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-left: 3px solid #fbbf24;
+  border-radius: 10px;
+  padding: 0.85rem 1rem 0.9rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(251,191,36,0.06);
+  animation: priorityPopupIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.priority-popup-actions {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.55rem;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.priority-popup-action-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.7rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  transition: color 0.15s;
+}
+.priority-popup-action-btn:hover { color: rgba(255,255,255,0.7); }
+
+.priority-popup-label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #fbbf24;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.priority-popup-text {
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding-right: 0.5rem;
+}
+
+.priority-popup-mini {
+  position: fixed;
+  bottom: 1.5rem;
+  left: calc(220px + 1rem);
+  z-index: 9997;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #0f1117;
+  border: 1px solid rgba(251,191,36,0.3);
+  border-radius: 20px;
+  padding: 0.35rem 0.75rem;
+  color: #fbbf24;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  animation: priorityPopupIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.priority-popup-mini:hover {
+  border-color: rgba(251,191,36,0.6);
+  box-shadow: 0 4px 20px rgba(251,191,36,0.15);
+}
+
 /* ─── Mobile breakpoint ─────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .content-container {
@@ -222,5 +312,17 @@
     right: 0.75rem;
     width: calc(100vw - 1.5rem);
     max-width: 320px;
+  }
+
+  .priority-popup {
+    bottom: calc(60px + 0.75rem);
+    left: 0.75rem;
+    width: calc(100vw - 1.5rem);
+    max-width: 320px;
+  }
+
+  .priority-popup-mini {
+    bottom: calc(60px + 0.75rem);
+    left: 0.75rem;
   }
 }

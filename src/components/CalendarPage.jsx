@@ -216,6 +216,7 @@ export default function CalendarPage({
   quickEvents,
   setQuickEvents,
   onUpdateStat,
+  todos = [],
 }) {
   const [view, setView] = useState(() => window.innerWidth < 768 ? 'day' : 'week');
   const [anchor, setAnchor] = useState(() => new Date());
@@ -228,6 +229,9 @@ export default function CalendarPage({
   const [editScope, setEditScope] = useState(null);
   const [deleteScope, setDeleteScope] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [upcomingMinimized, setUpcomingMinimized] = useState(false);
+  const [tasksMinimized, setTasksMinimized] = useState(false);
+  const [nextEventMinimized, setNextEventMinimized] = useState(false);
   const [tmplModal, setTmplModal] = useState(null);
   const [tmplForm, setTmplForm] = useState(defaultTmplForm());
   const [newBonusTask, setNewBonusTask] = useState(defaultBonusTaskForm());
@@ -238,6 +242,17 @@ export default function CalendarPage({
   const [nowMs, setNowMs] = useState(() => Date.now());
   const gridRef = useRef(null);
   const todayKey = toDateKey(new Date());
+
+  const getTaskDateKey = (todo) => {
+    if (todo.scheduledDate) return todo.scheduledDate;
+    if (todo.dueDate) return todo.dueDate;
+    if (todo.timeFrame === 'today' || !todo.timeFrame) return todayKey;
+    return null;
+  };
+  const taskPrimaryColor = (task) => {
+    const cats = task.categories || (task.category ? [task.category] : []);
+    return (cats.length && STAT_META[cats[0]]?.color) || '#64748b';
+  };
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -687,11 +702,42 @@ export default function CalendarPage({
     return entries.slice(0, 6);
   })();
 
+  const todosByDate = (() => {
+    const map = {};
+    for (const todo of todos) {
+      if (todo.completed) continue;
+      const dk = getTaskDateKey(todo);
+      if (!dk) continue;
+      if (!map[dk]) map[dk] = [];
+      map[dk].push(todo);
+    }
+    return map;
+  })();
+
+  const upcomingTodos = (() => {
+    const entries = [];
+    for (const [dk, tasks] of Object.entries(todosByDate)) {
+      if (dk < todayKey) continue;
+      for (const task of tasks) entries.push({ ...task, _dateKey: dk });
+    }
+    entries.sort((a, b) => a._dateKey.localeCompare(b._dateKey));
+    return entries.slice(0, 8);
+  })();
+
   // ─── Time Grid (Day / Week) ──────────────────────────────────────────────────
   const renderTimeGrid = (dates) => (
     <div className="cal-grid-wrapper">
       <div className="cal-day-header-row" style={{ gridTemplateColumns: `64px repeat(${dates.length}, minmax(0, 1fr))` }}>
-        <div className="cal-time-gutter-header" />
+        <div className="cal-time-gutter-header">
+          <button
+            className="cal-next-event-toggle"
+            onClick={() => setNextEventMinimized(m => !m)}
+            title={nextEventMinimized ? 'Show next events' : 'Hide next events'}
+            aria-label={nextEventMinimized ? 'Show next events' : 'Hide next events'}
+          >
+            {nextEventMinimized ? <ChevronRight size={11} strokeWidth={3} /> : <ChevronLeft size={11} strokeWidth={3} style={{ transform: 'rotate(-90deg)' }} />}
+          </button>
+        </div>
         {dates.map((d,i) => {
           const dk = toDateKey(d);
           const isToday = dk === todayKey;
@@ -708,34 +754,42 @@ export default function CalendarPage({
             return candidates[0] || null;
           })();
           const soonestRemaining = soonest ? fmtRemaining(soonest.targetMs, nowMs) : '';
+          const dayTaskCount = (todosByDate[dk] || []).length;
           return (
             <div key={i} className={`cal-day-header ${isToday?'cal-day-header--today':''}`}>
               <span className="cal-day-name">{DAYS_LABEL[d.getDay()]}</span>
               <span className={`cal-day-num ${isToday?'cal-day-num--today':''}`}>{d.getDate()}</span>
-              <button
-                type="button"
-                className="cal-dayevents-mini"
-                onClick={(e)=>{
-                  e.stopPropagation();
-                  if (soonest?.evt) openDayEventEdit(dk, soonest.evt);
-                  else openDayEventCreate(dk);
-                }}
-                title={soonest?.evt ? 'Edit next event' : 'Add an event'}
-              >
-                {!soonest?.evt ? (
-                  <>
-                    <span className="cal-dayevents-mini-label">＋ Add event</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="cal-dayevents-mini-top">
-                      <span className="cal-dayevents-mini-dot" style={{ '--mini-color': soonest.evt.color || '#fbbf24' }} />
-                      <span className="cal-dayevents-mini-title">{soonest.evt.title || 'Untitled'}</span>
-                    </span>
-                    <span className="cal-dayevents-mini-meta">{soonestRemaining}</span>
-                  </>
-                )}
-              </button>
+              {!nextEventMinimized && (
+                <button
+                  type="button"
+                  className="cal-dayevents-mini"
+                  onClick={(e)=>{
+                    e.stopPropagation();
+                    if (soonest?.evt) openDayEventEdit(dk, soonest.evt);
+                    else openDayEventCreate(dk);
+                  }}
+                  title={soonest?.evt ? 'Edit next event' : 'Add an event'}
+                >
+                  {!soonest?.evt ? (
+                    <>
+                      <span className="cal-dayevents-mini-label">＋ Add event</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="cal-dayevents-mini-top">
+                        <span className="cal-dayevents-mini-dot" style={{ '--mini-color': soonest.evt.color || '#fbbf24' }} />
+                        <span className="cal-dayevents-mini-title">{soonest.evt.title || 'Untitled'}</span>
+                      </span>
+                      <span className="cal-dayevents-mini-meta">{soonestRemaining}</span>
+                    </>
+                  )}
+                </button>
+              )}
+              {!nextEventMinimized && dayTaskCount > 0 && (
+                <div className="cal-day-task-badge">
+                  {dayTaskCount} task{dayTaskCount !== 1 ? 's' : ''}
+                </div>
+              )}
             </div>
           );
         })}
@@ -913,7 +967,21 @@ export default function CalendarPage({
                       </div>
                     );
                   })}
-                  {dayEvs.length>3&&<div className="cal-month-more">+{dayEvs.length-3} more</div>}
+                  {(() => {
+                    const dayTasks = (todosByDate[dk] || []);
+                    const slotsLeft = Math.max(0, 3 - Math.min(dayEvs.length, 3));
+                    return dayTasks.slice(0, slotsLeft).map((task) => (
+                      <div key={`t-${task.id}`}
+                        className="cal-month-chip cal-month-chip--task"
+                        style={{ '--chip-color': taskPrimaryColor(task) }}
+                        onClick={(e) => e.stopPropagation()}>
+                        {task.text}
+                      </div>
+                    ));
+                  })()}
+                  {(dayEvs.length + (todosByDate[dk] || []).length > 3) && (
+                    <div className="cal-month-more">+{dayEvs.length + (todosByDate[dk] || []).length - 3} more</div>
+                  )}
                 </div>
               </div>
             );
@@ -975,34 +1043,82 @@ export default function CalendarPage({
 
           <div className="cal-sidebar-header">
             <span className="cal-sidebar-title">Upcoming Events</span>
+            <button
+              className="cal-sidebar-minimize-btn"
+              onClick={() => setUpcomingMinimized(m => !m)}
+              title={upcomingMinimized ? 'Expand' : 'Minimize'}
+              aria-label={upcomingMinimized ? 'Expand upcoming events' : 'Minimize upcoming events'}
+            >
+              {upcomingMinimized ? <ChevronRight size={12} strokeWidth={3} /> : <ChevronLeft size={12} strokeWidth={3} style={{ transform: 'rotate(-90deg)' }} />}
+            </button>
           </div>
-          <p className="cal-sidebar-hint">Deadlines & reminders</p>
-          <div className="cal-sidebar-list cal-sidebar-list--events">
-            {upcomingDayEvents.map((evt) => {
-              const d = daysUntil(evt.targetMs, nowMs);
-              const meta = d === 0 ? 'Today' : `${d}d`;
-              return (
-                <button
-                  key={`${evt.dateKey}-${evt.id}`}
-                  type="button"
-                  className="cal-upcoming-item"
-                  style={{ '--up-color': evt.color }}
-                  onClick={() => openDayEventEdit(evt.dateKey, evt)}
-                  title="Edit event"
-                >
-                  <span className="cal-upcoming-dot" />
-                  <span className="cal-upcoming-main">
-                    <span className="cal-upcoming-title">{evt.title}</span>
-                    <span className="cal-upcoming-sub">{evt.dateKey}{evt.time ? ` • ${evt.time}` : ''}</span>
-                  </span>
-                  <span className="cal-upcoming-meta">{meta}</span>
-                </button>
-              );
-            })}
-            {upcomingDayEvents.length === 0 && (
-              <p className="cal-sidebar-empty">No upcoming events.</p>
-            )}
+          {!upcomingMinimized && <p className="cal-sidebar-hint">Deadlines & reminders</p>}
+          {!upcomingMinimized && (
+            <div className="cal-sidebar-list cal-sidebar-list--events">
+              {upcomingDayEvents.map((evt) => {
+                const d = daysUntil(evt.targetMs, nowMs);
+                const meta = d === 0 ? 'Today' : `${d}d`;
+                return (
+                  <button
+                    key={`${evt.dateKey}-${evt.id}`}
+                    type="button"
+                    className="cal-upcoming-item"
+                    style={{ '--up-color': evt.color }}
+                    onClick={() => openDayEventEdit(evt.dateKey, evt)}
+                    title="Edit event"
+                  >
+                    <span className="cal-upcoming-dot" />
+                    <span className="cal-upcoming-main">
+                      <span className="cal-upcoming-title">{evt.title}</span>
+                      <span className="cal-upcoming-sub">{evt.dateKey}{evt.time ? ` • ${evt.time}` : ''}</span>
+                    </span>
+                    <span className="cal-upcoming-meta">{meta}</span>
+                  </button>
+                );
+              })}
+              {upcomingDayEvents.length === 0 && (
+                <p className="cal-sidebar-empty">No upcoming events.</p>
+              )}
+            </div>
+          )}
+
+          <div className="cal-sidebar-divider" />
+
+          <div className="cal-sidebar-header">
+            <span className="cal-sidebar-title">Tasks</span>
+            <button
+              className="cal-sidebar-minimize-btn"
+              onClick={() => setTasksMinimized(m => !m)}
+              title={tasksMinimized ? 'Expand' : 'Minimize'}
+              aria-label={tasksMinimized ? 'Expand tasks' : 'Minimize tasks'}
+            >
+              {tasksMinimized ? <ChevronRight size={12} strokeWidth={3} /> : <ChevronLeft size={12} strokeWidth={3} style={{ transform: 'rotate(-90deg)' }} />}
+            </button>
           </div>
+          {!tasksMinimized && <p className="cal-sidebar-hint">Scheduled &amp; due soon</p>}
+          {!tasksMinimized && (
+            <div className="cal-sidebar-list cal-sidebar-list--tasks">
+              {upcomingTodos.map((task) => {
+                const color = taskPrimaryColor(task);
+                const dk = task._dateKey;
+                const d = daysUntil(buildDayEventTargetMs(dk, null), nowMs);
+                const meta = d === 0 ? 'Today' : `${d}d`;
+                return (
+                  <div key={task.id} className="cal-task-sidebar-item" style={{ '--task-color': color }}>
+                    <span className="cal-task-sidebar-dot" />
+                    <span className="cal-task-sidebar-main">
+                      <span className="cal-task-sidebar-title">{task.text}</span>
+                      <span className="cal-task-sidebar-sub">{dk}</span>
+                    </span>
+                    <span className="cal-task-sidebar-meta">{meta}</span>
+                  </div>
+                );
+              })}
+              {upcomingTodos.length === 0 && (
+                <p className="cal-sidebar-empty">No tasks scheduled.</p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -69,15 +69,16 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
     [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, Object.keys(logs).length, challenges.length]
   );
 
-  const [wentWell, setWentWell]   = useState(saved?.wentWell   || '');
-  const [heldBack, setHeldBack]   = useState(saved?.heldBack   || '');
-  const [priority, setPriority]   = useState(saved?.priority   || '');
-  const [justSaved, setJustSaved] = useState(false);
+  const [wentWell,     setWentWell]     = useState(saved?.wentWell     || '');
+  const [heldBack,     setHeldBack]     = useState(saved?.heldBack     || '');
+  const [improvements, setImprovements] = useState(saved?.improvements || '');
+  const [priority,     setPriority]     = useState(saved?.priority     || '');
+  const [justSaved,    setJustSaved]    = useState(false);
 
   const handleSave = () => {
     setWeeklyReviews(prev => ({
       ...prev,
-      [mondayKey]: { wentWell, heldBack, priority, completedAt: Date.now(), stats },
+      [mondayKey]: { wentWell, heldBack, improvements, priority, completedAt: Date.now(), stats },
     }));
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
@@ -91,6 +92,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
     setWeekOffset(newOffset);
     setWentWell(newSaved?.wentWell || '');
     setHeldBack(newSaved?.heldBack || '');
+    setImprovements(newSaved?.improvements || '');
     setPriority(newSaved?.priority || '');
   };
 
@@ -156,6 +158,16 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
               />
             </div>
             <div className="review-prompt-group">
+              <label className="review-prompt-label">📈 What do I need to improve on next week?</label>
+              <textarea
+                className="review-textarea"
+                placeholder="Skills to sharpen, habits to build, behaviors to change..."
+                value={improvements}
+                onChange={e => setImprovements(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="review-prompt-group">
               <label className="review-prompt-label">🎯 #1 Priority for next week</label>
               <textarea
                 className="review-textarea review-textarea--highlight"
@@ -187,6 +199,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
                   setWeekOffset(off);
                   setWentWell(r.wentWell || '');
                   setHeldBack(r.heldBack || '');
+                  setImprovements(r.improvements || '');
                   setPriority(r.priority || '');
                 }}
               >
