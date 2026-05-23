@@ -119,7 +119,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { temperature: 0.7, maxOutputTokens: 256 },
+        config: { temperature: 0.7, maxOutputTokens: 1024 },
       });
 
       setAiInsight(response.text?.trim() || 'Could not generate insight.');
@@ -211,7 +211,11 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
             {aiError && <p className="review-ai-error">{aiError}</p>}
             {aiInsight && (
               <div className="review-ai-result">
-                <p className="review-ai-text">{aiInsight}</p>
+                <p className="review-ai-text">
+                  {aiInsight.split(/\*\*(.*?)\*\*/g).map((part, i) =>
+                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                  )}
+                </p>
               </div>
             )}
           </div>
