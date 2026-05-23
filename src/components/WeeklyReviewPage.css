@@ -65,6 +65,67 @@
 .review-stat-value { font-size: 1.1rem; font-weight: 800; color: #fbbf24; }
 .review-stat-label { font-size: 0.62rem; color: #737373; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
 
+/* AI Insight */
+.review-ai-insight {
+  background: #1c1c1c;
+  border: 1px solid #2a2a2a;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.review-ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.review-ai-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #d4d4d4;
+}
+.review-ai-btn {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  border: none;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.review-ai-btn:hover:not(:disabled) { opacity: 0.85; }
+.review-ai-btn:disabled { opacity: 0.5; cursor: default; }
+.review-ai-hint {
+  font-size: 0.78rem;
+  color: #525252;
+  margin: 0;
+  line-height: 1.5;
+}
+.review-ai-error {
+  font-size: 0.78rem;
+  color: #f87171;
+  margin: 0;
+}
+.review-ai-result {
+  background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(124,58,237,0.05));
+  border: 1px solid rgba(168,85,247,0.2);
+  border-radius: 10px;
+  padding: 0.85rem;
+}
+.review-ai-text {
+  font-size: 0.85rem;
+  color: #e5e5e5;
+  margin: 0;
+  line-height: 1.6;
+}
+
 /* Prompts */
 .review-prompts { display: flex; flex-direction: column; gap: 1rem; }
 .review-prompt-group { display: flex; flex-direction: column; gap: 0.4rem; }

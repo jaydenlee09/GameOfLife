@@ -58,6 +58,15 @@ const STAT_ITEMS = [
   { key: 'challengesDone', icon: '⚔️', label: 'Challenges Done',    fmt: v => `${v}` },
 ];
 
+const getWeekDays = (mondayKey) => {
+  const mon = new Date(mondayKey + 'T00:00:00');
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mon);
+    d.setDate(d.getDate() + i);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+};
+
 const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, challenges = [] }) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const mondayKey = getMondayKey(weekOffset);
@@ -74,6 +83,52 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
   const [improvements, setImprovements] = useState(saved?.improvements || '');
   const [priority,     setPriority]     = useState(saved?.priority     || '');
   const [justSaved,    setJustSaved]    = useState(false);
+
+  const [aiInsight,  setAiInsight]  = useState(null);
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const [aiError,    setAiError]    = useState(null);
+
+  const analyzeImprovements = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiInsight(null);
+
+    const days = getWeekDays(mondayKey);
+    const allItems = [];
+    for (const day of days) {
+      const entry = logs[day];
+      if (!entry?.improve) continue;
+      for (const item of entry.improve) {
+        if (item?.trim()) allItems.push(item.trim());
+      }
+    }
+
+    if (allItems.length === 0) {
+      setAiError('No improvement entries found for this week.');
+      setAiLoading(false);
+      return;
+    }
+
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey });
+
+      const prompt = `Here are things I wrote as areas to improve on in my daily journal entries this week:\n\n${allItems.map((item, i) => `${i + 1}. ${item}`).join('\n')}\n\nWhat is the most common theme or pattern? Be direct and concise — 2–3 sentences max. Name the specific recurring pattern, then give one concrete action I can take.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { temperature: 0.7, maxOutputTokens: 256 },
+      });
+
+      setAiInsight(response.text?.trim() || 'Could not generate insight.');
+    } catch {
+      setAiError('Failed to analyze. Check your API key.');
+    }
+
+    setAiLoading(false);
+  };
 
   const handleSave = () => {
     setWeeklyReviews(prev => ({
@@ -94,6 +149,8 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
     setHeldBack(newSaved?.heldBack || '');
     setImprovements(newSaved?.improvements || '');
     setPriority(newSaved?.priority || '');
+    setAiInsight(null);
+    setAiError(null);
   };
 
   const pastReviews = Object.entries(weeklyReviews)
@@ -131,6 +188,30 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
                 <span className="review-stat-icon">😊</span>
                 <span className="review-stat-value">{stats.topEmotion}</span>
                 <span className="review-stat-label">Top Mood</span>
+              </div>
+            )}
+          </div>
+
+          {/* AI Improvement Insight */}
+          <div className="review-ai-insight">
+            <div className="review-ai-header">
+              <span className="review-ai-title">🤖 AI Pattern Analysis</span>
+              <button
+                className="review-ai-btn"
+                onClick={analyzeImprovements}
+                disabled={aiLoading}
+              >
+                {aiLoading ? 'Analyzing…' : 'Analyze Improvements'}
+              </button>
+            </div>
+            {!aiInsight && !aiError && !aiLoading && (
+              <p className="review-ai-hint">Tap to find the most common thing you wrote in "things I can improve" across this week's daily logs.</p>
+            )}
+            {aiLoading && <p className="review-ai-hint">Scanning your entries…</p>}
+            {aiError && <p className="review-ai-error">{aiError}</p>}
+            {aiInsight && (
+              <div className="review-ai-result">
+                <p className="review-ai-text">{aiInsight}</p>
               </div>
             )}
           </div>
