@@ -21,19 +21,29 @@ const calcSleepHours = (bed, wake) => {
 const ENERGY_LABELS = ['', 'Drained', 'Low', 'Okay', 'Good', 'Great'];
 const ENERGY_COLORS = ['', '#f87171', '#fb923c', '#fbbf24', '#4ade80', '#22d3ee'];
 
+const SCREENTIME_COLORS = { ideal: '#4ade80', toomuch: '#fb923c', excessive: '#f87171' };
+const getScreentimeStatus = (h) => h <= 1 ? 'ideal' : h <= 3 ? 'toomuch' : 'excessive';
+const SCREENTIME_LABELS   = { ideal: '✓ Ideal', toomuch: 'Too Much', excessive: '⚠ Excessive' };
+
 const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
   const todayKey = getLocalDateKey(0);
   const today    = healthLog[todayKey] || {};
 
-  const [bedtime,   setBedtime]   = useState(today.sleepBedtime  || '');
-  const [waketime,  setWaketime]  = useState(today.sleepWakeTime || '');
-  const [energy,    setEnergy]    = useState(today.energyLevel   || 0);
-  const [water,     setWater]     = useState(today.waterGlasses  || 0);
-  const [workouts,  setWorkouts]  = useState(today.workouts      || []);
-  const [newWType,  setNewWType]  = useState('Run');
-  const [newWDur,   setNewWDur]   = useState('');
-  const [newWNote,  setNewWNote]  = useState('');
-  const [saved,     setSaved]     = useState(false);
+  const [bedtime,      setBedtime]      = useState(today.sleepBedtime  || '');
+  const [waketime,     setWaketime]     = useState(today.sleepWakeTime || '');
+  const [energy,       setEnergy]       = useState(today.energyLevel   || 0);
+  const [water,        setWater]        = useState(today.waterGlasses  || 0);
+  const [workouts,     setWorkouts]     = useState(today.workouts      || []);
+  const [newWType,     setNewWType]     = useState('Run');
+  const [newWDur,      setNewWDur]      = useState('');
+  const [newWNote,     setNewWNote]     = useState('');
+  const [screentimeH,  setScreentimeH]  = useState(today.screentimeHours != null ? Math.floor(today.screentimeHours) : 0);
+  const [screentimeM,  setScreentimeM]  = useState(today.screentimeHours != null ? Math.round((today.screentimeHours % 1) * 60) : 0);
+  const [saved,        setSaved]        = useState(false);
+
+  const screentimeTotal  = screentimeH + screentimeM / 60;
+  const screentimeStatus = getScreentimeStatus(screentimeTotal);
+  const screentimeColor  = SCREENTIME_COLORS[screentimeStatus];
 
   const sleepHours = calcSleepHours(bedtime, waketime);
 
@@ -48,13 +58,14 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
 
   const handleSave = () => {
     const entry = {
-      sleepBedtime:  bedtime,
-      sleepWakeTime: waketime,
-      sleepHours:    sleepHours,
+      sleepBedtime:    bedtime,
+      sleepWakeTime:   waketime,
+      sleepHours:      sleepHours,
       workouts,
-      energyLevel:   energy,
-      waterGlasses:  water,
-      xpAwarded:     today.xpAwarded || false,
+      energyLevel:     energy,
+      waterGlasses:    water,
+      screentimeHours: screentimeTotal,
+      xpAwarded:       today.xpAwarded || false,
     };
 
     // Award XP if not already awarded today
@@ -84,6 +95,14 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
   });
 
   const maxSleep = Math.max(10, ...last7Sleep.map(s => s.hours));
+
+  const last7Screentime = Array.from({ length: 7 }, (_, i) => {
+    const key   = getLocalDateKey(-(6 - i));
+    const entry = healthLog[key];
+    const d     = new Date(); d.setDate(d.getDate() - (6 - i));
+    return { label: d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1), hours: entry?.screentimeHours || 0, key };
+  });
+  const maxScreentime = Math.max(8, ...last7Screentime.map(s => s.hours));
 
   return (
     <div className="health-page">
@@ -173,6 +192,45 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
             </div>
           </div>
 
+          <div className="health-card">
+            <h2 className="health-card-title">📱 SCREEN TIME</h2>
+            <div className="health-screentime-row">
+              <div className="health-screentime-inputs">
+                <div className="health-screentime-field">
+                  <button className="health-st-stepper" onClick={() => setScreentimeH(h => Math.max(0, h - 1))}>−</button>
+                  <input
+                    type="number" className="health-input health-st-input"
+                    min="0" max="24" value={screentimeH}
+                    onChange={e => setScreentimeH(Math.min(24, Math.max(0, parseInt(e.target.value) || 0)))}
+                  />
+                  <button className="health-st-stepper" onClick={() => setScreentimeH(h => Math.min(24, h + 1))}>+</button>
+                  <span className="health-st-unit">h</span>
+                </div>
+                <div className="health-screentime-field">
+                  <button className="health-st-stepper" onClick={() => setScreentimeM(m => m === 0 ? 45 : m - 15)}>−</button>
+                  <input
+                    type="number" className="health-input health-st-input"
+                    min="0" max="59" value={screentimeM}
+                    onChange={e => setScreentimeM(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                  />
+                  <button className="health-st-stepper" onClick={() => setScreentimeM(m => m >= 45 ? 0 : m + 15)}>+</button>
+                  <span className="health-st-unit">m</span>
+                </div>
+              </div>
+              {screentimeTotal > 0 && (
+                <div className="health-screentime-badge" style={{ borderColor: screentimeColor, background: `${screentimeColor}18`, color: screentimeColor }}>
+                  <span className="health-st-total">{screentimeH > 0 ? `${screentimeH}h ` : ''}{screentimeM > 0 ? `${screentimeM}m` : screentimeH > 0 ? '' : '0m'}</span>
+                  <span className="health-st-status">{SCREENTIME_LABELS[screentimeStatus]}</span>
+                </div>
+              )}
+            </div>
+            <div className="health-screentime-guide">
+              <span style={{ color: SCREENTIME_COLORS.ideal }}>&lt;1h ideal</span>
+              <span style={{ color: SCREENTIME_COLORS.toomuch }}>1–3h too much</span>
+              <span style={{ color: SCREENTIME_COLORS.excessive }}>&gt;3h excessive</span>
+            </div>
+          </div>
+
           <button className={`health-save-btn ${saved ? 'saved' : ''}`} onClick={handleSave}>
             {saved ? '✓ Saved! XP Awarded' : 'Save Today\'s Log'}
           </button>
@@ -201,6 +259,35 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
               <span className="health-legend-dot good" />8–10h optimal
               <span className="health-legend-dot ok" style={{ marginLeft: '0.75rem' }} />6–7h fair
               <span className="health-legend-dot bad" style={{ marginLeft: '0.75rem' }} />&lt;6h
+            </div>
+          </div>
+
+          <div className="health-card">
+            <h2 className="health-card-title">📱 7-DAY SCREEN TIME</h2>
+            <div className="health-sleep-chart">
+              {last7Screentime.map(({ label, hours, key }) => {
+                const status = hours > 0 ? getScreentimeStatus(hours) : 'empty';
+                return (
+                  <div key={key} className="health-sleep-bar-col">
+                    <div className="health-sleep-bar-wrap">
+                      <div
+                        className="health-sleep-bar-fill"
+                        style={{
+                          height: `${hours > 0 ? (hours / maxScreentime) * 100 : 4}%`,
+                          background: hours > 0 ? SCREENTIME_COLORS[status] : '#2a2a2a',
+                        }}
+                      />
+                    </div>
+                    <span className="health-sleep-bar-val">{hours > 0 ? `${Math.floor(hours)}h${Math.round((hours % 1) * 60) > 0 ? `${Math.round((hours % 1) * 60)}m` : ''}` : '—'}</span>
+                    <span className="health-sleep-bar-day">{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="health-sleep-legend">
+              <span className="health-legend-dot" style={{ background: SCREENTIME_COLORS.ideal }} />&lt;1h ideal
+              <span className="health-legend-dot" style={{ background: SCREENTIME_COLORS.toomuch, marginLeft: '0.75rem' }} />1–3h
+              <span className="health-legend-dot" style={{ background: SCREENTIME_COLORS.excessive, marginLeft: '0.75rem' }} />&gt;3h
             </div>
           </div>
 
