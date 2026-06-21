@@ -41,9 +41,10 @@ function App() {
   const { firebaseUser, signOut } = useAuth();
   const cloudSyncEnabled = useRef(false);
   const [cloudSyncReady, setCloudSyncReady] = useState(false);
-  // Keys edited locally since the current Firestore load/subscription cycle
-  // started, so an in-flight fetch or a live update for the same key can't
-  // clobber an edit the user just made.
+  // Keys edited locally during the current Firestore load (between login and
+  // that one fetch resolving), so the load can't clobber an edit the user
+  // just made. Cleared as soon as that load finishes deciding — see the
+  // Firestore Load effect below.
   const touchedSinceLoadStart = useRef(new Set());
 
   const [currentPage, setCurrentPage] = useState('statistics');
@@ -352,6 +353,10 @@ function App() {
           gameOfLife_shop: shop,
         }).catch(console.error);
       }
+      // This load has now made its one decision per key (apply cloud value or
+      // keep the local edit); clear the set so it doesn't keep blocking live
+      // updates for those keys for the rest of the session.
+      touchedSinceLoadStart.current = new Set();
       // Signal that Firestore data is ready. The cloudSyncReady useEffect above
       // will set cloudSyncEnabled=true in the same commit cycle as the persist
       // effects for this load, ensuring no stale state can be written first.
@@ -386,10 +391,11 @@ function App() {
 
   useEffect(() => {
     if (!firebaseUser || !cloudSyncReady) return;
+    // No touchedSinceLoadStart check here: that guard is scoped to the one
+    // initial load (and is cleared once it resolves), since this listener
+    // already ignores echoes of our own writes via firestoreService's
+    // lastWrittenValue cache.
     const unsubscribe = subscribeToUserData(firebaseUser.uid, (key, value) => {
-      // Still inside this load's protection window — let the load's own
-      // guard (above) be the only thing that decides this key.
-      if (touchedSinceLoadStart.current.has(key)) return;
       keySetters.current[key]?.(value);
     });
     return unsubscribe;
