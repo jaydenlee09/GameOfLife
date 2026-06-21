@@ -3,6 +3,16 @@ import './ShopPage.css';
 
 const PRIORITY_OPTIONS = ['low', 'medium', 'high'];
 
+const fetchPreviewImage = async (url) => {
+  try {
+    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    return data?.data?.image?.url || data?.data?.logo?.url || '';
+  } catch {
+    return '';
+  }
+};
+
 const ShopPage = ({ shop = { items: [] }, setShop }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
@@ -10,6 +20,7 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
   const [newUrl, setNewUrl] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [newPriority, setNewPriority] = useState('medium');
+  const [fetchingImageFor, setFetchingImageFor] = useState(null);
 
   const items = shop.items || [];
   const totalUnpurchased = items.filter(i => !i.purchased).reduce((s, i) => s + (Number(i.price) || 0), 0);
@@ -23,13 +34,24 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
     setShowAdd(false);
   };
 
+  const setItemImage = (id, imageUrl) => {
+    if (!imageUrl) return;
+    setShop(prev => ({
+      ...prev,
+      items: prev.items.map(i => i.id === id ? { ...i, imageUrl } : i),
+    }));
+  };
+
   const handleAddItem = () => {
     if (!newName.trim()) return;
+    const id = Date.now().toString();
+    const url = newUrl.trim();
     const item = {
-      id: Date.now().toString(),
+      id,
       name: newName.trim(),
       price: Number(newPrice) || 0,
-      url: newUrl.trim(),
+      url,
+      imageUrl: '',
       category: newCategory.trim(),
       priority: newPriority,
       purchased: false,
@@ -37,6 +59,16 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
     };
     setShop(prev => ({ ...prev, items: [item, ...(prev.items || [])] }));
     resetForm();
+
+    if (url) fetchPreviewImage(url).then(imageUrl => setItemImage(id, imageUrl));
+  };
+
+  const handleFetchImage = async (item) => {
+    if (!item.url || fetchingImageFor) return;
+    setFetchingImageFor(item.id);
+    const imageUrl = await fetchPreviewImage(item.url);
+    setItemImage(item.id, imageUrl);
+    setFetchingImageFor(null);
   };
 
   const handleDeleteItem = (id) => {
@@ -72,7 +104,7 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
               <input className="shop-input shop-input--sm" type="number" min="0" step="0.01" placeholder="Price ($)" value={newPrice} onChange={e => setNewPrice(e.target.value)} />
               <input className="shop-input shop-input--sm" placeholder="Category (optional)" value={newCategory} onChange={e => setNewCategory(e.target.value)} />
             </div>
-            <input className="shop-input" placeholder="Link / URL (optional)" value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+            <input className="shop-input" placeholder="Link / URL (optional — used to fetch a preview image)" value={newUrl} onChange={e => setNewUrl(e.target.value)} />
             <div className="shop-priority-row">
               <span className="shop-priority-label">Priority:</span>
               <div className="shop-priority-pills">
@@ -97,6 +129,14 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
           {items.map(item => (
             <div key={item.id} className={`shop-card ${item.purchased ? 'purchased' : ''}`}>
               <button className="shop-delete" onClick={() => handleDeleteItem(item.id)} title="Remove">✕</button>
+              {item.imageUrl && (
+                <img
+                  className="shop-item-image"
+                  src={item.imageUrl}
+                  alt={item.name}
+                  onError={e => { e.target.style.display = 'none'; }}
+                />
+              )}
               <label className="shop-checkbox-row">
                 <input type="checkbox" checked={item.purchased} onChange={() => handleTogglePurchased(item.id)} />
                 <span className="shop-checkbox-label">Purchased</span>
@@ -109,6 +149,15 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
               </div>
               {item.url && (
                 <a className="shop-item-link" href={item.url} target="_blank" rel="noopener noreferrer">View item ↗</a>
+              )}
+              {item.url && !item.imageUrl && (
+                <button
+                  className="shop-fetch-image-btn"
+                  onClick={() => handleFetchImage(item)}
+                  disabled={fetchingImageFor === item.id}
+                >
+                  {fetchingImageFor === item.id ? 'Fetching…' : '+ Fetch image'}
+                </button>
               )}
             </div>
           ))}
