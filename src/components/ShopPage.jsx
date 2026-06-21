@@ -18,9 +18,12 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newUrl, setNewUrl] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [newPriority, setNewPriority] = useState('medium');
   const [fetchingImageFor, setFetchingImageFor] = useState(null);
+  const [manualImageEditId, setManualImageEditId] = useState(null);
+  const [manualImageValue, setManualImageValue] = useState('');
 
   const items = shop.items || [];
   const totalUnpurchased = items.filter(i => !i.purchased).reduce((s, i) => s + (Number(i.price) || 0), 0);
@@ -29,6 +32,7 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
     setNewName('');
     setNewPrice('');
     setNewUrl('');
+    setNewImageUrl('');
     setNewCategory('');
     setNewPriority('medium');
     setShowAdd(false);
@@ -46,12 +50,13 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
     if (!newName.trim()) return;
     const id = Date.now().toString();
     const url = newUrl.trim();
+    const imageUrl = newImageUrl.trim();
     const item = {
       id,
       name: newName.trim(),
       price: Number(newPrice) || 0,
       url,
-      imageUrl: '',
+      imageUrl,
       category: newCategory.trim(),
       priority: newPriority,
       purchased: false,
@@ -60,7 +65,7 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
     setShop(prev => ({ ...prev, items: [item, ...(prev.items || [])] }));
     resetForm();
 
-    if (url) fetchPreviewImage(url).then(imageUrl => setItemImage(id, imageUrl));
+    if (!imageUrl && url) fetchPreviewImage(url).then(fetched => setItemImage(id, fetched));
   };
 
   const handleFetchImage = async (item) => {
@@ -69,6 +74,13 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
     const imageUrl = await fetchPreviewImage(item.url);
     setItemImage(item.id, imageUrl);
     setFetchingImageFor(null);
+  };
+
+  const handleSetManualImage = (id) => {
+    const trimmed = manualImageValue.trim();
+    if (trimmed) setItemImage(id, trimmed);
+    setManualImageEditId(null);
+    setManualImageValue('');
   };
 
   const handleDeleteItem = (id) => {
@@ -105,6 +117,7 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
               <input className="shop-input shop-input--sm" placeholder="Category (optional)" value={newCategory} onChange={e => setNewCategory(e.target.value)} />
             </div>
             <input className="shop-input" placeholder="Link / URL (optional — used to fetch a preview image)" value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+            <input className="shop-input" placeholder="Image URL (optional — overrides auto-fetch)" value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} />
             <div className="shop-priority-row">
               <span className="shop-priority-label">Priority:</span>
               <div className="shop-priority-pills">
@@ -150,14 +163,37 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
               {item.url && (
                 <a className="shop-item-link" href={item.url} target="_blank" rel="noopener noreferrer">View item ↗</a>
               )}
-              {item.url && !item.imageUrl && (
-                <button
-                  className="shop-fetch-image-btn"
-                  onClick={() => handleFetchImage(item)}
-                  disabled={fetchingImageFor === item.id}
-                >
-                  {fetchingImageFor === item.id ? 'Fetching…' : '+ Fetch image'}
-                </button>
+              {!item.imageUrl && manualImageEditId !== item.id && (
+                <div className="shop-image-actions">
+                  {item.url && (
+                    <button
+                      className="shop-fetch-image-btn"
+                      onClick={() => handleFetchImage(item)}
+                      disabled={fetchingImageFor === item.id}
+                    >
+                      {fetchingImageFor === item.id ? 'Fetching…' : '+ Fetch image'}
+                    </button>
+                  )}
+                  <button
+                    className="shop-fetch-image-btn"
+                    onClick={() => { setManualImageEditId(item.id); setManualImageValue(''); }}
+                  >
+                    + Add image
+                  </button>
+                </div>
+              )}
+              {manualImageEditId === item.id && (
+                <div className="shop-image-manual-row">
+                  <input
+                    className="shop-input shop-input--sm"
+                    placeholder="Image URL"
+                    value={manualImageValue}
+                    onChange={e => setManualImageValue(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSetManualImage(item.id)}
+                    autoFocus
+                  />
+                  <button className="shop-fetch-image-btn" onClick={() => handleSetManualImage(item.id)}>Set</button>
+                </div>
               )}
             </div>
           ))}

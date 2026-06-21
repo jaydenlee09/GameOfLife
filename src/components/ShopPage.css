@@ -203,6 +203,10 @@
 .shop-fetch-image-btn:hover:not(:disabled) { border-color: #34d399; color: #34d399; }
 .shop-fetch-image-btn:disabled { opacity: 0.5; cursor: default; }
 
+.shop-image-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.shop-image-manual-row { display: flex; gap: 0.4rem; margin-top: 0.25rem; }
+.shop-image-manual-row .shop-input--sm { padding: 0.4rem 0.6rem; }
+
 /* Mobile */
 @media (max-width: 768px) {
   .shop-page {
