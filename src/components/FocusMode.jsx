@@ -44,28 +44,47 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
   const [showTaskPicker, setShowTaskPicker] = useState(false);
 
   const intervalRef = useRef(null);
+  const endTimeRef  = useRef(null); // wall-clock timestamp (ms) when the timer reaches 0
   const pinnedTask  = todayTasks.find(t => t.id === pinnedId) || todayTasks[0];
 
+  // Recomputes remaining time from a fixed end timestamp rather than counting down
+  // by 1 each call, so background tab throttling/suspension of setInterval can't
+  // cause drift — the moment the tab wakes up, the correct remaining time is restored.
   const tick = useCallback(() => {
-    setTimeLeft(prev => {
-      if (prev <= 1) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-        setIsRunning(false);
-        setHasStarted(false);
-        playFinishSound();
-        setTimeout(() => setShowDone(true), 600);
-        return 0;
-      }
-      return prev - 1;
-    });
+    if (!endTimeRef.current) return;
+    const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
+    setTimeLeft(remaining);
+    if (remaining <= 0) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      endTimeRef.current = null;
+      setIsRunning(false);
+      setHasStarted(false);
+      playFinishSound();
+      setTimeout(() => setShowDone(true), 600);
+    }
   }, []);
 
   useEffect(() => {
-    if (isRunning) intervalRef.current = setInterval(tick, 1000);
-    else clearInterval(intervalRef.current);
+    if (isRunning) {
+      if (!endTimeRef.current) endTimeRef.current = Date.now() + timeLeft * 1000;
+      intervalRef.current = setInterval(tick, 1000);
+    } else {
+      clearInterval(intervalRef.current);
+    }
     return () => clearInterval(intervalRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, tick]);
+
+  // Resync immediately when the tab regains visibility, instead of waiting for
+  // the next (possibly throttled) interval tick.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [tick]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -80,9 +99,9 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
     if (!startedAt) setStartedAt(Date.now());
   };
 
-  const handlePause = () => setIsRunning(false);
-  const handleReset = () => { setIsRunning(false); setHasStarted(false); setTimeLeft(totalSecs); setStartedAt(null); };
-  const setPreset = (s) => { setIsRunning(false); setHasStarted(false); setTotalSecs(s); setTimeLeft(s); setStartedAt(null); };
+  const handlePause = () => { setIsRunning(false); endTimeRef.current = null; };
+  const handleReset = () => { setIsRunning(false); setHasStarted(false); setTimeLeft(totalSecs); setStartedAt(null); endTimeRef.current = null; };
+  const setPreset = (s) => { setIsRunning(false); setHasStarted(false); setTotalSecs(s); setTimeLeft(s); setStartedAt(null); endTimeRef.current = null; };
 
   const handleClaimXp = () => {
     onUpdateStat(xpStat, xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });

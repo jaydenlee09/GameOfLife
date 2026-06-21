@@ -94,6 +94,7 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
   const [activePreset, setActivePreset] = useState(25 * 60);
 
   const intervalRef = useRef(null);
+  const endTimeRef  = useRef(null); // wall-clock timestamp (ms) when the timer reaches 0
 
   // ── Derived session stats ────────────────────────────────────────────────
   const todayKey = getLocalDateKey(0);
@@ -111,29 +112,44 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
   });
 
   // ── Tick ──────────────────────────────────────────────────────────────────
+  // Recomputes remaining time from a fixed end timestamp rather than counting down
+  // by 1 each call, so background tab throttling/suspension of setInterval can't
+  // cause drift — the moment the tab wakes up, the correct remaining time is restored.
   const tick = useCallback(() => {
-    setTimeLeft((prev) => {
-      if (prev <= 1) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-        setIsRunning(false);
-        setHasStarted(false);
-        playFinishSound();
-        setTimeout(() => setShowXpModal(true), 600);
-        return 0;
-      }
-      return prev - 1;
-    });
+    if (!endTimeRef.current) return;
+    const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
+    setTimeLeft(remaining);
+    if (remaining <= 0) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      endTimeRef.current = null;
+      setIsRunning(false);
+      setHasStarted(false);
+      playFinishSound();
+      setTimeout(() => setShowXpModal(true), 600);
+    }
   }, []);
 
   useEffect(() => {
     if (isRunning) {
+      if (!endTimeRef.current) endTimeRef.current = Date.now() + timeLeft * 1000;
       intervalRef.current = setInterval(tick, 1000);
     } else {
       clearInterval(intervalRef.current);
     }
     return () => clearInterval(intervalRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, tick]);
+
+  // Resync immediately when the tab regains visibility, instead of waiting for
+  // the next (possibly throttled) interval tick.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [tick]);
 
   // ── Controls ──────────────────────────────────────────────────────────────
   const handleStart = () => {
@@ -143,13 +159,17 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
     if (!sessionStartedAt) setSessionStartedAt(Date.now());
   };
 
-  const handlePause = () => setIsRunning(false);
+  const handlePause = () => {
+    setIsRunning(false);
+    endTimeRef.current = null;
+  };
 
   const handleReset = () => {
     setIsRunning(false);
     setHasStarted(false);
     setTimeLeft(totalSeconds);
     setSessionStartedAt(null);
+    endTimeRef.current = null;
   };
 
   const handlePreset = (seconds) => {
@@ -161,6 +181,7 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
     setCustomMinutes('');
     setCustomSeconds('');
     setSessionStartedAt(null);
+    endTimeRef.current = null;
   };
 
   const handleCustomApply = () => {
@@ -174,6 +195,7 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
     setTimeLeft(total);
     setActivePreset(null);
     setSessionStartedAt(null);
+    endTimeRef.current = null;
   };
 
   const handleCustomKeyDown = (e) => { if (e.key === 'Enter') handleCustomApply(); };
