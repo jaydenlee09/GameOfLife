@@ -11,7 +11,7 @@ const NAV_LINKS = [
   { id: 'goals',      label: 'Goals',       icon: <TargetIcon /> },
   { id: 'health',     label: 'Health',      icon: <HeartIcon /> },
   { id: 'review',     label: 'Review',      icon: <ReviewIcon /> },
-  { id: 'rewards',    label: 'Rewards',     icon: <TrophyIcon /> },
+  { id: 'shop',       label: 'Shop',        icon: <ShopIcon /> },
 ];
 
 const getRankGradient = (level) => {
@@ -113,13 +113,11 @@ export function ReviewIcon() {
   );
 }
 
-export function TrophyIcon() {
+export function ShopIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M5 1H11V7C11 9.2 9.7 11 8 11C6.3 11 5 9.2 5 7V1Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-      <path d="M5 3H2.5C2.5 3 2 6 4.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      <path d="M11 3H13.5C13.5 3 14 6 11.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      <path d="M8 11V14M5 14H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M3 5H13L12.3 13.2C12.25 13.65 11.87 14 11.42 14H4.58C4.13 14 3.75 13.65 3.7 13.2L3 5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <path d="M5.5 5V3.5C5.5 2.12 6.62 1 8 1C9.38 1 10.5 2.12 10.5 3.5V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   );
 }

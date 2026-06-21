@@ -20,7 +20,7 @@ import GoalsPage from './components/GoalsPage'
 import DataModal from './components/DataModal'
 import HealthPage from './components/HealthPage'
 import WeeklyReviewPage from './components/WeeklyReviewPage'
-import RewardsPage from './components/RewardsPage'
+import ShopPage from './components/ShopPage'
 import FocusMode from './components/FocusMode'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
 
@@ -167,9 +167,9 @@ function App() {
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [rewards, setRewards] = useState(() => {
-    const saved = localStorage.getItem('gameOfLife_rewards');
-    return saved ? JSON.parse(saved) : { items: [], redemptions: [] };
+  const [shop, setShop] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_shop');
+    return saved ? JSON.parse(saved) : { items: [] };
   });
 
   const [priorityPopupDismissed, setPriorityPopupDismissed] = useState(false);
@@ -287,7 +287,7 @@ function App() {
   useEffect(() => { persist('gameOfLife_achievements', achievements); }, [achievements]);
   useEffect(() => { persist('gameOfLife_healthLog', healthLog); }, [healthLog]);
   useEffect(() => { persist('gameOfLife_weeklyReviews', weeklyReviews); }, [weeklyReviews]);
-  useEffect(() => { persist('gameOfLife_rewards', rewards); }, [rewards]);
+  useEffect(() => { persist('gameOfLife_shop', shop); }, [shop]);
 
   // Enable cloud sync only after persist effects for the Firestore load have run.
   // Using state + useEffect guarantees this effect runs AFTER all the persist
@@ -321,7 +321,7 @@ function App() {
         if (data.gameOfLife_achievements) setAchievements(data.gameOfLife_achievements);
         if (data.gameOfLife_healthLog) setHealthLog(data.gameOfLife_healthLog);
         if (data.gameOfLife_weeklyReviews) setWeeklyReviews(data.gameOfLife_weeklyReviews);
-        if (data.gameOfLife_rewards) setRewards(data.gameOfLife_rewards);
+        if (data.gameOfLife_shop) setShop(data.gameOfLife_shop);
       } else {
         // First login — migrate whatever exists in localStorage to the cloud
         migrateLocalStorageToFirestore(firebaseUser.uid, {
@@ -341,7 +341,7 @@ function App() {
           gameOfLife_achievements: achievements,
           gameOfLife_healthLog: healthLog,
           gameOfLife_weeklyReviews: weeklyReviews,
-          gameOfLife_rewards: rewards,
+          gameOfLife_shop: shop,
         }).catch(console.error);
       }
       // Signal that Firestore data is ready. The cloudSyncReady useEffect above
@@ -576,7 +576,7 @@ function App() {
         if (pageMap[e.key]) { e.preventDefault(); setCurrentPage(pageMap[e.key]); return; }
         if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setMentorOpen(o => !o); return; }
         if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFocusModeOpen(true); return; }
-        if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setCurrentPage('rewards'); return; }
+        if (e.key === 's' || e.key === 'S') { e.preventDefault(); setCurrentPage('shop'); return; }
       }
     };
     window.addEventListener('keydown', handler);
@@ -695,13 +695,11 @@ function App() {
             challenges={challenges}
           />
         );
-      case 'rewards':
+      case 'shop':
         return (
-          <RewardsPage
-            rewards={rewards}
-            setRewards={setRewards}
-            userXp={user.xp + (user.level - 1) * 50}
-            onAddXp={addXp}
+          <ShopPage
+            shop={shop}
+            setShop={setShop}
           />
         );
       default:

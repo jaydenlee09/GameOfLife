@@ -7,7 +7,7 @@ const GAME_KEYS = [
   'gameOfLife_calendarDayEvents', 'gameOfLife_commitmentArchive', 'gameOfLife_challenges_v2',
   'gameOfLife_goals_v1', 'gameOfLife_xpLog', 'gameOfLife_pomodoroSessions',
   'gameOfLife_achievements', 'gameOfLife_healthLog', 'gameOfLife_weeklyReviews',
-  'gameOfLife_rewards', 'gameOfLife_lastDate',
+  'gameOfLife_shop', 'gameOfLife_lastDate',
 ];
 
 const DataModal = ({ onClose }) => {
@@ -100,7 +100,7 @@ const DataModal = ({ onClose }) => {
                   ['Alt+1', 'Statistics'], ['Alt+2', 'Tasks'], ['Alt+3', 'Challenges'],
                   ['Alt+4', 'Daily Log'], ['Alt+5', 'Timer'], ['Alt+6', 'Calendar'],
                   ['Alt+7', 'Goals'], ['Alt+8', 'Health'], ['Alt+9', 'Review'],
-                  ['Alt+R', 'Rewards'], ['Alt+M', 'Toggle Mentor'], ['Alt+F', 'Focus Mode'],
+                  ['Alt+S', 'Shop'], ['Alt+M', 'Toggle Mentor'], ['Alt+F', 'Focus Mode'],
                 ].map(([key, label]) => (
                   <div key={key} className="data-shortcut-row">
                     <kbd className="data-kbd">{key}</kbd>
