@@ -1,5 +1,5 @@
 import { db } from '../firebase/config';
-import { doc, getDocFromServer, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDocFromServer, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
 
 const DATA_KEYS = [
   'gameOfLife_todos',
@@ -18,14 +18,24 @@ const DATA_KEYS = [
   'gameOfLife_achievements',
   'gameOfLife_healthLog',
   'gameOfLife_weeklyReviews',
-  'gameOfLife_rewards',
+  'gameOfLife_shop',
 ];
+
+const SHOP_KEY = 'gameOfLife_shop';
+// Old key from before the Shop page rename; fallback-only read so data
+// written under the old name (before this fix) isn't orphaned.
+const LEGACY_SHOP_KEY = 'gameOfLife_rewards';
+
+// Last value sent/received per key, so our own writes don't echo back
+// through the onSnapshot listeners in subscribeToUserData and loop forever.
+const lastWrittenValue = {};
 
 export async function loadAllUserData(uid) {
   // Always fetch from the server to avoid stale in-memory cache returning
   // old data when another device has written more recent changes.
+  const keysToFetch = [...DATA_KEYS, LEGACY_SHOP_KEY];
   const snapshots = await Promise.all(
-    DATA_KEYS.map(key => getDocFromServer(doc(db, 'users', uid, 'data', key)))
+    keysToFetch.map(key => getDocFromServer(doc(db, 'users', uid, 'data', key)))
   );
   const data = {};
   let hasAnyData = false;
@@ -34,6 +44,14 @@ export async function loadAllUserData(uid) {
       data[DATA_KEYS[i]] = snapshots[i].data().value;
       hasAnyData = true;
     }
+  }
+  const legacySnap = snapshots[snapshots.length - 1];
+  if (data[SHOP_KEY] === undefined && legacySnap.exists()) {
+    data[SHOP_KEY] = legacySnap.data().value;
+    hasAnyData = true;
+  }
+  for (const key of DATA_KEYS) {
+    if (data[key] !== undefined) lastWrittenValue[key] = JSON.stringify(data[key]);
   }
   return hasAnyData ? data : null;
 }
@@ -46,6 +64,7 @@ export function saveDataKey(uid, key, value) {
   clearTimeout(debouncers[key]);
   debouncers[key] = setTimeout(() => {
     delete pendingWrites[key];
+    lastWrittenValue[key] = JSON.stringify(value);
     setDoc(doc(db, 'users', uid, 'data', key), { value }).catch(console.error);
   }, 500);
 }
@@ -57,8 +76,24 @@ export function flushPendingWrites() {
     clearTimeout(debouncers[key]);
     delete debouncers[key];
     delete pendingWrites[key];
+    lastWrittenValue[key] = JSON.stringify(value);
     setDoc(doc(db, 'users', uid, 'data', key), { value }).catch(console.error);
   }
+}
+
+// Live cross-device updates. Returns a function that unsubscribes all of them.
+export function subscribeToUserData(uid, onKeyChanged) {
+  const unsubs = DATA_KEYS.map(key =>
+    onSnapshot(doc(db, 'users', uid, 'data', key), snap => {
+      if (!snap.exists()) return;
+      const value = snap.data().value;
+      const serialized = JSON.stringify(value);
+      if (lastWrittenValue[key] === serialized) return; // echo of our own write/load
+      lastWrittenValue[key] = serialized;
+      onKeyChanged(key, value);
+    })
+  );
+  return () => unsubs.forEach(unsub => unsub());
 }
 
 export async function migrateLocalStorageToFirestore(uid, currentData) {

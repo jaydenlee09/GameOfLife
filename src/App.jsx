@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import './App.css'
 import { useAuth } from './context/AuthContext'
-import { loadAllUserData, saveDataKey, flushPendingWrites, migrateLocalStorageToFirestore } from './services/firestoreService'
+import { loadAllUserData, saveDataKey, flushPendingWrites, migrateLocalStorageToFirestore, subscribeToUserData } from './services/firestoreService'
 import PlayerDashboard from './components/PlayerDashboard'
 import Navbar, { StatIcon, TaskIcon, TimerIcon, LogIcon, TargetIcon } from './components/Navbar'
 import TasksPage from './components/TasksPage'
@@ -41,6 +41,10 @@ function App() {
   const { firebaseUser, signOut } = useAuth();
   const cloudSyncEnabled = useRef(false);
   const [cloudSyncReady, setCloudSyncReady] = useState(false);
+  // Keys edited locally since the current Firestore load/subscription cycle
+  // started, so an in-flight fetch or a live update for the same key can't
+  // clobber an edit the user just made.
+  const touchedSinceLoadStart = useRef(new Set());
 
   const [currentPage, setCurrentPage] = useState('statistics');
   const [mentorOpen, setMentorOpen] = useState(false);
@@ -268,6 +272,7 @@ function App() {
   // ─── Persistence Effects ───────────────────────────────────────────────────────
   const persist = (key, value) => {
     localStorage.setItem(key, JSON.stringify(value));
+    touchedSinceLoadStart.current.add(key);
     if (cloudSyncEnabled.current && firebaseUser) saveDataKey(firebaseUser.uid, key, value);
   };
 
@@ -302,26 +307,29 @@ function App() {
     if (!firebaseUser) return;
     cloudSyncEnabled.current = false;
     setCloudSyncReady(false);
+    // Fresh window: only edits made during THIS load get protected below.
+    touchedSinceLoadStart.current = new Set();
 
     loadAllUserData(firebaseUser.uid).then(data => {
       if (data) {
-        if (data.gameOfLife_todos) setTodos(data.gameOfLife_todos);
-        if (data.gameOfLife_habits) setHabits(data.gameOfLife_habits);
-        if (data.gameOfLife_logs) setLogs(data.gameOfLife_logs);
-        if (data.gameOfLife_chatHistory) setChatHistory(data.gameOfLife_chatHistory);
-        if (data.gameOfLife_calendarEvents) setCalendarEvents(data.gameOfLife_calendarEvents);
-        if (data.gameOfLife_quickEvents) setQuickEvents(data.gameOfLife_quickEvents);
-        if (data.gameOfLife_calendarDayEvents) setCalendarDayEvents(data.gameOfLife_calendarDayEvents);
-        if (data.gameOfLife_commitmentArchive) setCommitmentArchive(data.gameOfLife_commitmentArchive);
-        if (data.gameOfLife_challenges_v2) setChallenges(data.gameOfLife_challenges_v2);
-        if (data.gameOfLife_goals_v1) setGoals(data.gameOfLife_goals_v1);
-        if (data.gameOfLife_user) setUser(data.gameOfLife_user);
-        if (data.gameOfLife_xpLog) setXpLog(data.gameOfLife_xpLog);
-        if (data.gameOfLife_pomodoroSessions) setPomodoroSessions(data.gameOfLife_pomodoroSessions);
-        if (data.gameOfLife_achievements) setAchievements(data.gameOfLife_achievements);
-        if (data.gameOfLife_healthLog) setHealthLog(data.gameOfLife_healthLog);
-        if (data.gameOfLife_weeklyReviews) setWeeklyReviews(data.gameOfLife_weeklyReviews);
-        if (data.gameOfLife_shop) setShop(data.gameOfLife_shop);
+        const touched = touchedSinceLoadStart.current;
+        if (data.gameOfLife_todos && !touched.has('gameOfLife_todos')) setTodos(data.gameOfLife_todos);
+        if (data.gameOfLife_habits && !touched.has('gameOfLife_habits')) setHabits(data.gameOfLife_habits);
+        if (data.gameOfLife_logs && !touched.has('gameOfLife_logs')) setLogs(data.gameOfLife_logs);
+        if (data.gameOfLife_chatHistory && !touched.has('gameOfLife_chatHistory')) setChatHistory(data.gameOfLife_chatHistory);
+        if (data.gameOfLife_calendarEvents && !touched.has('gameOfLife_calendarEvents')) setCalendarEvents(data.gameOfLife_calendarEvents);
+        if (data.gameOfLife_quickEvents && !touched.has('gameOfLife_quickEvents')) setQuickEvents(data.gameOfLife_quickEvents);
+        if (data.gameOfLife_calendarDayEvents && !touched.has('gameOfLife_calendarDayEvents')) setCalendarDayEvents(data.gameOfLife_calendarDayEvents);
+        if (data.gameOfLife_commitmentArchive && !touched.has('gameOfLife_commitmentArchive')) setCommitmentArchive(data.gameOfLife_commitmentArchive);
+        if (data.gameOfLife_challenges_v2 && !touched.has('gameOfLife_challenges_v2')) setChallenges(data.gameOfLife_challenges_v2);
+        if (data.gameOfLife_goals_v1 && !touched.has('gameOfLife_goals_v1')) setGoals(data.gameOfLife_goals_v1);
+        if (data.gameOfLife_user && !touched.has('gameOfLife_user')) setUser(data.gameOfLife_user);
+        if (data.gameOfLife_xpLog && !touched.has('gameOfLife_xpLog')) setXpLog(data.gameOfLife_xpLog);
+        if (data.gameOfLife_pomodoroSessions && !touched.has('gameOfLife_pomodoroSessions')) setPomodoroSessions(data.gameOfLife_pomodoroSessions);
+        if (data.gameOfLife_achievements && !touched.has('gameOfLife_achievements')) setAchievements(data.gameOfLife_achievements);
+        if (data.gameOfLife_healthLog && !touched.has('gameOfLife_healthLog')) setHealthLog(data.gameOfLife_healthLog);
+        if (data.gameOfLife_weeklyReviews && !touched.has('gameOfLife_weeklyReviews')) setWeeklyReviews(data.gameOfLife_weeklyReviews);
+        if (data.gameOfLife_shop && !touched.has('gameOfLife_shop')) setShop(data.gameOfLife_shop);
       } else {
         // First login — migrate whatever exists in localStorage to the cloud
         migrateLocalStorageToFirestore(firebaseUser.uid, {
@@ -354,6 +362,38 @@ function App() {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firebaseUser]);
+
+  // ─── Real-time Cross-Device Sync ───────────────────────────────────────────────
+  const keySetters = useRef({
+    gameOfLife_todos: setTodos,
+    gameOfLife_habits: setHabits,
+    gameOfLife_logs: setLogs,
+    gameOfLife_chatHistory: setChatHistory,
+    gameOfLife_calendarEvents: setCalendarEvents,
+    gameOfLife_quickEvents: setQuickEvents,
+    gameOfLife_calendarDayEvents: setCalendarDayEvents,
+    gameOfLife_commitmentArchive: setCommitmentArchive,
+    gameOfLife_challenges_v2: setChallenges,
+    gameOfLife_goals_v1: setGoals,
+    gameOfLife_user: setUser,
+    gameOfLife_xpLog: setXpLog,
+    gameOfLife_pomodoroSessions: setPomodoroSessions,
+    gameOfLife_achievements: setAchievements,
+    gameOfLife_healthLog: setHealthLog,
+    gameOfLife_weeklyReviews: setWeeklyReviews,
+    gameOfLife_shop: setShop,
+  });
+
+  useEffect(() => {
+    if (!firebaseUser || !cloudSyncReady) return;
+    const unsubscribe = subscribeToUserData(firebaseUser.uid, (key, value) => {
+      // Still inside this load's protection window — let the load's own
+      // guard (above) be the only thing that decides this key.
+      if (touchedSinceLoadStart.current.has(key)) return;
+      keySetters.current[key]?.(value);
+    });
+    return unsubscribe;
+  }, [firebaseUser, cloudSyncReady]);
 
   // ─── XP Logging ───────────────────────────────────────────────────────────────
   const logXpEvent = useCallback((stat, amount, source = 'manual', label = '') => {
@@ -561,10 +601,21 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.level, xpLog.length, pomodoroSessions.length, commitmentArchive.length, challenges]);
 
-  // ─── Flush pending Firestore writes before page unload ────────────────────────
+  // ─── Flush pending Firestore writes before page unload or backgrounding ───────
+  // beforeunload alone misses mobile app-switches/backgrounding (notably iOS
+  // Safari), so also flush on visibilitychange/pagehide.
   useEffect(() => {
+    const flushIfHidden = () => {
+      if (document.visibilityState === 'hidden') flushPendingWrites();
+    };
     window.addEventListener('beforeunload', flushPendingWrites);
-    return () => window.removeEventListener('beforeunload', flushPendingWrites);
+    window.addEventListener('pagehide', flushPendingWrites);
+    document.addEventListener('visibilitychange', flushIfHidden);
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingWrites);
+      window.removeEventListener('pagehide', flushPendingWrites);
+      document.removeEventListener('visibilitychange', flushIfHidden);
+    };
   }, []);
 
   // ─── Keyboard Shortcuts ────────────────────────────────────────────────────────
