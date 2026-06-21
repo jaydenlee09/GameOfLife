@@ -19,7 +19,9 @@ const DataModal = ({ onClose }) => {
     const data = {};
     for (const key of GAME_KEYS) {
       const val = localStorage.getItem(key);
-      if (val !== null) data[key] = JSON.parse(val);
+      if (val === null) continue;
+      // gameOfLife_lastDate is stored as a raw date string, not JSON.
+      data[key] = key === 'gameOfLife_lastDate' ? val : JSON.parse(val);
     }
     const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), version: 1, data }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -40,7 +42,7 @@ const DataModal = ({ onClose }) => {
         if (!parsed.data || parsed.version !== 1) throw new Error('Invalid backup file format.');
         if (!window.confirm('This will overwrite ALL your current data. Are you sure?')) return;
         for (const [key, val] of Object.entries(parsed.data)) {
-          localStorage.setItem(key, JSON.stringify(val));
+          localStorage.setItem(key, key === 'gameOfLife_lastDate' ? val : JSON.stringify(val));
         }
         setImportStatus('success');
         setTimeout(() => window.location.reload(), 1200);
