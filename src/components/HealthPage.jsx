@@ -178,17 +178,12 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
           <div className="health-card">
             <h2 className="health-card-title">💧 WATER INTAKE</h2>
             <div className="health-water-row">
-              {Array.from({ length: 8 }, (_, i) => i + 1).map(n => (
-                <button
-                  key={n}
-                  className={`health-water-glass ${n <= water ? 'filled' : ''}`}
-                  onClick={() => setWater(n === water ? 0 : n)}
-                  title={`${n} glass${n > 1 ? 'es' : ''}`}
-                >
-                  💧
-                </button>
-              ))}
-              <span className="health-water-count">{water}/8</span>
+              <button className="health-st-stepper" onClick={() => setWater(w => Math.max(0, w - 1))}>−</button>
+              <span className="health-water-bottles">
+                {Array.from({ length: water }, (_, i) => <span key={i}>🍶</span>)}
+              </span>
+              <span className="health-water-count">{water} bottle{water === 1 ? '' : 's'}</span>
+              <button className="health-st-stepper" onClick={() => setWater(w => w + 1)}>+</button>
             </div>
           </div>
 

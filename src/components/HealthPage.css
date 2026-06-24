@@ -151,20 +151,9 @@
 .health-energy-btn.active .health-energy-label { color: inherit; }
 
 /* Water */
-.health-water-row { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
-.health-water-glass {
-  background: none;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
-  font-size: 1.2rem;
-  padding: 0.25rem;
-  cursor: pointer;
-  opacity: 0.3;
-  transition: opacity 0.2s, transform 0.1s;
-}
-.health-water-glass.filled { opacity: 1; }
-.health-water-glass:hover { transform: scale(1.1); }
-.health-water-count { font-size: 0.8rem; color: #737373; margin-left: 0.25rem; }
+.health-water-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.health-water-bottles { display: flex; gap: 0.2rem; flex-wrap: wrap; font-size: 1.2rem; max-width: 220px; }
+.health-water-count { font-size: 0.8rem; color: #737373; font-weight: 700; }
 
 /* Screentime */
 .health-screentime-row {
