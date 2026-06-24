@@ -144,8 +144,27 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  margin-bottom: 0.6rem;
+}
+.health-food-verdict-row {
+  display: flex;
+  gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
+.health-food-verdict-btn {
+  flex: 1;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  color: #a3a3a3;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.health-food-verdict-btn:hover { border-color: #3a3a3a; }
+.health-food-hint { font-size: 0.68rem; color: #525252; margin: -0.25rem 0 0.75rem; }
 .health-food-item {
   display: flex;
   align-items: center;
@@ -156,7 +175,6 @@
   font-size: 0.82rem;
 }
 .health-food-item .health-workout-type { color: #fff; flex: 1; min-width: 0; }
-.health-food-pending { color: #737373; font-size: 0.75rem; font-style: italic; }
 .health-food-badge {
   border: 1px solid;
   border-radius: 999px;

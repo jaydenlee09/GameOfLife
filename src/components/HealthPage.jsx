@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import './HealthPage.css';
-import { classifyFood } from '../utils/foodUtils';
 
 const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -27,7 +26,19 @@ const getScreentimeStatus = (h) => h <= 1 ? 'ideal' : h <= 3 ? 'toomuch' : 'exce
 const SCREENTIME_LABELS   = { ideal: '✓ Ideal', toomuch: 'Too Much', excessive: '⚠ Excessive' };
 
 const FOOD_VERDICT_COLORS = { healthy: '#4ade80', unhealthy: '#f87171', neutral: '#9ca3af' };
-const FOOD_VERDICT_LABELS = { healthy: 'Healthy', unhealthy: 'Unhealthy', neutral: 'Neutral' };
+const CHEAT_MEAL_THRESHOLD = 50;
+
+// Cheat meals are only "unlocked" once enough points are saved up; below the
+// threshold, eating unhealthy isn't a purchase, it's a flat penalty.
+const FOOD_OPTION_MAP = {
+  healthy:     { label: 'Healthy',           points: 8,   verdict: 'healthy' },
+  neutral:     { label: 'Neutral',           points: 0,   verdict: 'neutral' },
+  small_cheat: { label: 'Small Cheat Meal',  points: -30, verdict: 'unhealthy' },
+  large_cheat: { label: 'Large Cheat Meal',  points: -40, verdict: 'unhealthy' },
+  unhealthy:   { label: 'Unhealthy',         points: -60, verdict: 'unhealthy' },
+};
+const CHEAT_MEAL_KEYS  = ['healthy', 'neutral', 'small_cheat', 'large_cheat'];
+const PENALTY_ONLY_KEYS = ['healthy', 'neutral', 'unhealthy'];
 
 const HealthPage = ({ healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 }, setFoodPoints, onUpdateStat }) => {
   const todayKey = getLocalDateKey(0);
@@ -45,37 +56,33 @@ const HealthPage = ({ healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, fo
   const [screentimeM,  setScreentimeM]  = useState(today.screentimeHours != null ? Math.round((today.screentimeHours % 1) * 60) : 0);
   const [saved,        setSaved]        = useState(false);
 
-  const [newFoodText,  setNewFoodText]  = useState('');
+  const [newFoodText,      setNewFoodText]      = useState('');
+  const [newFoodOptionKey, setNewFoodOptionKey] = useState('healthy');
   const foodEntries = foodLog[todayKey]?.entries || [];
+  const foodBalance = foodPoints.balance ?? 0;
+  const canAffordCheatMeal = foodBalance > CHEAT_MEAL_THRESHOLD;
+  const foodOptionKeys = canAffordCheatMeal ? CHEAT_MEAL_KEYS : PENALTY_ONLY_KEYS;
 
-  const addFood = async () => {
+  let activeFoodKey = 'healthy';
+  if (newFoodOptionKey === 'neutral') activeFoodKey = 'neutral';
+  else if (canAffordCheatMeal && (newFoodOptionKey === 'small_cheat' || newFoodOptionKey === 'large_cheat')) activeFoodKey = newFoodOptionKey;
+  else if (!canAffordCheatMeal && newFoodOptionKey === 'unhealthy') activeFoodKey = 'unhealthy';
+  const selectedFoodOption = FOOD_OPTION_MAP[activeFoodKey];
+
+  const addFood = () => {
     const text = newFoodText.trim();
     if (!text) return;
-    setNewFoodText('');
 
+    const { points, verdict, label } = selectedFoodOption;
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const pendingEntry = { id, text, verdict: null, points: 0, reasoning: '', ts: Date.now() };
+    const entry = { id, text, verdict, label, points, ts: Date.now() };
 
     setFoodLog(prev => {
       const dayEntries = prev[todayKey]?.entries || [];
-      return { ...prev, [todayKey]: { entries: [...dayEntries, pendingEntry] } };
+      return { ...prev, [todayKey]: { entries: [...dayEntries, entry] } };
     });
-
-    let result;
-    try {
-      result = await classifyFood(text);
-    } catch {
-      result = { verdict: 'neutral', points: 0, reasoning: 'Could not analyze this food.' };
-    }
-
-    setFoodLog(prev => {
-      const dayEntries = prev[todayKey]?.entries || [];
-      return {
-        ...prev,
-        [todayKey]: { entries: dayEntries.map(e => e.id === id ? { ...e, ...result } : e) },
-      };
-    });
-    setFoodPoints(prev => ({ balance: (prev.balance || 0) + result.points }));
+    setFoodPoints(prev => ({ balance: (prev.balance || 0) + points }));
+    setNewFoodText('');
   };
 
   const removeFood = (id) => {
@@ -85,9 +92,7 @@ const HealthPage = ({ healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, fo
       const dayEntries = prev[todayKey]?.entries || [];
       return { ...prev, [todayKey]: { entries: dayEntries.filter(e => e.id !== id) } };
     });
-    if (entry.verdict) {
-      setFoodPoints(prev => ({ balance: (prev.balance || 0) - entry.points }));
-    }
+    setFoodPoints(prev => ({ balance: (prev.balance || 0) - entry.points }));
   };
 
   const screentimeTotal  = screentimeH + screentimeM / 60;
@@ -176,6 +181,25 @@ const HealthPage = ({ healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, fo
               />
               <button className="health-add-btn" onClick={addFood} disabled={!newFoodText.trim()}>Log it</button>
             </div>
+            <div className="health-food-verdict-row">
+              {foodOptionKeys.map(key => {
+                const o = FOOD_OPTION_MAP[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`health-food-verdict-btn ${activeFoodKey === key ? 'active' : ''}`}
+                    style={activeFoodKey === key ? { borderColor: FOOD_VERDICT_COLORS[o.verdict], color: FOOD_VERDICT_COLORS[o.verdict], background: `${FOOD_VERDICT_COLORS[o.verdict]}18` } : {}}
+                    onClick={() => setNewFoodOptionKey(key)}
+                  >
+                    {o.label} ({o.points > 0 ? `+${o.points}` : o.points})
+                  </button>
+                );
+              })}
+            </div>
+            {foodBalance <= CHEAT_MEAL_THRESHOLD && (
+              <p className="health-food-hint">Save over {CHEAT_MEAL_THRESHOLD} points to unlock small/large cheat meals instead of the flat unhealthy penalty.</p>
+            )}
             {foodEntries.length === 0 ? (
               <p className="health-empty">No food logged yet today</p>
             ) : (
@@ -185,22 +209,16 @@ const HealthPage = ({ healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, fo
                   return (
                     <div key={f.id} className="health-food-item">
                       <span className="health-workout-type">{f.text}</span>
-                      {f.verdict === null ? (
-                        <span className="health-food-pending">analyzing…</span>
-                      ) : (
-                        <>
-                          <span
-                            className="health-food-badge"
-                            style={{ borderColor: FOOD_VERDICT_COLORS[f.verdict], color: FOOD_VERDICT_COLORS[f.verdict], background: `${FOOD_VERDICT_COLORS[f.verdict]}18` }}
-                          >
-                            {FOOD_VERDICT_LABELS[f.verdict]}
-                          </span>
-                          <span className={`health-food-points ${f.points > 0 ? 'pos' : f.points < 0 ? 'neg' : ''}`}>
-                            {f.points > 0 ? `+${f.points}` : f.points}
-                          </span>
-                          {overBudget && <span className="health-food-warning">⚠ over budget</span>}
-                        </>
-                      )}
+                      <span
+                        className="health-food-badge"
+                        style={{ borderColor: FOOD_VERDICT_COLORS[f.verdict], color: FOOD_VERDICT_COLORS[f.verdict], background: `${FOOD_VERDICT_COLORS[f.verdict]}18` }}
+                      >
+                        {f.label || (f.verdict === 'healthy' ? 'Healthy' : f.verdict === 'unhealthy' ? 'Unhealthy' : 'Neutral')}
+                      </span>
+                      <span className={`health-food-points ${f.points > 0 ? 'pos' : f.points < 0 ? 'neg' : ''}`}>
+                        {f.points > 0 ? `+${f.points}` : f.points}
+                      </span>
+                      {overBudget && <span className="health-food-warning">⚠ over budget</span>}
                       <button className="health-remove-btn" onClick={() => removeFood(f.id)}>✕</button>
                     </div>
                   );
