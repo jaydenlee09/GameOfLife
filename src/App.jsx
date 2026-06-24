@@ -172,6 +172,16 @@ function App() {
     return saved ? JSON.parse(saved) : {};
   });
 
+  const [foodLog, setFoodLog] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_foodLog');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [foodPoints, setFoodPoints] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_foodPoints');
+    return saved ? JSON.parse(saved) : { balance: 0 };
+  });
+
   const [weeklyReviews, setWeeklyReviews] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_weeklyReviews');
     return saved ? JSON.parse(saved) : {};
@@ -298,6 +308,8 @@ function App() {
   useEffect(() => { persist('gameOfLife_pomodoroSessions', pomodoroSessions); }, [pomodoroSessions]);
   useEffect(() => { persist('gameOfLife_achievements', achievements); }, [achievements]);
   useEffect(() => { persist('gameOfLife_healthLog', healthLog); }, [healthLog]);
+  useEffect(() => { persist('gameOfLife_foodLog', foodLog); }, [foodLog]);
+  useEffect(() => { persist('gameOfLife_foodPoints', foodPoints); }, [foodPoints]);
   useEffect(() => { persist('gameOfLife_weeklyReviews', weeklyReviews); }, [weeklyReviews]);
   useEffect(() => { persist('gameOfLife_shop', shop); }, [shop]);
 
@@ -336,6 +348,8 @@ function App() {
         if (data.gameOfLife_pomodoroSessions && !touched.has('gameOfLife_pomodoroSessions')) setPomodoroSessions(data.gameOfLife_pomodoroSessions);
         if (data.gameOfLife_achievements && !touched.has('gameOfLife_achievements')) setAchievements(data.gameOfLife_achievements);
         if (data.gameOfLife_healthLog && !touched.has('gameOfLife_healthLog')) setHealthLog(data.gameOfLife_healthLog);
+        if (data.gameOfLife_foodLog && !touched.has('gameOfLife_foodLog')) setFoodLog(data.gameOfLife_foodLog);
+        if (data.gameOfLife_foodPoints && !touched.has('gameOfLife_foodPoints')) setFoodPoints(data.gameOfLife_foodPoints);
         if (data.gameOfLife_weeklyReviews && !touched.has('gameOfLife_weeklyReviews')) setWeeklyReviews(data.gameOfLife_weeklyReviews);
         if (data.gameOfLife_shop && !touched.has('gameOfLife_shop')) setShop(data.gameOfLife_shop);
       } else {
@@ -357,6 +371,8 @@ function App() {
           gameOfLife_pomodoroSessions: pomodoroSessions,
           gameOfLife_achievements: achievements,
           gameOfLife_healthLog: healthLog,
+          gameOfLife_foodLog: foodLog,
+          gameOfLife_foodPoints: foodPoints,
           gameOfLife_weeklyReviews: weeklyReviews,
           gameOfLife_shop: shop,
         }).catch(console.error);
@@ -394,6 +410,8 @@ function App() {
     gameOfLife_pomodoroSessions: setPomodoroSessions,
     gameOfLife_achievements: setAchievements,
     gameOfLife_healthLog: setHealthLog,
+    gameOfLife_foodLog: setFoodLog,
+    gameOfLife_foodPoints: setFoodPoints,
     gameOfLife_weeklyReviews: setWeeklyReviews,
     gameOfLife_shop: setShop,
   });
@@ -747,6 +765,10 @@ function App() {
           <HealthPage
             healthLog={healthLog}
             setHealthLog={setHealthLog}
+            foodLog={foodLog}
+            setFoodLog={setFoodLog}
+            foodPoints={foodPoints}
+            setFoodPoints={setFoodPoints}
             onUpdateStat={updateStat}
           />
         );

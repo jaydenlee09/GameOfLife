@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './HealthPage.css';
+import { classifyFood } from '../utils/foodUtils';
 
 const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -25,7 +26,10 @@ const SCREENTIME_COLORS = { ideal: '#4ade80', toomuch: '#fb923c', excessive: '#f
 const getScreentimeStatus = (h) => h <= 1 ? 'ideal' : h <= 3 ? 'toomuch' : 'excessive';
 const SCREENTIME_LABELS   = { ideal: '✓ Ideal', toomuch: 'Too Much', excessive: '⚠ Excessive' };
 
-const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
+const FOOD_VERDICT_COLORS = { healthy: '#4ade80', unhealthy: '#f87171', neutral: '#9ca3af' };
+const FOOD_VERDICT_LABELS = { healthy: 'Healthy', unhealthy: 'Unhealthy', neutral: 'Neutral' };
+
+const HealthPage = ({ healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 }, setFoodPoints, onUpdateStat }) => {
   const todayKey = getLocalDateKey(0);
   const today    = healthLog[todayKey] || {};
 
@@ -40,6 +44,51 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
   const [screentimeH,  setScreentimeH]  = useState(today.screentimeHours != null ? Math.floor(today.screentimeHours) : 0);
   const [screentimeM,  setScreentimeM]  = useState(today.screentimeHours != null ? Math.round((today.screentimeHours % 1) * 60) : 0);
   const [saved,        setSaved]        = useState(false);
+
+  const [newFoodText,  setNewFoodText]  = useState('');
+  const foodEntries = foodLog[todayKey]?.entries || [];
+
+  const addFood = async () => {
+    const text = newFoodText.trim();
+    if (!text) return;
+    setNewFoodText('');
+
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const pendingEntry = { id, text, verdict: null, points: 0, reasoning: '', ts: Date.now() };
+
+    setFoodLog(prev => {
+      const dayEntries = prev[todayKey]?.entries || [];
+      return { ...prev, [todayKey]: { entries: [...dayEntries, pendingEntry] } };
+    });
+
+    let result;
+    try {
+      result = await classifyFood(text);
+    } catch {
+      result = { verdict: 'neutral', points: 0, reasoning: 'Could not analyze this food.' };
+    }
+
+    setFoodLog(prev => {
+      const dayEntries = prev[todayKey]?.entries || [];
+      return {
+        ...prev,
+        [todayKey]: { entries: dayEntries.map(e => e.id === id ? { ...e, ...result } : e) },
+      };
+    });
+    setFoodPoints(prev => ({ balance: (prev.balance || 0) + result.points }));
+  };
+
+  const removeFood = (id) => {
+    const entry = (foodLog[todayKey]?.entries || []).find(e => e.id === id);
+    if (!entry) return;
+    setFoodLog(prev => {
+      const dayEntries = prev[todayKey]?.entries || [];
+      return { ...prev, [todayKey]: { entries: dayEntries.filter(e => e.id !== id) } };
+    });
+    if (entry.verdict) {
+      setFoodPoints(prev => ({ balance: (prev.balance || 0) - entry.points }));
+    }
+  };
 
   const screentimeTotal  = screentimeH + screentimeM / 60;
   const screentimeStatus = getScreentimeStatus(screentimeTotal);
@@ -111,6 +160,55 @@ const HealthPage = ({ healthLog = {}, setHealthLog, onUpdateStat }) => {
       <div className="health-layout">
         {/* ── Today's Log ──────────────────────────────────────────────────── */}
         <div className="health-main">
+          <div className="health-card">
+            <h2 className="health-card-title">🍎 FOOD TRACKER</h2>
+            <div className="health-food-balance">
+              <span className="health-food-balance-icon">💰</span>
+              <span className="health-food-balance-val">{foodPoints.balance ?? 0}</span>
+              <span className="health-food-balance-label">food points saved</span>
+            </div>
+            <div className="health-food-add">
+              <input
+                type="text" className="health-input health-input--flex"
+                placeholder="What did you eat?" value={newFoodText}
+                onChange={e => setNewFoodText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addFood()}
+              />
+              <button className="health-add-btn" onClick={addFood} disabled={!newFoodText.trim()}>Log it</button>
+            </div>
+            {foodEntries.length === 0 ? (
+              <p className="health-empty">No food logged yet today</p>
+            ) : (
+              <div className="health-workout-list">
+                {foodEntries.slice().reverse().map((f) => {
+                  const overBudget = f.verdict === 'unhealthy' && (foodPoints.balance ?? 0) < 0;
+                  return (
+                    <div key={f.id} className="health-food-item">
+                      <span className="health-workout-type">{f.text}</span>
+                      {f.verdict === null ? (
+                        <span className="health-food-pending">analyzing…</span>
+                      ) : (
+                        <>
+                          <span
+                            className="health-food-badge"
+                            style={{ borderColor: FOOD_VERDICT_COLORS[f.verdict], color: FOOD_VERDICT_COLORS[f.verdict], background: `${FOOD_VERDICT_COLORS[f.verdict]}18` }}
+                          >
+                            {FOOD_VERDICT_LABELS[f.verdict]}
+                          </span>
+                          <span className={`health-food-points ${f.points > 0 ? 'pos' : f.points < 0 ? 'neg' : ''}`}>
+                            {f.points > 0 ? `+${f.points}` : f.points}
+                          </span>
+                          {overBudget && <span className="health-food-warning">⚠ over budget</span>}
+                        </>
+                      )}
+                      <button className="health-remove-btn" onClick={() => removeFood(f.id)}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="health-card">
             <h2 className="health-card-title">🌙 SLEEP</h2>
             <div className="health-sleep-row">
