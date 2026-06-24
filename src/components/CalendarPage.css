@@ -385,23 +385,31 @@
 .cal-slot--nophone-drag { background: rgba(248,113,113,0.1); }
 
 /* ─── No Phone Time Bands ────────────────────────────────────────────────────── */
+/* Purely decorative + pointer-events:none so it never blocks placing a normal
+   time block, or dragging/dropping one, over the same slots. Only the small
+   chip (label + delete) inside opts back into pointer events. */
 .cal-nophone-band {
   position: absolute; left: 0; right: 0; z-index: 1;
   background: repeating-linear-gradient(45deg, rgba(248,113,113,0.14) 0 10px, rgba(248,113,113,0.05) 10px 20px);
   border-top: 1px solid rgba(248,113,113,0.35);
   border-bottom: 1px solid rgba(248,113,113,0.35);
-  cursor: pointer;
   box-sizing: border-box;
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 4px;
+  display: flex; align-items: flex-start;
   padding: 2px 6px;
-  transition: background 0.1s;
+  pointer-events: none;
 }
-.cal-nophone-band:hover { background-color: rgba(248,113,113,0.08); }
 .cal-nophone-band--preview {
   background: repeating-linear-gradient(45deg, rgba(248,113,113,0.22) 0 10px, rgba(248,113,113,0.08) 10px 20px);
   border: 1px dashed rgba(248,113,113,0.6);
-  pointer-events: none;
 }
+.cal-nophone-chip {
+  pointer-events: auto; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  max-width: 100%;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+.cal-nophone-chip:hover { background: rgba(248,113,113,0.16); }
 .cal-nophone-label {
   font-size: 0.62rem; font-weight: 900; color: #f87171;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -412,7 +420,7 @@
   background: transparent; color: #f87171; cursor: pointer; opacity: 0;
   display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.1s;
 }
-.cal-nophone-band:hover .cal-nophone-delete { opacity: 1; }
+.cal-nophone-chip:hover .cal-nophone-delete { opacity: 1; }
 .cal-nophone-delete:hover { background: rgba(248,113,113,0.2); }
 
 /* ─── Current Time Line ──────────────────────────────────────────────────────── */

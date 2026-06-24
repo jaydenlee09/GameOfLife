@@ -973,12 +973,13 @@ export default function CalendarPage({
                       key={`np-${block.id}-${block._instanceDate}-${bi}`}
                       className="cal-nophone-band"
                       style={{top,height}}
-                      onClick={(e)=>{e.stopPropagation();openNoPhoneEdit(block);}}
                     >
-                      <span className="cal-nophone-label">📵 {block.label || 'No Phone'} {fmtTime(block.startHour,block.startMin)}–{fmtTime(block.endHour,block.endMin)}</span>
-                      <button className="cal-nophone-delete" onClick={(e)=>requestDeleteNoPhone(block,e)} title="Delete" aria-label="Delete">
-                        <X size={11} strokeWidth={3} />
-                      </button>
+                      <div className="cal-nophone-chip" onClick={(e)=>{e.stopPropagation();openNoPhoneEdit(block);}}>
+                        <span className="cal-nophone-label">📵 {block.label || 'No Phone'} {fmtTime(block.startHour,block.startMin)}–{fmtTime(block.endHour,block.endMin)}</span>
+                        <button className="cal-nophone-delete" onClick={(e)=>requestDeleteNoPhone(block,e)} title="Delete" aria-label="Delete">
+                          <X size={11} strokeWidth={3} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
