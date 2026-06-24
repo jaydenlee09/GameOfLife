@@ -95,6 +95,11 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [noPhoneBlocks, setNoPhoneBlocks] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_noPhoneBlocks');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const DEFAULT_QUICK_EVENTS = [
     { id: 't1', title: 'Morning Routine', duration: 30, attributes: ['discipline','health'], xpAmount: 20, recurrence: 'daily', color: '#fbbf24' },
     { id: 't2', title: 'Deep Work', duration: 90, attributes: ['focus','productivity'], xpAmount: 50, recurrence: 'none', color: '#38bdf8' },
@@ -282,6 +287,7 @@ function App() {
   useEffect(() => { persist('gameOfLife_logs', logs); }, [logs]);
   useEffect(() => { persist('gameOfLife_chatHistory', chatHistory); }, [chatHistory]);
   useEffect(() => { persist('gameOfLife_calendarEvents', calendarEvents); }, [calendarEvents]);
+  useEffect(() => { persist('gameOfLife_noPhoneBlocks', noPhoneBlocks); }, [noPhoneBlocks]);
   useEffect(() => { persist('gameOfLife_quickEvents', quickEvents); }, [quickEvents]);
   useEffect(() => { persist('gameOfLife_calendarDayEvents', calendarDayEvents); }, [calendarDayEvents]);
   useEffect(() => { persist('gameOfLife_commitmentArchive', commitmentArchive); }, [commitmentArchive]);
@@ -319,6 +325,7 @@ function App() {
         if (data.gameOfLife_logs && !touched.has('gameOfLife_logs')) setLogs(data.gameOfLife_logs);
         if (data.gameOfLife_chatHistory && !touched.has('gameOfLife_chatHistory')) setChatHistory(data.gameOfLife_chatHistory);
         if (data.gameOfLife_calendarEvents && !touched.has('gameOfLife_calendarEvents')) setCalendarEvents(data.gameOfLife_calendarEvents);
+        if (data.gameOfLife_noPhoneBlocks && !touched.has('gameOfLife_noPhoneBlocks')) setNoPhoneBlocks(data.gameOfLife_noPhoneBlocks);
         if (data.gameOfLife_quickEvents && !touched.has('gameOfLife_quickEvents')) setQuickEvents(data.gameOfLife_quickEvents);
         if (data.gameOfLife_calendarDayEvents && !touched.has('gameOfLife_calendarDayEvents')) setCalendarDayEvents(data.gameOfLife_calendarDayEvents);
         if (data.gameOfLife_commitmentArchive && !touched.has('gameOfLife_commitmentArchive')) setCommitmentArchive(data.gameOfLife_commitmentArchive);
@@ -339,6 +346,7 @@ function App() {
           gameOfLife_logs: logs,
           gameOfLife_chatHistory: chatHistory,
           gameOfLife_calendarEvents: calendarEvents,
+          gameOfLife_noPhoneBlocks: noPhoneBlocks,
           gameOfLife_quickEvents: quickEvents,
           gameOfLife_calendarDayEvents: calendarDayEvents,
           gameOfLife_commitmentArchive: commitmentArchive,
@@ -375,6 +383,7 @@ function App() {
     gameOfLife_logs: setLogs,
     gameOfLife_chatHistory: setChatHistory,
     gameOfLife_calendarEvents: setCalendarEvents,
+    gameOfLife_noPhoneBlocks: setNoPhoneBlocks,
     gameOfLife_quickEvents: setQuickEvents,
     gameOfLife_calendarDayEvents: setCalendarDayEvents,
     gameOfLife_commitmentArchive: setCommitmentArchive,
@@ -713,6 +722,8 @@ function App() {
           <CalendarPage
             calendarEvents={calendarEvents}
             setCalendarEvents={setCalendarEvents}
+            noPhoneBlocks={noPhoneBlocks}
+            setNoPhoneBlocks={setNoPhoneBlocks}
             calendarDayEvents={calendarDayEvents}
             setCalendarDayEvents={setCalendarDayEvents}
             quickEvents={quickEvents}

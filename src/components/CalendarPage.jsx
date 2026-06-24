@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import STAT_META from './statMeta';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SLOT_HEIGHT = 16;
@@ -195,6 +195,19 @@ const buildDetachedInstanceEvent = (ev, overrides = {}) => {
     completedDates: [],
   };
 };
+const buildDetachedNoPhoneInstance = (block, overrides = {}) => {
+  const instanceDate = block._instanceDate || block.date;
+  return {
+    id: overrides.id || Date.now(),
+    date: overrides.date ?? instanceDate,
+    startHour: overrides.startHour ?? block.startHour,
+    startMin: overrides.startMin ?? block.startMin,
+    endHour: overrides.endHour ?? block.endHour,
+    endMin: overrides.endMin ?? block.endMin,
+    label: overrides.label ?? block.label,
+    recurrence: 'none',
+  };
+};
 
 // ─── Default Forms ────────────────────────────────────────────────────────────
 const defaultForm = (o = {}) => ({
@@ -203,6 +216,10 @@ const defaultForm = (o = {}) => ({
   xpAmount: 20, attributes: [], recurrence: 'none', notes: '', subEvents: [], bonusTasks: [], ...o,
 });
 const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', color: '#fbbf24' });
+const defaultNoPhoneForm = (o = {}) => ({
+  date: toDateKey(new Date()), startHour: 8, startMin: 0, endHour: 9, endMin: 0,
+  label: 'No Phone', recurrence: 'none', ...o,
+});
 const defaultBonusTaskForm = () => ({ title: '', xpAmount: 10, attributes: [] });
 const toTimeInput = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 const parseTimeInput = (val) => { const [h,m] = val.split(':'); return { h: parseInt(h,10), m: parseInt(m,10) }; };
@@ -211,6 +228,8 @@ const parseTimeInput = (val) => { const [h,m] = val.split(':'); return { h: pars
 export default function CalendarPage({
   calendarEvents,
   setCalendarEvents,
+  noPhoneBlocks = [],
+  setNoPhoneBlocks,
   calendarDayEvents = {},
   setCalendarDayEvents,
   quickEvents,
@@ -238,6 +257,13 @@ export default function CalendarPage({
   const [dragOver, setDragOver] = useState(null);
   const [draggingTemplate, setDraggingTemplate] = useState(null);
   const [draggingEvent, setDraggingEvent] = useState(null); // { ev, offsetSlots }
+  const [noPhoneMode, setNoPhoneMode] = useState(false);
+  const [npDragStart, setNpDragStart] = useState(null); // { dateKey, slot }
+  const [npDragCurrent, setNpDragCurrent] = useState(null); // { dateKey, slot }
+  const [noPhoneModal, setNoPhoneModal] = useState(null); // { mode: 'create'|'edit', id? }
+  const [noPhoneForm, setNoPhoneForm] = useState(defaultNoPhoneForm());
+  const [noPhoneEditScope, setNoPhoneEditScope] = useState(null);
+  const [noPhoneDeleteScope, setNoPhoneDeleteScope] = useState(null);
   const [currentMinute, setCurrentMinute] = useState(() => { const n = new Date(); return n.getHours()*60+n.getMinutes(); });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const gridRef = useRef(null);
@@ -447,6 +473,13 @@ export default function CalendarPage({
     setModal('edit');
   };
 
+  // ─── Duplicate ───────────────────────────────────────────────────────────────
+  const duplicateEvent = (ev, e) => {
+    e.stopPropagation();
+    const newEvent = { ...buildDetachedInstanceEvent(ev, { id: Date.now() }), completed: false, completedDates: [] };
+    setCalendarEvents(prev => [...prev, newEvent]);
+  };
+
   // ─── Delete ──────────────────────────────────────────────────────────────────
   const requestDelete = (ev, e) => {
     e.stopPropagation();
@@ -460,6 +493,98 @@ export default function CalendarPage({
     else setCalendarEvents(prev=>prev.filter(e=>e.id!==ev.id));
     setDeleteScope(null);
   };
+
+  // ─── No-Phone Block CRUD ───────────────────────────────────────────────────────
+  const openNoPhoneCreate = (dateKey, startSlot, endSlot) => {
+    const startMins = slotToMinutes(Math.min(startSlot, endSlot));
+    const endMins = slotToMinutes(Math.max(startSlot, endSlot) + 1);
+    setNoPhoneForm(defaultNoPhoneForm({
+      date: dateKey,
+      startHour: Math.floor(startMins/60), startMin: startMins%60,
+      endHour: Math.floor(endMins/60), endMin: endMins%60,
+    }));
+    setNoPhoneModal({ mode: 'create' });
+  };
+  const openNoPhoneEdit = (block) => {
+    if (block.recurrence !== 'none' && block._isVirtual) { setNoPhoneEditScope({ show: true, block }); return; }
+    setNoPhoneForm({ date: block.date, startHour: block.startHour, startMin: block.startMin, endHour: block.endHour, endMin: block.endMin, label: block.label || 'No Phone', recurrence: block.recurrence || 'none' });
+    setNoPhoneModal({ mode: 'edit', id: block.id });
+  };
+  const closeNoPhoneModal = () => { setNoPhoneModal(null); setNoPhoneEditScope(null); setNoPhoneDeleteScope(null); };
+
+  const isNoPhoneFormValid = () => (noPhoneForm.endHour*60+noPhoneForm.endMin) > (noPhoneForm.startHour*60+noPhoneForm.startMin);
+  const buildNoPhoneFromForm = (id) => ({
+    id: id || Date.now(), date: noPhoneForm.date,
+    startHour: noPhoneForm.startHour, startMin: noPhoneForm.startMin, endHour: noPhoneForm.endHour, endMin: noPhoneForm.endMin,
+    label: noPhoneForm.label.trim() || 'No Phone', recurrence: noPhoneForm.recurrence,
+  });
+  const saveNoPhoneBlock = () => { if (!isNoPhoneFormValid()) return; setNoPhoneBlocks(prev=>[...prev, buildNoPhoneFromForm()]); closeNoPhoneModal(); };
+  const updateNoPhoneBlock = (scope='all') => {
+    if (!isNoPhoneFormValid()) return;
+    if (scope === 'all') {
+      setNoPhoneBlocks(prev=>prev.map(b=>b.id!==noPhoneModal.id?b:{
+        ...b, startHour:noPhoneForm.startHour, startMin:noPhoneForm.startMin,
+        endHour:noPhoneForm.endHour, endMin:noPhoneForm.endMin, label:noPhoneForm.label.trim()||'No Phone', recurrence:noPhoneForm.recurrence,
+      }));
+    } else {
+      setNoPhoneBlocks(prev=>[
+        ...prev.map(b=>b.id!==noPhoneModal.id?b:{...b,_exceptDates:[...(b._exceptDates||[]),noPhoneForm.date]}),
+        {...buildNoPhoneFromForm(), id:Date.now()},
+      ]);
+    }
+    closeNoPhoneModal();
+  };
+  const handleNoPhoneEditScopeSelect = (scope) => {
+    const block = noPhoneEditScope.block;
+    setNoPhoneForm({ date: block._instanceDate, startHour: block.startHour, startMin: block.startMin, endHour: block.endHour, endMin: block.endMin, label: block.label || 'No Phone', recurrence: block.recurrence });
+    setNoPhoneEditScope(null);
+    if (scope === 'this') {
+      const newId = Date.now();
+      setNoPhoneBlocks(prev=>[
+        ...prev.map(b=>b.id===block.id?{...b,_exceptDates:[...(b._exceptDates||[]),block._instanceDate]}:b),
+        buildDetachedNoPhoneInstance(block, { id: newId }),
+      ]);
+      setTimeout(()=>setNoPhoneModal({ mode:'edit', id:newId }),0);
+    } else {
+      setNoPhoneModal({ mode: 'edit', id: block.id });
+    }
+  };
+  const requestDeleteNoPhone = (block, e) => {
+    e.stopPropagation();
+    if (block.recurrence !== 'none') { setNoPhoneDeleteScope({ show:true, block }); return; }
+    setNoPhoneBlocks(prev=>prev.filter(b=>b.id!==block.id));
+  };
+  const handleNoPhoneDeleteScope = (scope) => {
+    const block = noPhoneDeleteScope.block;
+    if (scope==='this') setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,_exceptDates:[...(b._exceptDates||[]),block._instanceDate]}:b));
+    else if (scope==='this-forward') setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,_forwardDeleteFrom:block._instanceDate}:b));
+    else setNoPhoneBlocks(prev=>prev.filter(b=>b.id!==block.id));
+    setNoPhoneDeleteScope(null);
+  };
+
+  // ─── No-Phone Drag-to-create ───────────────────────────────────────────────────
+  const handleNoPhoneSlotMouseDown = (dateKey, slot) => {
+    if (!noPhoneMode) return;
+    setNpDragStart({ dateKey, slot });
+    setNpDragCurrent({ dateKey, slot });
+  };
+  const handleNoPhoneSlotMouseEnter = (dateKey, slot) => {
+    if (!noPhoneMode || !npDragStart || npDragStart.dateKey !== dateKey) return;
+    setNpDragCurrent({ dateKey, slot });
+  };
+  const npDragCurrentRef = useRef(null);
+  npDragCurrentRef.current = npDragCurrent;
+  useEffect(() => {
+    if (!npDragStart) return;
+    const finalize = () => {
+      const current = npDragCurrentRef.current || npDragStart;
+      openNoPhoneCreate(npDragStart.dateKey, npDragStart.slot, current.slot);
+      setNpDragStart(null);
+      setNpDragCurrent(null);
+    };
+    window.addEventListener('mouseup', finalize);
+    return () => window.removeEventListener('mouseup', finalize);
+  }, [npDragStart]);
 
   // ─── Complete ────────────────────────────────────────────────────────────────
   const completeEvent = (ev, e) => {
@@ -679,6 +804,12 @@ export default function CalendarPage({
   for (const dk of activeDateKeys) columnedByDate[dk] = buildColumns(byDate[dk]);
   const editingEvent = modal === 'edit' ? calendarEvents.find((ev) => ev.id === editingId) : null;
 
+  // ─── Expand no-phone blocks (full-width bands, never column-packed) ───────────
+  const expandedNoPhone = expandEventsForDates(noPhoneBlocks, activeDateKeys);
+  const noPhoneByDate = {};
+  for (const dk of activeDateKeys) noPhoneByDate[dk] = [];
+  for (const block of expandedNoPhone) { if (noPhoneByDate[block._instanceDate]!==undefined) noPhoneByDate[block._instanceDate].push(block); }
+
   const upcomingDayEvents = (() => {
     const entries = [];
     const obj = calendarDayEvents && typeof calendarDayEvents === 'object' ? calendarDayEvents : {};
@@ -814,12 +945,15 @@ export default function CalendarPage({
               <div key={di} className={`cal-day-col ${isToday?'cal-day-col--today':''}`} style={{height:TOTAL_HEIGHT}}>
                 {Array.from({length:TOTAL_SLOTS},(_,s)=>{
                   const isDragTarget = dragOver?.date===dk && dragOver?.slot===s;
+                  const isNpTarget = noPhoneMode && npDragStart?.dateKey===dk && s>=Math.min(npDragStart.slot,npDragCurrent?.slot??npDragStart.slot) && s<=Math.max(npDragStart.slot,npDragCurrent?.slot??npDragStart.slot);
                   return (
                     <div
                       key={s}
-                      className={`cal-slot ${s%4===0?'cal-slot--hour':''} ${isDragTarget?'cal-slot--drag':''}`}
+                      className={`cal-slot ${s%4===0?'cal-slot--hour':''} ${isDragTarget?'cal-slot--drag':''} ${noPhoneMode?'cal-slot--nophone-mode':''} ${isNpTarget?'cal-slot--nophone-drag':''}`}
                       style={{ top: s*SLOT_HEIGHT, height: isDragTarget ? durationSlots*SLOT_HEIGHT : SLOT_HEIGHT }}
-                      onClick={()=>openCreate(dk,s)}
+                      onClick={()=>{ if (!noPhoneMode) openCreate(dk,s); }}
+                      onMouseDown={()=>handleNoPhoneSlotMouseDown(dk,s)}
+                      onMouseEnter={()=>handleNoPhoneSlotMouseEnter(dk,s)}
                       onDragOver={(e)=>handleSlotDragOver(e,dk,s)}
                       onDrop={(e)=>handleSlotDrop(e,dk,s)}
                     />
@@ -830,6 +964,29 @@ export default function CalendarPage({
                     <div className="cal-now-dot"/><div className="cal-now-bar"/>
                   </div>
                 )}
+                {(noPhoneByDate[dk]||[]).map((block,bi)=>{
+                  const startMin=minsFromEvent(block), endMin=minsEndFromEvent(block);
+                  const top=(startMin/(24*60))*TOTAL_HEIGHT;
+                  const height=Math.max(((endMin-startMin)/(24*60))*TOTAL_HEIGHT,8);
+                  return (
+                    <div
+                      key={`np-${block.id}-${block._instanceDate}-${bi}`}
+                      className="cal-nophone-band"
+                      style={{top,height}}
+                      onClick={(e)=>{e.stopPropagation();openNoPhoneEdit(block);}}
+                    >
+                      <span className="cal-nophone-label">📵 {block.label || 'No Phone'} {fmtTime(block.startHour,block.startMin)}–{fmtTime(block.endHour,block.endMin)}</span>
+                      <button className="cal-nophone-delete" onClick={(e)=>requestDeleteNoPhone(block,e)} title="Delete" aria-label="Delete">
+                        <X size={11} strokeWidth={3} />
+                      </button>
+                    </div>
+                  );
+                })}
+                {noPhoneMode && npDragStart?.dateKey===dk && npDragCurrent && (() => {
+                  const s1=Math.min(npDragStart.slot,npDragCurrent.slot), s2=Math.max(npDragStart.slot,npDragCurrent.slot);
+                  const top=s1*SLOT_HEIGHT, height=(s2-s1+1)*SLOT_HEIGHT;
+                  return <div className="cal-nophone-band cal-nophone-band--preview" style={{top,height}} />;
+                })()}
                 {dayEvents.map((ev,ei)=>{
                   const startMin=minsFromEvent(ev), endMin=minsEndFromEvent(ev);
                   const top=(startMin/(24*60))*TOTAL_HEIGHT;
@@ -886,6 +1043,7 @@ export default function CalendarPage({
                       </div>
                       <div className="cal-event-actions">
                         <button className={`cal-event-btn cal-event-complete ${done?'cal-event-complete--done':''}`} onClick={(e)=>completeEvent(ev,e)} title={done?'Completed':'Mark complete'}>{done?'✓':'○'}</button>
+                        <button className="cal-event-btn cal-event-duplicate" onClick={(e)=>duplicateEvent(ev,e)} title="Duplicate"><Copy size={11} strokeWidth={3} /></button>
                         <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete">✕</button>
                       </div>
                     </div>
@@ -917,7 +1075,10 @@ export default function CalendarPage({
             return (
               <div key={i} className={`cal-month-cell ${isToday?'cal-month-cell--today':''} ${!inMonth?'cal-month-cell--out':''}`}
                 onClick={()=>{setAnchor(d);setView('day');}}>
-                <div className={`cal-month-daynum ${isToday?'cal-month-daynum--today':''}`}>{d.getDate()}</div>
+                <div className="cal-month-daynum-row">
+                  <div className={`cal-month-daynum ${isToday?'cal-month-daynum--today':''}`}>{d.getDate()}</div>
+                  {(noPhoneByDate[dk]||[]).length>0 && <span className="cal-month-nophone-dot" title="No-phone time scheduled">📵</span>}
+                </div>
 
                 <button
                   type="button"
@@ -1165,6 +1326,15 @@ export default function CalendarPage({
           ))}
         </div>
         <div className="cal-header-right">
+          {view!=='month' && (
+            <button
+              className={`cal-nophone-toggle ${noPhoneMode?'cal-nophone-toggle--active':''}`}
+              onClick={()=>{ setNoPhoneMode(m=>!m); setNpDragStart(null); setNpDragCurrent(null); }}
+              title={noPhoneMode ? 'Exit No Phone mode' : 'Drag on the grid to block out No Phone time'}
+            >
+              <PhoneOff size={13} strokeWidth={2.5} /> No Phone
+            </button>
+          )}
           <button className="cal-nav-btn" onClick={()=>navigate(-1)}>&#8249;</button>
           <button className="cal-nav-btn" onClick={()=>navigate(1)}>&#8250;</button>
         </div>
@@ -1480,6 +1650,105 @@ export default function CalendarPage({
                 {dayEventModal.mode === 'edit' ? 'Save Changes' : 'Add Event'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── No Phone Block Modal ── */}
+      {noPhoneModal&&(
+        <div className="cal-modal-overlay" onClick={closeNoPhoneModal}>
+          <div className="cal-modal" onClick={e=>e.stopPropagation()}>
+            <div className="cal-modal-header">
+              <h3>{noPhoneModal.mode === 'edit' ? 'Edit No Phone Time' : 'New No Phone Time'}</h3>
+              <button className="cal-modal-close" onClick={closeNoPhoneModal}>✕</button>
+            </div>
+            <div className="cal-modal-body">
+              <div className="cal-field">
+                <label className="cal-label">Label</label>
+                <input
+                  className="cal-input"
+                  placeholder="e.g. No Phone"
+                  value={noPhoneForm.label}
+                  onChange={(e)=>setNoPhoneForm(f=>({...f,label:e.target.value}))}
+                  autoFocus
+                />
+              </div>
+              <div className="cal-field-row">
+                <div className="cal-field">
+                  <label className="cal-label">Start</label>
+                  <input
+                    className="cal-input"
+                    type="time"
+                    step="900"
+                    value={toTimeInput(noPhoneForm.startHour, noPhoneForm.startMin)}
+                    onChange={(e)=>{const {h,m}=parseTimeInput(e.target.value); setNoPhoneForm(f=>({...f,startHour:h,startMin:m}));}}
+                  />
+                </div>
+                <div className="cal-field">
+                  <label className="cal-label">End</label>
+                  <input
+                    className="cal-input"
+                    type="time"
+                    step="900"
+                    value={toTimeInput(noPhoneForm.endHour, noPhoneForm.endMin)}
+                    onChange={(e)=>{const {h,m}=parseTimeInput(e.target.value); setNoPhoneForm(f=>({...f,endHour:h,endMin:m}));}}
+                  />
+                </div>
+              </div>
+              <div className="cal-field">
+                <label className="cal-label">Repeat</label>
+                {renderRecurBtns(noPhoneForm.recurrence, r=>setNoPhoneForm(f=>({...f,recurrence:r})))}
+              </div>
+            </div>
+            {!isNoPhoneFormValid()&&<p className="cal-modal-err">End time must be after start time.</p>}
+            <div className="cal-modal-footer">
+              <button className="cal-btn cal-btn--ghost" onClick={closeNoPhoneModal}>Cancel</button>
+              <button
+                className="cal-btn cal-btn--primary"
+                disabled={!isNoPhoneFormValid()}
+                onClick={()=>noPhoneModal.mode==='create'?saveNoPhoneBlock():updateNoPhoneBlock()}
+              >
+                {noPhoneModal.mode === 'edit' ? 'Save Changes' : 'Add No Phone Time'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── No Phone Edit scope (recurring) ── */}
+      {noPhoneEditScope?.show&&(
+        <div className="cal-modal-overlay" onClick={()=>setNoPhoneEditScope(null)}>
+          <div className="cal-scope-modal" onClick={e=>e.stopPropagation()}>
+            <h4>Edit recurring No Phone block</h4>
+            <p>Which blocks do you want to change?</p>
+            <div className="cal-scope-btns">
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleNoPhoneEditScopeSelect('this')}>This block only</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleNoPhoneEditScopeSelect('this-forward')}>This &amp; future blocks</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleNoPhoneEditScopeSelect('all')}>All blocks</button>
+              <button className="cal-modal-close" onClick={()=>setNoPhoneEditScope(null)} aria-label="Close">
+                <X size={16} strokeWidth={3} />
+              </button>
+            </div>
+            <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setNoPhoneEditScope(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── No Phone Delete scope (recurring) ── */}
+      {noPhoneDeleteScope?.show&&(
+        <div className="cal-modal-overlay" onClick={()=>setNoPhoneDeleteScope(null)}>
+          <div className="cal-scope-modal" onClick={e=>e.stopPropagation()}>
+            <h4>Delete recurring No Phone block</h4>
+            <p>Which blocks do you want to delete?</p>
+            <div className="cal-scope-btns">
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleNoPhoneDeleteScope('this')}>This block only</button>
+              <button className="cal-btn cal-btn--ghost" onClick={()=>handleNoPhoneDeleteScope('this-forward')}>This &amp; future blocks</button>
+              <button className="cal-btn cal-btn--danger" onClick={()=>handleNoPhoneDeleteScope('all')}>All blocks</button>
+              <button className="cal-modal-close" onClick={()=>setNoPhoneDeleteScope(null)} aria-label="Close">
+                <X size={16} strokeWidth={3} />
+              </button>
+            </div>
+            <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setNoPhoneDeleteScope(null)}>Cancel</button>
           </div>
         </div>
       )}
