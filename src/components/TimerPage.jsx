@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import './TimerPage.css';
+import { Sparkles, Play, Pause, RotateCcw } from 'lucide-react';
 import STAT_META from './statMeta';
+import { xpForFocusMinutes } from '../utils/xpUtils';
+import { useCountdownTimer } from '../hooks/useCountdownTimer';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -11,7 +14,6 @@ const PRESETS = [
   { label: '45 min', seconds: 45 * 60 },
 ];
 
-const XP_OPTIONS = [10, 20, 30, 50, 75, 100];
 const STAT_ATTRIBUTES = Object.keys(STAT_META);
 const STAT_LABELS = Object.fromEntries(Object.entries(STAT_META).map(([k, v]) => [k, v.label]));
 
@@ -37,36 +39,16 @@ const relativeTime = (ts) => {
   return `${h}h ago`;
 };
 
-// ─── Audio Cue ────────────────────────────────────────────────────────────────
-const playFinishSound = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.18);
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
-      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + i * 0.18 + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.5);
-      osc.start(ctx.currentTime + i * 0.18);
-      osc.stop(ctx.currentTime + i * 0.18 + 0.55);
-    });
-  } catch (e) { /* silently fail */ }
-};
 
 // ─── XP Modal ─────────────────────────────────────────────────────────────────
 const XpModal = ({ xp, stat, onClose }) => (
   <div className="modal-overlay" onClick={onClose}>
     <div className="modal-content xp-modal" onClick={(e) => e.stopPropagation()}>
-      <span className="xp-badge-big">✨</span>
+      <span className="xp-badge-big"><Sparkles size={48} /></span>
       <h3 className="modal-title xp-title">+{xp} XP</h3>
       <p className="modal-body">
         Focus session complete!{' '}
-        <span style={{ color: '#fbbf24', fontWeight: 700, textTransform: 'capitalize' }}>
+        <span style={{ color: 'var(--accent)', fontWeight: 600, textTransform: 'capitalize' }}>
           {STAT_LABELS[stat] || stat}
         </span>{' '}
         increased.
@@ -78,23 +60,18 @@ const XpModal = ({ xp, stat, onClose }) => (
 
 // ─── Timer Page ───────────────────────────────────────────────────────────────
 const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) => {
-  const [totalSeconds, setTotalSeconds]   = useState(25 * 60);
-  const [timeLeft, setTimeLeft]           = useState(25 * 60);
-  const [isRunning, setIsRunning]         = useState(false);
-  const [hasStarted, setHasStarted]       = useState(false);
   const [sessionStartedAt, setSessionStartedAt] = useState(null);
-
   const [customMinutes, setCustomMinutes] = useState('');
   const [customSeconds, setCustomSeconds] = useState('');
-
-  const [xpAmount, setXpAmount] = useState(20);
   const [xpStat, setXpStat]   = useState('focus');
-
   const [showXpModal, setShowXpModal] = useState(false);
   const [activePreset, setActivePreset] = useState(25 * 60);
 
-  const intervalRef = useRef(null);
-  const endTimeRef  = useRef(null); // wall-clock timestamp (ms) when the timer reaches 0
+  const { totalSecs: totalSeconds, timeLeft, isRunning, hasStarted, start, pause, reset, setDuration } =
+    useCountdownTimer(25 * 60, () => setTimeout(() => setShowXpModal(true), 600));
+
+  // Reward is EARNED from the session length, not chosen — 1 XP per focused minute.
+  const xpAmount = xpForFocusMinutes(totalSeconds / 60);
 
   // ── Derived session stats ────────────────────────────────────────────────
   const todayKey = getLocalDateKey(0);
@@ -111,77 +88,23 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
     return { label, mins, isToday: i === 6 };
   });
 
-  // ── Tick ──────────────────────────────────────────────────────────────────
-  // Recomputes remaining time from a fixed end timestamp rather than counting down
-  // by 1 each call, so background tab throttling/suspension of setInterval can't
-  // cause drift — the moment the tab wakes up, the correct remaining time is restored.
-  const tick = useCallback(() => {
-    if (!endTimeRef.current) return;
-    const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
-    setTimeLeft(remaining);
-    if (remaining <= 0) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-      endTimeRef.current = null;
-      setIsRunning(false);
-      setHasStarted(false);
-      playFinishSound();
-      setTimeout(() => setShowXpModal(true), 600);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isRunning) {
-      if (!endTimeRef.current) endTimeRef.current = Date.now() + timeLeft * 1000;
-      intervalRef.current = setInterval(tick, 1000);
-    } else {
-      clearInterval(intervalRef.current);
-    }
-    return () => clearInterval(intervalRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, tick]);
-
-  // Resync immediately when the tab regains visibility, instead of waiting for
-  // the next (possibly throttled) interval tick.
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') tick();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [tick]);
-
   // ── Controls ──────────────────────────────────────────────────────────────
   const handleStart = () => {
     if (timeLeft === 0) return;
-    setIsRunning(true);
-    setHasStarted(true);
+    start();
     if (!sessionStartedAt) setSessionStartedAt(Date.now());
   };
 
-  const handlePause = () => {
-    setIsRunning(false);
-    endTimeRef.current = null;
-  };
+  const handlePause = () => pause();
 
-  const handleReset = () => {
-    setIsRunning(false);
-    setHasStarted(false);
-    setTimeLeft(totalSeconds);
-    setSessionStartedAt(null);
-    endTimeRef.current = null;
-  };
+  const handleReset = () => { reset(); setSessionStartedAt(null); };
 
   const handlePreset = (seconds) => {
-    setIsRunning(false);
-    setHasStarted(false);
-    setTotalSeconds(seconds);
-    setTimeLeft(seconds);
+    setDuration(seconds);
     setActivePreset(seconds);
     setCustomMinutes('');
     setCustomSeconds('');
     setSessionStartedAt(null);
-    endTimeRef.current = null;
   };
 
   const handleCustomApply = () => {
@@ -189,13 +112,9 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
     const secs = parseInt(customSeconds || '0', 10);
     const total = mins * 60 + secs;
     if (total <= 0 || total > 99 * 60) return;
-    setIsRunning(false);
-    setHasStarted(false);
-    setTotalSeconds(total);
-    setTimeLeft(total);
+    setDuration(total);
     setActivePreset(null);
     setSessionStartedAt(null);
-    endTimeRef.current = null;
   };
 
   const handleCustomKeyDown = (e) => { if (e.key === 'Enter') handleCustomApply(); };
@@ -217,7 +136,7 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
       });
     }
     setSessionStartedAt(null);
-    setTimeLeft(totalSeconds);
+    reset();
   };
 
   // ── Derived display ────────────────────────────────────────────────────────
@@ -231,18 +150,18 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
 
   return (
     <div className="timer-page-container">
-      <h1 className="section-page-title">TIMER</h1>
+      <h1 className="section-page-title">Timer</h1>
 
       <div className="timer-layout">
         {/* ── Main Timer Card ─────────────────────────────────────────────── */}
         <div className="timer-main-card">
           <div className="timer-ring-wrapper">
             <svg className="timer-ring-svg" viewBox="0 0 320 320">
-              <circle cx="160" cy="160" r={RADIUS} fill="none" stroke="#262626" strokeWidth="8" />
+              <circle cx="160" cy="160" r={RADIUS} fill="none" stroke="#2c2c2e" strokeWidth="8" />
               <circle
                 cx="160" cy="160" r={RADIUS}
                 fill="none"
-                stroke={isRunning || hasStarted ? '#fbbf24' : '#525252'}
+                stroke={isRunning || hasStarted ? '#38bdf8' : '#6e6e73'}
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={CIRCUMFERENCE}
@@ -252,27 +171,27 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
             </svg>
             <div className="timer-clock">
               <span className="timer-display">{displayMins}<span className="timer-colon">:</span>{displaySecs}</span>
-              {isRunning && <span className="timer-status-label">FOCUSING</span>}
-              {!isRunning && hasStarted && timeLeft > 0 && <span className="timer-status-label paused">PAUSED</span>}
-              {!isRunning && !hasStarted && timeLeft > 0 && <span className="timer-status-label idle">READY</span>}
-              {timeLeft === 0 && <span className="timer-status-label done">DONE!</span>}
+              {isRunning && <span className="timer-status-label">Focusing</span>}
+              {!isRunning && hasStarted && timeLeft > 0 && <span className="timer-status-label paused">Paused</span>}
+              {!isRunning && !hasStarted && timeLeft > 0 && <span className="timer-status-label idle">Ready</span>}
+              {timeLeft === 0 && <span className="timer-status-label done">Done!</span>}
             </div>
           </div>
 
           <div className="timer-controls">
             {!isRunning ? (
               <button className="timer-btn play" onClick={handleStart} disabled={timeLeft === 0}>
-                ▶ {hasStarted ? 'Resume' : 'Start'}
+                <Play size={16} /> {hasStarted ? 'Resume' : 'Start'}
               </button>
             ) : (
-              <button className="timer-btn pause" onClick={handlePause}>⏸ Pause</button>
+              <button className="timer-btn pause" onClick={handlePause}><Pause size={16} /> Pause</button>
             )}
-            <button className="timer-btn reset" onClick={handleReset}>↺ Reset</button>
+            <button className="timer-btn reset" onClick={handleReset}><RotateCcw size={16} /> Reset</button>
           </div>
 
           {/* Today's focus summary */}
           <div className="timer-today-summary">
-            <span className="timer-today-label">TODAY</span>
+            <span className="timer-today-label">Today</span>
             <span className="timer-today-value">{formatMins(todayMinutes)}</span>
             <span className="timer-today-sub">{todaySessions.length} session{todaySessions.length !== 1 ? 's' : ''}</span>
           </div>
@@ -281,7 +200,7 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
         {/* ── Right Panel ─────────────────────────────────────────────────── */}
         <div className="timer-side-panel">
           <div className="timer-section">
-            <span className="timer-section-label">DURATION</span>
+            <span className="timer-section-label">Duration</span>
             <div className="timer-presets">
               {PRESETS.map((p) => (
                 <button
@@ -296,7 +215,7 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
           </div>
 
           <div className="timer-section">
-            <span className="timer-section-label">CUSTOM</span>
+            <span className="timer-section-label">Custom</span>
             <div className="timer-custom-row">
               <div className="timer-custom-field">
                 <input type="number" min="0" max="99" value={customMinutes} onChange={(e) => setCustomMinutes(e.target.value)} onKeyDown={handleCustomKeyDown} placeholder="00" className="timer-custom-input" />
@@ -312,16 +231,15 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
           </div>
 
           <div className="timer-section">
-            <span className="timer-section-label">XP REWARD</span>
-            <div className="timer-xp-pills">
-              {XP_OPTIONS.map((val) => (
-                <button key={val} className={`timer-xp-pill ${xpAmount === val ? 'active' : ''}`} onClick={() => setXpAmount(val)}>+{val}</button>
-              ))}
+            <span className="timer-section-label">Reward</span>
+            <div className="timer-xp-earned">
+              <span className="timer-xp-earned-val">+{xpAmount} XP</span>
+              <span className="timer-xp-earned-note">earned · 1 XP per focused minute</span>
             </div>
           </div>
 
           <div className="timer-section">
-            <span className="timer-section-label">ATTRIBUTE</span>
+            <span className="timer-section-label">Attribute</span>
             <div className="timer-stat-pills">
               {STAT_ATTRIBUTES.map((attr) => {
                 const meta = STAT_META[attr];
@@ -346,19 +264,19 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
 
       {/* ── Focus History ────────────────────────────────────────────────────── */}
       <div className="timer-history-section">
-        <h3 className="timer-history-title">7-DAY FOCUS</h3>
+        <h3 className="timer-history-title">7-Day Focus</h3>
         <div className="timer-history-chart">
           <ResponsiveContainer width="100%" height={120}>
             <BarChart data={last7} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-              <XAxis dataKey="label" tick={{ fill: '#737373', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="label" tick={{ fill: '#8e8e93', fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={{ background: '#1c1c1c', border: '1px solid #333', borderRadius: 8, color: '#fff', fontSize: 12 }}
+                contentStyle={{ background: '#1c1c1e', border: '1px solid #3a3a3c', borderRadius: 8, color: '#fff', fontSize: 12 }}
                 formatter={(v) => [`${v}m`, 'Focus']}
                 cursor={{ fill: 'rgba(255,255,255,0.04)' }}
               />
               <Bar dataKey="mins" radius={[4, 4, 0, 0]}>
                 {last7.map((entry, i) => (
-                  <Cell key={i} fill={entry.isToday ? '#fbbf24' : '#333'} />
+                  <Cell key={i} fill={entry.isToday ? '#38bdf8' : '#3a3a3c'} />
                 ))}
               </Bar>
             </BarChart>
@@ -367,9 +285,9 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
 
         {pomodoroSessions.filter(s => s.date === todayKey).length > 0 && (
           <div className="timer-sessions-list">
-            <span className="timer-sessions-header">TODAY'S SESSIONS</span>
+            <span className="timer-sessions-header">Today's Sessions</span>
             {pomodoroSessions.filter(s => s.date === todayKey).slice(0, 5).map(s => {
-              const meta = STAT_META[s.stat] || { label: s.stat, color: '#a3a3a3' };
+              const meta = STAT_META[s.stat] || { label: s.stat, color: 'var(--text-secondary)' };
               return (
                 <div key={s.id} className="timer-session-item">
                   <span className="timer-session-dur">{formatMins(Math.floor(s.durationSecs / 60))}</span>

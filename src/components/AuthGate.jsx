@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Swords } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthGate() {
@@ -48,9 +49,9 @@ export default function AuthGate() {
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 24px',
-          fontSize: 26,
+          color: '#fff',
         }}>
-          ⚔️
+          <Swords size={28} />
         </div>
 
         <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, margin: '0 0 8px' }}>

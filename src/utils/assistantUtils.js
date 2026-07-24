@@ -1,5 +1,5 @@
-import { getRankForLevel } from './rankMeta';
 import { xpCapForLevel } from './xpUtils';
+import { computeRankStatus } from './scoreUtils';
 
 const STAT_LABELS = {
   strength:     'Strength',
@@ -74,24 +74,69 @@ const summarizeHabits = (habits) => {
   return habits.map(h => `${h.text} (streak: ${h.streak || 0} days)`).join(', ');
 };
 
-/** Summarize active challenges */
-const summarizeChallenges = (challenges) => {
-  if (!challenges?.length) return 'No challenges.';
-  const active = challenges.filter(c => c.started && !c.completed);
-  const completed = challenges.filter(c => c.completed).length;
-  if (!active.length && !completed) return 'No challenges started yet.';
-  const lines = [];
-  if (active.length) lines.push(`Active challenges: ${active.map(c => c.title || c.text).join(', ')}`);
-  if (completed) lines.push(`Completed challenges: ${completed} total`);
-  return lines.join('\n');
+const assistantDateKey = (offset = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** Summarize the most recent health entry + food budget */
+const summarizeHealth = (healthLog, foodPoints) => {
+  if (!healthLog || Object.keys(healthLog).length === 0) return 'No health data logged.';
+  const entry = healthLog[assistantDateKey(0)] || healthLog[assistantDateKey(-1)] || {};
+  const parts = [];
+  if (entry.sleepHours) parts.push(`Sleep: ${entry.sleepHours.toFixed(1)}h`);
+  if (entry.energyLevel) parts.push(`Energy: ${entry.energyLevel}/5`);
+  if (entry.workouts?.length) parts.push(`Workouts: ${entry.workouts.map(w => w.type).join(', ')}`);
+  if (entry.screentimeHours != null) parts.push(`Screen time: ${entry.screentimeHours.toFixed(1)}h`);
+  if (entry.waterGlasses) parts.push(`Water: ${entry.waterGlasses} bottles`);
+  if (foodPoints?.balance != null) parts.push(`Food budget: ${foodPoints.balance}`);
+  return parts.length ? parts.join(' | ') : 'Health logged but sparse.';
+};
+
+/** Summarize focus/pomodoro time */
+const summarizeFocus = (pomodoroSessions) => {
+  if (!pomodoroSessions?.length) return 'No focus sessions yet.';
+  const todayKey = assistantDateKey(0);
+  const week = new Set(Array.from({ length: 7 }, (_, i) => assistantDateKey(-i)));
+  const mins = (filter) => pomodoroSessions.filter(filter).reduce((s, p) => s + Math.floor(p.durationSecs / 60), 0);
+  const todayMins = mins(s => s.date === todayKey && s.completed);
+  const weekMins = mins(s => week.has(s.date) && s.completed);
+  return `Focused ${todayMins}m today, ${weekMins}m over the last 7 days.`;
+};
+
+/** Summarize active goals with progress */
+const summarizeGoals = (goals) => {
+  if (!goals?.length) return 'No goals set.';
+  const active = goals.filter(g => !g.completed);
+  if (!active.length) return 'All goals completed — time to set new ones.';
+  return active.slice(0, 8).map(g => {
+    const ms = g.milestones || [];
+    let prog = '';
+    if (ms.length) prog = ` (${ms.filter(m => m.completed).length}/${ms.length} milestones)`;
+    else if (g.targetValue) prog = ` (${g.currentValue || 0}/${g.targetValue}${g.unit ? ' ' + g.unit : ''})`;
+    return `${g.pinned ? '[Pinned] ' : ''}${g.title} [${g.period}]${prog}`;
+  }).join('\n');
+};
+
+/** Summarize the latest weekly review */
+const summarizeWeekly = (weeklyReviews) => {
+  if (!weeklyReviews || Object.keys(weeklyReviews).length === 0) return 'No weekly reviews yet.';
+  const latest = weeklyReviews[Object.keys(weeklyReviews).sort().reverse()[0]];
+  const parts = [];
+  if (latest.priority?.trim()) parts.push(`This week's #1 priority: ${latest.priority}`);
+  if (latest.improvements?.trim()) parts.push(`Wants to improve: ${latest.improvements}`);
+  if (latest.heldBack?.trim()) parts.push(`Held back by: ${latest.heldBack}`);
+  return parts.length ? parts.join(' | ') : 'Weekly review logged.';
 };
 
 /**
- * Builds the system prompt for the Gemini mentor AI.
- * Injects the player's full game state so the mentor has real context.
+ * Builds the system prompt for the Gemini-backed assistant.
+ * Injects the player's full game state so the assistant has real context.
  */
-export const buildSystemPrompt = (user, todos, habits, logs, challenges) => {
-  const rank = getRankForLevel(user.level);
+export const buildSystemPrompt = (user, todos, habits, logs, extra = {}) => {
+  const { healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive } = extra;
+  const rankStatus = computeRankStatus(habits, xpLog, pomodoroSessions, logs, commitmentArchive);
   const { weakest, strongest, all } = analyzeStats(user.stats);
   const xpCap = xpCapForLevel(user.level);
   const xpPercent = Math.round((user.xp / xpCap) * 100);
@@ -100,7 +145,7 @@ export const buildSystemPrompt = (user, todos, habits, logs, challenges) => {
   const weakBlock = weakest.map(s => `  - ${s.label} (Lv ${s.level})`).join('\n');
   const strongBlock = strongest.map(s => `  - ${s.label} (Lv ${s.level})`).join('\n');
 
-  return `You are ${user.name}'s personal life mentor inside their self-improvement app called "Game of Life". Your role is to be a direct, no-nonsense, deeply invested mentor — like a personal trainer meets life coach. You use the RPG game framing naturally (stats, levels, XP, challenges) because that's how ${user.name} tracks their real life.
+  return `You are ${user.name}'s personal life assistant inside their self-improvement app called "Game of Life". Your role is to be a direct, no-nonsense, deeply invested assistant — like a personal trainer meets life coach. You use the RPG game framing naturally (stats, levels, XP) because that's how ${user.name} tracks their real life.
 
 YOUR PERSONA:
 - You are direct, honest, and encouraging — you call out weak areas without being harsh
@@ -114,7 +159,7 @@ YOUR PERSONA:
 
 PLAYER PROFILE:
 Name: ${user.name}
-Level: ${user.level} | Rank: ${rank.name}
+Level: ${user.level} | Rank: ${rankStatus.tier.name} (${rankStatus.streakDays}-day streak)
 XP: ${user.xp} / ${xpCap} (${xpPercent}% to next level)
 
 CURRENT STATS:
@@ -130,8 +175,17 @@ ACTIVE TASKS & HABITS:
 ${summarizeTasks(todos)}
 Habits: ${summarizeHabits(habits)}
 
-CHALLENGES:
-${summarizeChallenges(challenges)}
+GOALS:
+${summarizeGoals(goals)}
+
+FOCUS TIME:
+${summarizeFocus(pomodoroSessions)}
+
+HEALTH:
+${summarizeHealth(healthLog, foodPoints)}
+
+LATEST WEEKLY REVIEW:
+${summarizeWeekly(weeklyReviews)}
 
 RECENT JOURNAL (last 7 days):
 ${summarizeLogs(logs)}
@@ -141,7 +195,7 @@ INSTRUCTIONS:
 - When asked about a specific area, go deeper with actionable steps.
 - Reference journal emotions if they reveal stress, anxiety, or burnout — address those directly.
 - If their commitment streak is broken (no recent journal entries), call it out.
-- Always end responses with a clear next action or challenge.
+- Always end responses with a clear next action.
 
 AI ACTION FORMAT:
 - You can propose structured app actions, but they require user confirmation before execution.
@@ -150,7 +204,7 @@ AI ACTION FORMAT:
     "message": "string",
     "actions": [
       {
-        "type": "create_task | create_calendar_event | create_quick_event_template | create_challenge",
+        "type": "create_task | create_calendar_event | create_quick_event_template",
         "payload": { "...": "..." }
       }
     ]
@@ -159,7 +213,7 @@ AI ACTION FORMAT:
 - Do not include markdown, code fences, or extra text outside JSON.`;
 };
 
-const parseMentorResponse = (rawText) => {
+const parseAssistantResponse = (rawText) => {
   const fallbackText = rawText || 'No response received.';
   if (!rawText) return { text: fallbackText, actions: [] };
 
@@ -181,7 +235,7 @@ const parseMentorResponse = (rawText) => {
  * history: array of { role: 'user'|'model', parts: [{ text }] }
  * caps history at 20 messages before sending
  */
-export const sendToMentor = async (history, userMessage, systemPrompt) => {
+export const sendToAssistant = async (history, userMessage, systemPrompt) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your_gemini_api_key_here') {
     throw new Error('Missing Gemini API key. Add VITE_GEMINI_API_KEY to your .env file.');
@@ -209,5 +263,5 @@ export const sendToMentor = async (history, userMessage, systemPrompt) => {
     },
   });
 
-  return parseMentorResponse(response.text || '');
+  return parseAssistantResponse(response.text || '');
 };

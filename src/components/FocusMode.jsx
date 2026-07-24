@@ -1,29 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import './FocusMode.css';
+import { X, ChevronDown, Play, Pause, RotateCcw, Timer, PartyPopper } from 'lucide-react';
 import STAT_META from './statMeta';
+import { xpForFocusMinutes } from '../utils/xpUtils';
+import { useCountdownTimer } from '../hooks/useCountdownTimer';
 
 const getLocalDateKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-};
-
-const playFinishSound = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((freq, i) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.18);
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
-      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + i * 0.18 + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.5);
-      osc.start(ctx.currentTime + i * 0.18);
-      osc.stop(ctx.currentTime + i * 0.18 + 0.55);
-    });
-  } catch {}
 };
 
 const PRESETS = [5 * 60, 10 * 60, 25 * 60, 45 * 60];
@@ -33,58 +17,17 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
   const todayTasks = todos.filter(t => (t.timeFrame === 'today' || t.timeFrame === 'tomorrow') && !t.completed);
 
   const [pinnedId, setPinnedId]   = useState(todayTasks[0]?.id || null);
-  const [totalSecs, setTotalSecs] = useState(25 * 60);
-  const [timeLeft, setTimeLeft]   = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
   const [xpStat, setXpStat]       = useState('focus');
-  const [xpAmount, setXpAmount]   = useState(20);
   const [showDone, setShowDone]   = useState(false);
   const [startedAt, setStartedAt] = useState(null);
   const [showTaskPicker, setShowTaskPicker] = useState(false);
 
-  const intervalRef = useRef(null);
-  const endTimeRef  = useRef(null); // wall-clock timestamp (ms) when the timer reaches 0
+  const { totalSecs, timeLeft, isRunning, hasStarted, start, pause, reset, setDuration } =
+    useCountdownTimer(25 * 60, () => setTimeout(() => setShowDone(true), 600));
+
+  // Reward is EARNED from session length, not chosen — 1 XP per focused minute.
+  const xpAmount = xpForFocusMinutes(totalSecs / 60);
   const pinnedTask  = todayTasks.find(t => t.id === pinnedId) || todayTasks[0];
-
-  // Recomputes remaining time from a fixed end timestamp rather than counting down
-  // by 1 each call, so background tab throttling/suspension of setInterval can't
-  // cause drift — the moment the tab wakes up, the correct remaining time is restored.
-  const tick = useCallback(() => {
-    if (!endTimeRef.current) return;
-    const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
-    setTimeLeft(remaining);
-    if (remaining <= 0) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-      endTimeRef.current = null;
-      setIsRunning(false);
-      setHasStarted(false);
-      playFinishSound();
-      setTimeout(() => setShowDone(true), 600);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isRunning) {
-      if (!endTimeRef.current) endTimeRef.current = Date.now() + timeLeft * 1000;
-      intervalRef.current = setInterval(tick, 1000);
-    } else {
-      clearInterval(intervalRef.current);
-    }
-    return () => clearInterval(intervalRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, tick]);
-
-  // Resync immediately when the tab regains visibility, instead of waiting for
-  // the next (possibly throttled) interval tick.
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') tick();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [tick]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -94,14 +37,13 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
 
   const handleStart = () => {
     if (timeLeft === 0) return;
-    setIsRunning(true);
-    setHasStarted(true);
+    start();
     if (!startedAt) setStartedAt(Date.now());
   };
 
-  const handlePause = () => { setIsRunning(false); endTimeRef.current = null; };
-  const handleReset = () => { setIsRunning(false); setHasStarted(false); setTimeLeft(totalSecs); setStartedAt(null); endTimeRef.current = null; };
-  const setPreset = (s) => { setIsRunning(false); setHasStarted(false); setTotalSecs(s); setTimeLeft(s); setStartedAt(null); endTimeRef.current = null; };
+  const handlePause = () => pause();
+  const handleReset = () => { reset(); setStartedAt(null); };
+  const setPreset = (s) => { setDuration(s); setStartedAt(null); };
 
   const handleClaimXp = () => {
     onUpdateStat(xpStat, xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
@@ -117,7 +59,7 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
     });
     setShowDone(false);
     setStartedAt(null);
-    setTimeLeft(totalSecs);
+    reset();
   };
 
   const todayFocusMins = pomodoroSessions.filter(s => s.date === getLocalDateKey() && s.completed)
@@ -130,14 +72,14 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
 
   return (
     <div className="focus-overlay">
-      <button className="focus-close" onClick={onClose} title="Exit (Esc)">✕</button>
+      <button className="focus-close" onClick={onClose} title="Exit (Esc)"><X size={16} /></button>
 
       {/* Current task */}
       <div className="focus-task-section">
-        <span className="focus-task-label">WORKING ON</span>
+        <span className="focus-task-label">Working On</span>
         {pinnedTask ? (
           <button className="focus-task-name" onClick={() => setShowTaskPicker(o => !o)}>
-            {pinnedTask.text} ▾
+            {pinnedTask.text} <ChevronDown size={14} />
           </button>
         ) : (
           <span className="focus-task-name muted">No tasks for today</span>
@@ -156,10 +98,10 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
       {/* Timer ring */}
       <div className="focus-ring-wrap">
         <svg viewBox="0 0 240 240" className="focus-ring-svg">
-          <circle cx="120" cy="120" r={R} fill="none" stroke="#1a1a1a" strokeWidth="7" />
+          <circle cx="120" cy="120" r={R} fill="none" stroke="#2c2c2e" strokeWidth="7" />
           <circle
             cx="120" cy="120" r={R} fill="none"
-            stroke={isRunning || hasStarted ? '#fbbf24' : '#333'}
+            stroke={isRunning || hasStarted ? '#38bdf8' : '#6e6e73'}
             strokeWidth="7" strokeLinecap="round"
             strokeDasharray={C} strokeDashoffset={C * (1 - progress)}
             style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.8s linear, stroke 0.3s' }}
@@ -167,21 +109,21 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
         </svg>
         <div className="focus-ring-inner">
           <span className="focus-time">{displayMins}<span className="focus-colon">:</span>{displaySecs}</span>
-          {isRunning && <span className="focus-status">FOCUSING</span>}
-          {!isRunning && hasStarted && timeLeft > 0 && <span className="focus-status paused">PAUSED</span>}
-          {!isRunning && !hasStarted && <span className="focus-status idle">READY</span>}
-          {timeLeft === 0 && <span className="focus-status done">DONE!</span>}
+          {isRunning && <span className="focus-status">Focusing</span>}
+          {!isRunning && hasStarted && timeLeft > 0 && <span className="focus-status paused">Paused</span>}
+          {!isRunning && !hasStarted && <span className="focus-status idle">Ready</span>}
+          {timeLeft === 0 && <span className="focus-status done">Done!</span>}
         </div>
       </div>
 
       {/* Controls */}
       <div className="focus-controls">
         {!isRunning ? (
-          <button className="focus-btn play" onClick={handleStart} disabled={timeLeft === 0}>▶ {hasStarted ? 'Resume' : 'Start'}</button>
+          <button className="focus-btn play" onClick={handleStart} disabled={timeLeft === 0}><Play size={16} /> {hasStarted ? 'Resume' : 'Start'}</button>
         ) : (
-          <button className="focus-btn pause" onClick={handlePause}>⏸ Pause</button>
+          <button className="focus-btn pause" onClick={handlePause}><Pause size={16} /> Pause</button>
         )}
-        <button className="focus-btn reset" onClick={handleReset}>↺</button>
+        <button className="focus-btn reset" onClick={handleReset}><RotateCcw size={16} /></button>
       </div>
 
       {/* Presets */}
@@ -195,10 +137,9 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
 
       {/* Stat + XP */}
       <div className="focus-config">
-        <div className="focus-config-row">
-          {[10, 20, 30, 50].map(v => (
-            <button key={v} className={`focus-xp-pill ${xpAmount === v ? 'active' : ''}`} onClick={() => setXpAmount(v)}>+{v}</button>
-          ))}
+        <div className="focus-config-row focus-xp-earned-row">
+          <span className="focus-xp-earned">+{xpAmount} XP</span>
+          <span className="focus-xp-earned-note">earned · 1 XP / focused min</span>
         </div>
         <div className="focus-config-row focus-stat-row">
           {STAT_ATTRS.map(attr => {
@@ -216,14 +157,14 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
 
       {todayFocusMins > 0 && (
         <div className="focus-today-stats">
-          ⏱️ {todayFocusMins >= 60 ? `${Math.floor(todayFocusMins/60)}h ${todayFocusMins%60}m` : `${todayFocusMins}m`} focused today
+          <Timer size={14} /> {todayFocusMins >= 60 ? `${Math.floor(todayFocusMins/60)}h ${todayFocusMins%60}m` : `${todayFocusMins}m`} focused today
         </div>
       )}
 
       {/* Done overlay */}
       {showDone && (
         <div className="focus-done-overlay">
-          <span className="focus-done-emoji">🎉</span>
+          <span className="focus-done-emoji"><PartyPopper size={64} /></span>
           <h2 className="focus-done-title">Session Complete!</h2>
           <p className="focus-done-xp">+{xpAmount} XP → {STAT_META[xpStat]?.label}</p>
           <button className="focus-done-btn" onClick={handleClaimXp}>Claim XP</button>

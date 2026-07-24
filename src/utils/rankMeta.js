@@ -1,31 +1,22 @@
-import bronzeBadge       from '../assets/badges/bronze.png';
-import silverBadge       from '../assets/badges/silver.png';
-import goldBadge         from '../assets/badges/gold.png';
-import platinumBadge     from '../assets/badges/platinum.png';
-import masterBadge       from '../assets/badges/master.png';
-import championBadge     from '../assets/badges/champion.png';
-import grandChampionBadge from '../assets/badges/grand_champion.png';
-import supremeBadge      from '../assets/badges/supreme.png';
+import { CloudOff, Hammer, Waves, Lock, Sparkles } from 'lucide-react';
 
-const RANKS = [
-  { name: 'Bronze',        minLevel: 1,  maxLevel: 5,   badge: bronzeBadge,        color: '#cd7f32' },
-  { name: 'Silver',        minLevel: 6,  maxLevel: 10,  badge: silverBadge,        color: '#c0c0c0' },
-  { name: 'Gold',          minLevel: 11, maxLevel: 20,  badge: goldBadge,          color: '#fbbf24' },
-  { name: 'Platinum',      minLevel: 21, maxLevel: 30,  badge: platinumBadge,      color: '#67e8f9' },
-  { name: 'Master',        minLevel: 31, maxLevel: 45,  badge: masterBadge,        color: '#c084fc' },
-  { name: 'Champion',      minLevel: 46, maxLevel: 60,  badge: championBadge,      color: '#f97316' },
-  { name: 'Grand Champion',minLevel: 61, maxLevel: 80,  badge: grandChampionBadge, color: '#ef4444' },
-  { name: 'Supreme',       minLevel: 81, maxLevel: Infinity, badge: supremeBadge,  color: '#fbbf24' },
+// Rank tiers. Rank is a "maintain" system (see scoreUtils.js#computeRankStatus):
+// to HOLD a tier, the Daily Score must clear that tier's own `min` threshold for
+// REQUIRED_STREAK_DAYS consecutive days running — so rank is reversible and fully
+// traceable to real recent behavior, not a blended average or lifetime level/XP.
+//
+// Order matters: worst → best. Consumers compare tiers via RANK_TIERS.indexOf(...)
+// to determine whether a transition was an improvement or a slip.
+// `max` is currently unused (no consumer buckets a raw score into a tier anymore)
+// — kept for documentation/possible future use (e.g. a range tooltip).
+export const RANK_TIERS = [
+  { name: 'Drifting',   min: 0,   max: 2.9,        color: '#94a3b8', icon: 'CloudOff' },
+  { name: 'Building',   min: 3.0, max: 4.9,        color: '#60a5fa', icon: 'Hammer'   },
+  { name: 'Steady',     min: 5.0, max: 6.4,        color: '#34d399', icon: 'Waves'    },
+  { name: 'Locked In',  min: 6.5, max: 8.4,        color: '#fbbf24', icon: 'Lock'     },
+  { name: 'Peak State', min: 8.5, max: Infinity,   color: '#f472b6', icon: 'Sparkles' },
 ];
 
-export const getRankForLevel = (level) =>
-  RANKS.find(r => level >= r.minLevel && level <= r.maxLevel) || RANKS[0];
+export const TIER_ICONS = { CloudOff, Hammer, Waves, Lock, Sparkles };
 
-// Returns the rank for a given level, or null if the level is NOT the first level of that rank
-// (used to detect rank-up moments)
-export const getRankUpAtLevel = (level) => {
-  const rank = getRankForLevel(level);
-  return level === rank.minLevel ? rank : null;
-};
-
-export default RANKS;
+export default RANK_TIERS;

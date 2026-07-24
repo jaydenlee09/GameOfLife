@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { X, Plus, Check, ExternalLink } from 'lucide-react';
 import './ShopPage.css';
 
 const PRIORITY_OPTIONS = ['low', 'medium', 'high'];
@@ -87,25 +88,25 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
     setShop(prev => ({ ...prev, items: prev.items.filter(i => i.id !== id) }));
   };
 
-  const handleTogglePurchased = (id) => {
+  const handleTogglePurchased = (item) => {
     setShop(prev => ({
       ...prev,
-      items: prev.items.map(i => i.id === id ? { ...i, purchased: !i.purchased } : i),
+      items: prev.items.map(i => i.id === item.id ? { ...i, purchased: !i.purchased } : i),
     }));
   };
 
   return (
     <div className="shop-page">
       <div className="shop-content">
-        <h1 className="section-page-title">SHOP</h1>
+        <h1 className="section-page-title">Shop</h1>
 
         <div className="shop-header">
           <div className="shop-total-display">
-            <span className="shop-total-label">WISHLIST TOTAL</span>
+            <span className="shop-total-label">Wishlist Total</span>
             <span className="shop-total-value">${totalUnpurchased.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <button className="shop-add-btn" onClick={() => setShowAdd(o => !o)}>
-            {showAdd ? '✕ Cancel' : '+ Add Item'}
+            {showAdd ? <><X size={14} /> Cancel</> : <><Plus size={14} /> Add Item</>}
           </button>
         </div>
 
@@ -141,7 +142,7 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
         <div className="shop-grid">
           {items.map(item => (
             <div key={item.id} className={`shop-card ${item.purchased ? 'purchased' : ''}`}>
-              <button className="shop-delete" onClick={() => handleDeleteItem(item.id)} title="Remove">✕</button>
+              <button className="shop-delete" onClick={() => handleDeleteItem(item.id)} title="Remove"><X size={14} /></button>
               {item.imageUrl && (
                 <img
                   className="shop-item-image"
@@ -150,10 +151,19 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
                   onError={e => { e.target.style.display = 'none'; }}
                 />
               )}
-              <label className="shop-checkbox-row">
-                <input type="checkbox" checked={item.purchased} onChange={() => handleTogglePurchased(item.id)} />
-                <span className="shop-checkbox-label">Purchased</span>
-              </label>
+              {item.purchased ? (
+                <button className="shop-greenlight shop-greenlight--done" onClick={() => handleTogglePurchased(item)} title="Mark as not bought yet">
+                  <Check size={14} /> Bought
+                </button>
+              ) : (
+                <button
+                  className="shop-greenlight"
+                  onClick={() => handleTogglePurchased(item)}
+                  title="Mark as bought"
+                >
+                  Mark as Bought
+                </button>
+              )}
               <h3 className="shop-item-name">{item.name}</h3>
               <div className="shop-item-meta">
                 <span className="shop-item-price">${Number(item.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -161,7 +171,7 @@ const ShopPage = ({ shop = { items: [] }, setShop }) => {
                 {item.category && <span className="shop-item-category">{item.category}</span>}
               </div>
               {item.url && (
-                <a className="shop-item-link" href={item.url} target="_blank" rel="noopener noreferrer">View item ↗</a>
+                <a className="shop-item-link" href={item.url} target="_blank" rel="noopener noreferrer">View item <ExternalLink size={13} /></a>
               )}
               {!item.imageUrl && manualImageEditId !== item.id && (
                 <div className="shop-image-actions">

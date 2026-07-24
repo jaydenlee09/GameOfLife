@@ -2,7 +2,7 @@
 .levelup-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,13 +27,13 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 3px solid #fbbf24;
+  border: 3px solid var(--accent);
   box-shadow:
-    0 0 30px #fbbf2466,
-    0 0 80px #fbbf2433,
-    inset 0 0 40px #fbbf2422;
+    0 0 30px rgba(56, 189, 248, 0.4),
+    0 0 80px rgba(56, 189, 248, 0.2),
+    inset 0 0 40px rgba(56, 189, 248, 0.13);
   animation: levelup-pulse 1.6s ease-in-out infinite;
-  background: radial-gradient(circle at 50% 50%, #fbbf2412 0%, transparent 70%);
+  background: radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.07) 0%, transparent 70%);
 }
 
 /* ─── Particles ──────────────────────────────────────────────────────────── */
@@ -50,7 +50,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #fbbf24;
+  background: var(--accent);
   transform-origin: 0 0;
   animation: levelup-particle 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   animation-delay: calc(var(--i) * 0.04s);
@@ -59,8 +59,8 @@
 
 /* Alternate particle colours for variety */
 .levelup-particle:nth-child(3n)   { background: #fff; width: 4px; height: 4px; }
-.levelup-particle:nth-child(3n+1) { background: #f9d05a; }
-.levelup-particle:nth-child(3n+2) { background: #fb923c; }
+.levelup-particle:nth-child(3n+1) { background: #64d2ff; }
+.levelup-particle:nth-child(3n+2) { background: var(--accent-pressed); }
 
 @keyframes levelup-particle {
   0%   { transform: rotate(calc(var(--i) * 30deg)) translateY(-20px) scale(1); opacity: 1; }
@@ -79,52 +79,54 @@
 }
 
 .levelup-pre {
-  font-size: 0.75rem;
-  font-weight: 900;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--accent);
   margin: 0;
   animation: levelup-slideDown 0.5s 0.2s both;
 }
 
 .levelup-number {
   font-size: 7rem;
-  font-weight: 900;
-  color: #fff;
+  font-weight: 600;
+  color: var(--text-primary);
   margin: 0;
   line-height: 1;
-  letter-spacing: -4px;
-  text-shadow: 0 0 40px #fbbf2466, 0 0 80px #fbbf2433;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 40px rgba(56, 189, 248, 0.4), 0 0 80px rgba(56, 189, 248, 0.2);
   animation: levelup-numberPop 0.5s 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
 .levelup-sub {
   font-size: 0.85rem;
-  font-weight: 600;
-  color: #a3a3a3;
+  font-weight: 500;
+  color: var(--text-secondary);
   margin: 0;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   animation: levelup-slideDown 0.5s 0.3s both;
 }
 
 .levelup-btn {
   margin-top: 1rem;
-  background: #fbbf24;
-  color: #0d0d0d;
+  background: var(--accent);
+  color: #fff;
   border: none;
   border-radius: 50px;
   padding: 0.65rem 2rem;
   font-size: 0.95rem;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0;
   cursor: pointer;
-  transition: transform 0.1s, background 0.2s;
+  transition: transform 0.1s, background var(--duration) var(--ease);
   animation: levelup-slideDown 0.5s 0.4s both;
 }
 
-.levelup-btn:hover  { background: #f9d05a; }
+.levelup-btn:hover  { background: var(--accent-pressed); }
 .levelup-btn:active { transform: scale(0.95); }
 
 /* ─── Keyframes ──────────────────────────────────────────────────────────── */
@@ -139,8 +141,8 @@
 }
 
 @keyframes levelup-pulse {
-  0%, 100% { box-shadow: 0 0 30px #fbbf2466, 0 0 80px #fbbf2433, inset 0 0 40px #fbbf2422; }
-  50%       { box-shadow: 0 0 50px #fbbf2499, 0 0 120px #fbbf2455, inset 0 0 60px #fbbf2433; }
+  0%, 100% { box-shadow: 0 0 30px rgba(56, 189, 248, 0.4), 0 0 80px rgba(56, 189, 248, 0.2), inset 0 0 40px rgba(56, 189, 248, 0.13); }
+  50%       { box-shadow: 0 0 50px rgba(56, 189, 248, 0.55), 0 0 120px rgba(56, 189, 248, 0.3), inset 0 0 60px rgba(56, 189, 248, 0.2); }
 }
 
 @keyframes levelup-numberPop {
@@ -151,34 +153,4 @@
 @keyframes levelup-slideDown {
   from { transform: translateY(-12px); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
-}
-
-/* ─── Rank-up section ────────────────────────────────────────────────────── */
-.levelup-rank-up {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  animation: levelup-slideDown 0.5s 0.25s both;
-}
-
-.levelup-rank-badge {
-  width: 56px;
-  height: 56px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 12px currentColor);
-  animation: levelup-badgePop 0.55s 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
-}
-
-.levelup-rank-name {
-  font-size: 0.8rem;
-  font-weight: 900;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  margin: 0;
-}
-
-@keyframes levelup-badgePop {
-  from { transform: scale(0.4) rotate(-15deg); opacity: 0; }
-  to   { transform: scale(1)   rotate(0deg);   opacity: 1; }
 }

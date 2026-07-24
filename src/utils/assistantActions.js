@@ -7,7 +7,6 @@ const TASK_TIMEFRAME_XP = {
 
 const VALID_TIMEFRAMES = Object.keys(TASK_TIMEFRAME_XP);
 const VALID_RECURRENCE = ['none', 'daily', 'weekly'];
-const VALID_CHALLENGE_DURATIONS = ['daily', 'weekly', 'monthly'];
 
 const makeId = (prefix = 'id') => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 
@@ -127,32 +126,14 @@ const normalizeQuickTemplatePayload = (payload, validStats) => {
   };
 };
 
-const normalizeChallengePayload = (payload, validStats) => {
-  const text = toTrimmedString(payload?.text || payload?.title);
-  if (!text) throw new Error('Challenge is missing text.');
-
-  const category = validStats.includes(payload?.category) ? payload.category : 'discipline';
-  const duration = VALID_CHALLENGE_DURATIONS.includes(payload?.duration) ? payload.duration : 'daily';
-  const xpFallback = duration === 'monthly' ? 500 : duration === 'weekly' ? 100 : 30;
-  const xp = clamp(Math.round(toNumber(payload?.xp, xpFallback)), 1, 9999);
-
-  return {
-    text,
-    category,
-    duration,
-    xp,
-  };
-};
-
 const friendlyLabel = (type, payload) => {
   if (type === 'create_task') return `Create task: ${payload.text}`;
   if (type === 'create_calendar_event') return `Add calendar block: ${payload.title}`;
   if (type === 'create_quick_event_template') return `Create time block template: ${payload.title}`;
-  if (type === 'create_challenge') return `Create challenge: ${payload.text}`;
   return 'Unknown action';
 };
 
-export const prepareMentorActions = (rawActions, validStats) => {
+export const prepareAssistantActions = (rawActions, validStats) => {
   const actions = [];
   const errors = [];
   const statKeys = Array.isArray(validStats) && validStats.length ? validStats : ['discipline'];
@@ -167,11 +148,10 @@ export const prepareMentorActions = (rawActions, validStats) => {
       if (type === 'create_task') normalizedPayload = normalizeTaskPayload(payload, statKeys);
       else if (type === 'create_calendar_event') normalizedPayload = normalizeCalendarEventPayload(payload, statKeys);
       else if (type === 'create_quick_event_template') normalizedPayload = normalizeQuickTemplatePayload(payload, statKeys);
-      else if (type === 'create_challenge') normalizedPayload = normalizeChallengePayload(payload, statKeys);
       else throw new Error(`Unsupported action type: ${type || 'missing type'}`);
 
       actions.push({
-        id: makeId(`mentor_action_${index}`),
+        id: makeId(`assistant_action_${index}`),
         type,
         payload: normalizedPayload,
         status: 'pending',
@@ -185,7 +165,7 @@ export const prepareMentorActions = (rawActions, validStats) => {
   return { actions, errors };
 };
 
-export const applyMentorAction = (action, { setTodos, setCalendarEvents, setQuickEvents, setChallenges }) => {
+export const applyAssistantAction = (action, { setTodos, setCalendarEvents, setQuickEvents }) => {
   if (!action?.type || !action?.payload) {
     return { ok: false, message: 'Action payload is missing.' };
   }
@@ -240,22 +220,6 @@ export const applyMentorAction = (action, { setTodos, setCalendarEvents, setQuic
     };
     setQuickEvents((prev) => [...prev, nextTemplate]);
     return { ok: true, message: `Created time block template: ${nextTemplate.title}` };
-  }
-
-  if (action.type === 'create_challenge') {
-    const nextChallenge = {
-      id: `custom_${Date.now()}_${Math.floor(Math.random() * 10_000)}`,
-      text: action.payload.text,
-      xp: action.payload.xp,
-      category: action.payload.category,
-      duration: action.payload.duration,
-      isCustom: true,
-      completed: false,
-      started: false,
-      startedAt: null,
-    };
-    setChallenges((prev) => [...prev, nextChallenge]);
-    return { ok: true, message: `Created challenge: ${nextChallenge.text}` };
   }
 
   return { ok: false, message: `Unsupported action type: ${action.type}` };

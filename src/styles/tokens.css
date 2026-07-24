@@ -1,0 +1,71 @@
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS — Apple-refined dark mode
+   Single source of truth for color, type, radius, shadow, motion.
+   Every component should read these vars instead of hardcoding values.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Surfaces — elevation via graphite layers, not glow */
+  --bg-base: #000000;
+  --bg-elevated-1: #1c1c1e;
+  --bg-elevated-2: #2c2c2e;
+  --bg-elevated-3: #3a3a3c;
+  --separator: rgba(255, 255, 255, 0.09);
+  --separator-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-tertiary: rgba(255, 255, 255, 0.32);
+
+  /* Accent — single system blue for interactive/progress state */
+  --accent: #38bdf8;
+  --accent-pressed: #0ea5e9;
+  --accent-wash: rgba(56, 189, 248, 0.12);
+
+  /* Semantic — kept minimal, no neon */
+  --danger: #ff453a;
+  --danger-wash: rgba(255, 69, 58, 0.12);
+  --warning: #ff9f0a;
+  --warning-wash: rgba(255, 159, 10, 0.12);
+  --success: #30d158;
+  --success-wash: rgba(48, 209, 88, 0.12);
+
+  /* AI-flavored features (weekly review insight, chat assistant) get a
+     distinct purple, matching how Apple sets its own AI features apart
+     from the primary accent color. */
+  --ai-accent: #bf5af2;
+  --ai-wash: rgba(191, 90, 242, 0.12);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  /* Shadow — one soft layer, never colored glow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* Motion */
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --duration: 200ms;
+
+  /* Layout */
+  --sidebar-w: 220px;
+  --sidebar-w-collapsed: 76px;
+
+  /* Type */
+  --font-sans: "Montserrat", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+
+  /* Liquid glass surface — matches the Shop page's card treatment.
+     Used for primary card containers (not small pills/badges/inputs). */
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025));
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-hover: rgba(56, 189, 248, 0.4);
+  --glass-blur: blur(18px) saturate(160%);
+  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, transparent 35%);
+  --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  --glass-shadow-hover: 0 14px 36px rgba(0, 0, 0, 0.45), 0 0 28px rgba(56, 189, 248, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}

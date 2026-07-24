@@ -3,26 +3,31 @@ import './App.css'
 import { useAuth } from './context/AuthContext'
 import { loadAllUserData, saveDataKey, flushPendingWrites, migrateLocalStorageToFirestore, subscribeToUserData } from './services/firestoreService'
 import PlayerDashboard from './components/PlayerDashboard'
+import WelcomePage from './components/WelcomePage'
 import Navbar, { StatIcon, TaskIcon, TimerIcon, LogIcon, TargetIcon } from './components/Navbar'
+import { CalendarDays, X, ChevronDown, Target } from 'lucide-react'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
 import LevelUpModal from './components/LevelUpModal'
 import CommitmentModal from './components/CommitmentModal'
 import DailyLogPage from './components/DailyLogPage'
-import ChallengesPage from './components/ChallengesPage'
 import { xpCapForLevel } from './utils/xpUtils'
-import { getRankUpAtLevel } from './utils/rankMeta'
-import CHALLENGES_POOL from './utils/challengesMeta'
+import RANK_TIERS from './utils/rankMeta'
+import { computeRankStatus } from './utils/scoreUtils'
+import RankChangeModal from './components/RankChangeModal'
+import { calcStreakXp, getHabitAttrs } from './utils/habitUtils'
 import CalendarPage from './components/CalendarPage'
-import MentorAssistant from './components/MentorAssistant'
-import { applyMentorAction } from './utils/mentorActions'
+import AssistantDrawer from './components/AssistantDrawer'
+import FloatingAIBar from './components/FloatingAIBar'
+import { applyAssistantAction } from './utils/assistantActions'
 import GoalsPage from './components/GoalsPage'
 import DataModal from './components/DataModal'
-import HealthPage from './components/HealthPage'
 import WeeklyReviewPage from './components/WeeklyReviewPage'
 import ShopPage from './components/ShopPage'
+import BrainDumpPage from './components/BrainDumpPage'
 import FocusMode from './components/FocusMode'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
+import { normalizeGoal } from './utils/goalUtils'
 
 const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -47,8 +52,9 @@ function App() {
   // Firestore Load effect below.
   const touchedSinceLoadStart = useRef(new Set());
 
-  const [currentPage, setCurrentPage] = useState('statistics');
-  const [mentorOpen, setMentorOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState('welcome');
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantDraft, setAssistantDraft] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleNavigate = (page) => {
@@ -121,34 +127,33 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const buildDefaultChallenges = () =>
-    CHALLENGES_POOL.map(c => ({ ...c, completed: false, started: false, startedAt: null }));
-
-  const [challenges, setChallenges] = useState(() => {
-    const saved = localStorage.getItem('gameOfLife_challenges_v2');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      const savedMap = Object.fromEntries(parsed.map(c => [c.id, c]));
-      const merged = CHALLENGES_POOL.map(c => savedMap[c.id] ? { ...c, ...savedMap[c.id] } : { ...c, completed: false, started: false, startedAt: null });
-      const userCreated = parsed.filter(c => !CHALLENGES_POOL.find(p => p.id === c.id));
-      return [...merged, ...userCreated];
-    }
-    return buildDefaultChallenges();
-  });
 
   const [goals, setGoals] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_goals_v1');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved).map(normalizeGoal) : [];
   });
 
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_user');
-    return saved ? JSON.parse(saved) : {
+    const base = saved ? JSON.parse(saved) : {
       name: 'Player 1',
       level: 1,
       xp: 0,
       stats: { strength: 0, intelligence: 0, charisma: 0, discipline: 0, mentalHealth: 0, health: 0, focus: 0, creativity: 0, productivity: 0 }
     };
+    // Backfill monotonic lifetime counters from the (possibly truncated) xpLog once.
+    // After this they only ever grow, so they no longer decay as the 500-entry log rotates.
+    if (base.lifetimeXp === undefined || base.lifetimeTaskCount === undefined) {
+      const xpLogSaved = localStorage.getItem('gameOfLife_xpLog');
+      const log = xpLogSaved ? JSON.parse(xpLogSaved) : [];
+      if (base.lifetimeXp === undefined) {
+        base.lifetimeXp = log.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
+      }
+      if (base.lifetimeTaskCount === undefined) {
+        base.lifetimeTaskCount = log.filter(e => e.source === 'task').length;
+      }
+    }
+    return base;
   });
 
   // ─── New Data Slices ───────────────────────────────────────────────────────────
@@ -190,6 +195,16 @@ function App() {
   const [shop, setShop] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_shop');
     return saved ? JSON.parse(saved) : { items: [] };
+  });
+
+  const [brainDumpNotes, setBrainDumpNotes] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_brainDump');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [brainDumpConnections, setBrainDumpConnections] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_brainDumpConnections');
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [priorityPopupDismissed, setPriorityPopupDismissed] = useState(false);
@@ -280,10 +295,39 @@ function App() {
 
   // ─── UI State ──────────────────────────────────────────────────────────────────
   const [levelUpModal, setLevelUpModal] = useState(null);
+  const [rankChangeModal, setRankChangeModal] = useState(null);
   const [commitmentModal, setCommitmentModal] = useState(null);
   const [dataModalOpen, setDataModalOpen] = useState(false);
   const [focusModeOpen, setFocusModeOpen] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
+
+  // ─── Rank ──────────────────────────────────────────────────────────────────────
+  // Rank is a "maintain" system: it holds a tier only while the Daily Score keeps
+  // clearing that tier's threshold for enough consecutive days, so it can rise AND
+  // fall. Computed once here and passed down (rather than letting PlayerDashboard/
+  // Navbar recompute it independently) so the transition-detection effect below and
+  // every display of it can never silently drift apart.
+  const rankStatus = useMemo(
+    () => computeRankStatus(habits, xpLog, pomodoroSessions, logs, commitmentArchive),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [habits.length, xpLog.length, pomodoroSessions.length, Object.keys(logs).length, commitmentArchive.length]
+  );
+
+  useEffect(() => {
+    if (user.lastSeenRankTier == null) {
+      // First run ever (pre-migration user, or a brand-new user's first day) —
+      // establish the baseline silently, don't celebrate/warn about it.
+      setUser(prev => ({ ...prev, lastSeenRankTier: rankStatus.tier.name }));
+      return;
+    }
+    if (rankStatus.tier.name !== user.lastSeenRankTier) {
+      const prevTier = RANK_TIERS.find(t => t.name === user.lastSeenRankTier);
+      const direction = RANK_TIERS.indexOf(rankStatus.tier) > RANK_TIERS.indexOf(prevTier) ? 'up' : 'down';
+      setRankChangeModal({ tier: rankStatus.tier, direction, streakDays: rankStatus.streakDays });
+      setUser(prev => ({ ...prev, lastSeenRankTier: rankStatus.tier.name }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankStatus.tier.name]);
 
   // ─── Persistence Effects ───────────────────────────────────────────────────────
   const persist = (key, value) => {
@@ -301,7 +345,6 @@ function App() {
   useEffect(() => { persist('gameOfLife_quickEvents', quickEvents); }, [quickEvents]);
   useEffect(() => { persist('gameOfLife_calendarDayEvents', calendarDayEvents); }, [calendarDayEvents]);
   useEffect(() => { persist('gameOfLife_commitmentArchive', commitmentArchive); }, [commitmentArchive]);
-  useEffect(() => { persist('gameOfLife_challenges_v2', challenges); }, [challenges]);
   useEffect(() => { persist('gameOfLife_goals_v1', goals); }, [goals]);
   useEffect(() => { persist('gameOfLife_user', user); }, [user]);
   useEffect(() => { persist('gameOfLife_xpLog', xpLog); }, [xpLog]);
@@ -312,6 +355,8 @@ function App() {
   useEffect(() => { persist('gameOfLife_foodPoints', foodPoints); }, [foodPoints]);
   useEffect(() => { persist('gameOfLife_weeklyReviews', weeklyReviews); }, [weeklyReviews]);
   useEffect(() => { persist('gameOfLife_shop', shop); }, [shop]);
+  useEffect(() => { persist('gameOfLife_brainDump', brainDumpNotes); }, [brainDumpNotes]);
+  useEffect(() => { persist('gameOfLife_brainDumpConnections', brainDumpConnections); }, [brainDumpConnections]);
 
   // Enable cloud sync only after persist effects for the Firestore load have run.
   // Using state + useEffect guarantees this effect runs AFTER all the persist
@@ -341,8 +386,7 @@ function App() {
         if (data.gameOfLife_quickEvents && !touched.has('gameOfLife_quickEvents')) setQuickEvents(data.gameOfLife_quickEvents);
         if (data.gameOfLife_calendarDayEvents && !touched.has('gameOfLife_calendarDayEvents')) setCalendarDayEvents(data.gameOfLife_calendarDayEvents);
         if (data.gameOfLife_commitmentArchive && !touched.has('gameOfLife_commitmentArchive')) setCommitmentArchive(data.gameOfLife_commitmentArchive);
-        if (data.gameOfLife_challenges_v2 && !touched.has('gameOfLife_challenges_v2')) setChallenges(data.gameOfLife_challenges_v2);
-        if (data.gameOfLife_goals_v1 && !touched.has('gameOfLife_goals_v1')) setGoals(data.gameOfLife_goals_v1);
+        if (data.gameOfLife_goals_v1 && !touched.has('gameOfLife_goals_v1')) setGoals(data.gameOfLife_goals_v1.map(normalizeGoal));
         if (data.gameOfLife_user && !touched.has('gameOfLife_user')) setUser(data.gameOfLife_user);
         if (data.gameOfLife_xpLog && !touched.has('gameOfLife_xpLog')) setXpLog(data.gameOfLife_xpLog);
         if (data.gameOfLife_pomodoroSessions && !touched.has('gameOfLife_pomodoroSessions')) setPomodoroSessions(data.gameOfLife_pomodoroSessions);
@@ -352,6 +396,8 @@ function App() {
         if (data.gameOfLife_foodPoints && !touched.has('gameOfLife_foodPoints')) setFoodPoints(data.gameOfLife_foodPoints);
         if (data.gameOfLife_weeklyReviews && !touched.has('gameOfLife_weeklyReviews')) setWeeklyReviews(data.gameOfLife_weeklyReviews);
         if (data.gameOfLife_shop && !touched.has('gameOfLife_shop')) setShop(data.gameOfLife_shop);
+        if (data.gameOfLife_brainDump && !touched.has('gameOfLife_brainDump')) setBrainDumpNotes(data.gameOfLife_brainDump);
+        if (data.gameOfLife_brainDumpConnections && !touched.has('gameOfLife_brainDumpConnections')) setBrainDumpConnections(data.gameOfLife_brainDumpConnections);
       } else {
         // First login — migrate whatever exists in localStorage to the cloud
         migrateLocalStorageToFirestore(firebaseUser.uid, {
@@ -364,7 +410,6 @@ function App() {
           gameOfLife_quickEvents: quickEvents,
           gameOfLife_calendarDayEvents: calendarDayEvents,
           gameOfLife_commitmentArchive: commitmentArchive,
-          gameOfLife_challenges_v2: challenges,
           gameOfLife_goals_v1: goals,
           gameOfLife_user: user,
           gameOfLife_xpLog: xpLog,
@@ -375,6 +420,8 @@ function App() {
           gameOfLife_foodPoints: foodPoints,
           gameOfLife_weeklyReviews: weeklyReviews,
           gameOfLife_shop: shop,
+          gameOfLife_brainDump: brainDumpNotes,
+          gameOfLife_brainDumpConnections: brainDumpConnections,
         }).catch(console.error);
       }
       // This load has now made its one decision per key (apply cloud value or
@@ -403,8 +450,7 @@ function App() {
     gameOfLife_quickEvents: setQuickEvents,
     gameOfLife_calendarDayEvents: setCalendarDayEvents,
     gameOfLife_commitmentArchive: setCommitmentArchive,
-    gameOfLife_challenges_v2: setChallenges,
-    gameOfLife_goals_v1: setGoals,
+    gameOfLife_goals_v1: (value) => setGoals((value || []).map(normalizeGoal)),
     gameOfLife_user: setUser,
     gameOfLife_xpLog: setXpLog,
     gameOfLife_pomodoroSessions: setPomodoroSessions,
@@ -414,6 +460,8 @@ function App() {
     gameOfLife_foodPoints: setFoodPoints,
     gameOfLife_weeklyReviews: setWeeklyReviews,
     gameOfLife_shop: setShop,
+    gameOfLife_brainDump: setBrainDumpNotes,
+    gameOfLife_brainDumpConnections: setBrainDumpConnections,
   });
 
   useEffect(() => {
@@ -444,30 +492,23 @@ function App() {
       const next = [event, ...prev];
       return next.length > 500 ? next.slice(0, 500) : next;
     });
+    // Keep monotonic lifetime counters (the xpLog itself is capped at 500 and rotates,
+    // so it can't be trusted for "lifetime" achievement thresholds).
+    if (amount > 0) {
+      setUser(prev => ({
+        ...prev,
+        lifetimeXp: (prev.lifetimeXp || 0) + amount,
+        lifetimeTaskCount: (prev.lifetimeTaskCount || 0) + (source === 'task' ? 1 : 0),
+      }));
+    }
   }, []);
 
   // ─── User / XP Functions ───────────────────────────────────────────────────────
   const updateName = (newName) => setUser(prev => ({ ...prev, name: newName }));
 
-  const addXp = useCallback((amount, meta = {}) => {
-    logXpEvent('xp', amount, meta.source || 'manual', meta.label || '');
-    setUser(prev => {
-      let currentXp = prev.xp + amount;
-      let currentLevel = prev.level;
-      let didLevelUp = false;
-      while (currentXp >= xpCapForLevel(currentLevel)) {
-        currentXp -= xpCapForLevel(currentLevel);
-        currentLevel++;
-        didLevelUp = true;
-      }
-      if (didLevelUp) {
-        const rankUp = getRankUpAtLevel(currentLevel);
-        setTimeout(() => setLevelUpModal({ newLevel: currentLevel, newRank: rankUp }), 300);
-      }
-      return { ...prev, level: currentLevel, xp: currentXp };
-    });
-  }, [logXpEvent]);
-
+  // updateStat is the single XP mutator: it credits a stat AND global XP together,
+  // handles level up/down, and logs the event. (A second global-only `addXp` used to
+  // exist for commitments — it was removed so every reward flows through one path.)
   const updateStat = useCallback((statName, amount, meta = {}) => {
     logXpEvent(statName, amount, meta.source || 'manual', meta.label || '');
     setUser(prev => {
@@ -485,8 +526,7 @@ function App() {
       }
       if (currentLevel === 1 && currentXp < 0) currentXp = 0;
       if (didLevelUp) {
-        const rankUp = getRankUpAtLevel(currentLevel);
-        setTimeout(() => setLevelUpModal({ newLevel: currentLevel, newRank: rankUp }), 300);
+        setTimeout(() => setLevelUpModal({ newLevel: currentLevel }), 300);
       }
       return {
         ...prev,
@@ -496,6 +536,25 @@ function App() {
       };
     });
   }, [logXpEvent]);
+
+  // Toggle a habit for a given day, awarding/removing the same streak XP as the Tasks
+  // page (shared via habitUtils). Lets the daily check-in and the Tasks page stay in sync.
+  const handleToggleHabitDay = useCallback((habitId, dateStr) => {
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+    const attrs = getHabitAttrs(habit);
+    const history = { ...(habit.history || {}) };
+    if (history[dateStr]) {
+      const xp = calcStreakXp(history, dateStr); // streak still includes this day
+      delete history[dateStr];
+      attrs.forEach(attr => updateStat(attr, -xp, { source: 'habit', label: habit.text }));
+    } else {
+      history[dateStr] = true;
+      const xp = calcStreakXp(history, dateStr);
+      attrs.forEach(attr => updateStat(attr, xp, { source: 'habit', label: habit.text }));
+    }
+    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, history } : h));
+  }, [habits, updateStat]);
 
   // ─── Pomodoro Session Callback ─────────────────────────────────────────────────
   const handleSessionComplete = useCallback((session) => {
@@ -582,35 +641,17 @@ function App() {
 
   const handleArchiveCommitmentResolve = (date, text, denied) => {
     if (!date) return;
-    if (!denied) addXp(10, { source: 'commitment', label: 'Commitment kept' });
+    // Keeping your word builds Discipline — route it through the one mutator so it
+    // shows up in stats/feed consistently (previously addXp granted global-only XP).
+    if (!denied) updateStat('discipline', 10, { source: 'commitment', label: 'Commitment kept' });
     resolveCommitmentRecord(date, text, denied);
     if (commitmentModal?.date === date) setCommitmentModal(null);
   };
 
-  // ─── Challenge Handlers ────────────────────────────────────────────────────────
-  const handleChallengeStart = (challengeId) => {
-    setChallenges(prev => prev.map(c => c.id === challengeId ? { ...c, started: true, startedAt: Date.now() } : c));
-  };
-
-  const handleChallengeComplete = (challengeId) => {
-    const challenge = challenges.find(c => c.id === challengeId);
-    if (challenge && !challenge.completed) {
-      updateStat(challenge.category, challenge.xp, { source: 'challenge', label: challenge.text });
-      setChallenges(prev => prev.map(c => c.id === challengeId ? { ...c, completed: true } : c));
-    }
-  };
-
-  const handleChallengeAdd = (newChallenge) => {
-    setChallenges(prev => [...prev, { ...newChallenge, completed: false, started: false, startedAt: null }]);
-  };
-
-  const handleChallengeDelete = (challengeId) => {
-    setChallenges(prev => prev.filter(c => c.id !== challengeId));
-  };
 
   // ─── Achievements Detection ────────────────────────────────────────────────────
   useEffect(() => {
-    const data = computeAchievementData(user, habits, xpLog, pomodoroSessions, commitmentArchive, challenges, logs);
+    const data = computeAchievementData(user, habits, xpLog, pomodoroSessions, commitmentArchive, logs, goals);
     const current = checkAchievements(data);
     const newlyUnlocked = [];
     for (const id of Object.keys(current)) {
@@ -632,7 +673,7 @@ function App() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.level, xpLog.length, pomodoroSessions.length, commitmentArchive.length, challenges]);
+  }, [user.level, xpLog.length, pomodoroSessions.length, commitmentArchive.length, goals]);
 
   // ─── Flush pending Firestore writes before page unload or backgrounding ───────
   // beforeunload alone misses mobile app-switches/backgrounding (notably iOS
@@ -656,9 +697,9 @@ function App() {
     const handler = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
       if (e.altKey) {
-        const pageMap = { '1': 'statistics', '2': 'tasks', '3': 'challenges', '4': 'daily-log', '5': 'timer', '6': 'calendar', '7': 'goals', '8': 'health', '9': 'review' };
+        const pageMap = { '1': 'statistics', '2': 'tasks', '3': 'daily-log', '4': 'timer', '5': 'calendar', '6': 'goals', '7': 'review' };
         if (pageMap[e.key]) { e.preventDefault(); setCurrentPage(pageMap[e.key]); return; }
-        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setMentorOpen(o => !o); return; }
+        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setAssistantOpen(o => !o); return; }
         if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFocusModeOpen(true); return; }
         if (e.key === 's' || e.key === 'S') { e.preventDefault(); setCurrentPage('shop'); return; }
       }
@@ -667,14 +708,34 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // ─── Mentor Action Handler ─────────────────────────────────────────────────────
-  const handleMentorAction = (action) => {
-    return applyMentorAction(action, { setTodos, setCalendarEvents, setQuickEvents, setChallenges });
+  // ─── Assistant Action Handler ─────────────────────────────────────────────────────
+  const handleAssistantAction = (action) => {
+    return applyAssistantAction(action, { setTodos, setCalendarEvents, setQuickEvents });
   };
 
   // ─── Page Renderer ─────────────────────────────────────────────────────────────
   const renderPage = () => {
     switch (currentPage) {
+      case 'welcome':
+        return (
+          <WelcomePage
+            user={user}
+            todos={todos}
+            setTodos={setTodos}
+            onUpdateStat={updateStat}
+            calendarEvents={calendarEvents}
+            noPhoneBlocks={noPhoneBlocks}
+            calendarDayEvents={calendarDayEvents}
+            currentWeekPriority={currentWeekPriority}
+            logs={logs}
+            commitmentArchive={commitmentArchive}
+            goals={goals}
+            habits={habits}
+            xpLog={xpLog}
+            pomodoroSessions={pomodoroSessions}
+            onNavigate={handleNavigate}
+          />
+        );
       case 'statistics':
         return (
           <PlayerDashboard
@@ -684,29 +745,18 @@ function App() {
             habits={habits}
             logs={logs}
             onUpdateStat={updateStat}
-            onAddXp={addXp}
             setTodos={setTodos}
             setHabits={setHabits}
-            challenges={challenges}
-            onChallengeStart={handleChallengeStart}
-            onChallengeComplete={handleChallengeComplete}
             xpCap={xpCapForLevel(user.level)}
             commitmentArchive={commitmentArchive}
-            onResolveCommitment={handleArchiveCommitmentResolve}
             xpLog={xpLog}
             pomodoroSessions={pomodoroSessions}
-            achievements={achievements}
+            rankStatus={rankStatus}
             onOpenFocusMode={() => setFocusModeOpen(true)}
-          />
-        );
-      case 'challenges':
-        return (
-          <ChallengesPage
-            challenges={challenges}
-            onChallengeStart={handleChallengeStart}
-            onChallengeComplete={handleChallengeComplete}
-            onChallengeAdd={handleChallengeAdd}
-            onChallengeDelete={handleChallengeDelete}
+            goals={goals}
+            healthLog={healthLog}
+            noPhoneBlocks={noPhoneBlocks}
+            onNavigate={handleNavigate}
           />
         );
       case 'tasks':
@@ -715,8 +765,6 @@ function App() {
             onUpdateStat={updateStat}
             todos={todos}
             setTodos={setTodos}
-            habits={habits}
-            setHabits={setHabits}
           />
         );
       case 'daily-log':
@@ -725,6 +773,16 @@ function App() {
             logs={logs}
             setLogs={setLogs}
             onCommitmentLocked={({ date, text }) => upsertCommitmentRecord(date, text)}
+            habits={habits}
+            setHabits={setHabits}
+            onToggleHabitDay={handleToggleHabitDay}
+            healthLog={healthLog}
+            setHealthLog={setHealthLog}
+            foodLog={foodLog}
+            setFoodLog={setFoodLog}
+            foodPoints={foodPoints}
+            setFoodPoints={setFoodPoints}
+            onUpdateStat={updateStat}
           />
         );
       case 'timer':
@@ -755,21 +813,10 @@ function App() {
           <GoalsPage
             goals={goals}
             setGoals={setGoals}
-            todos={todos}
             setTodos={setTodos}
             onUpdateStat={updateStat}
-          />
-        );
-      case 'health':
-        return (
-          <HealthPage
-            healthLog={healthLog}
-            setHealthLog={setHealthLog}
-            foodLog={foodLog}
-            setFoodLog={setFoodLog}
-            foodPoints={foodPoints}
-            setFoodPoints={setFoodPoints}
-            onUpdateStat={updateStat}
+            habits={habits}
+            setHabits={setHabits}
           />
         );
       case 'review':
@@ -782,7 +829,10 @@ function App() {
             habits={habits}
             todos={todos}
             logs={logs}
-            challenges={challenges}
+            goals={goals}
+            healthLog={healthLog}
+            setGoals={setGoals}
+            onUpdateStat={updateStat}
           />
         );
       case 'shop':
@@ -792,8 +842,17 @@ function App() {
             setShop={setShop}
           />
         );
+      case 'brain-dump':
+        return (
+          <BrainDumpPage
+            brainDumpNotes={brainDumpNotes}
+            setBrainDumpNotes={setBrainDumpNotes}
+            brainDumpConnections={brainDumpConnections}
+            setBrainDumpConnections={setBrainDumpConnections}
+          />
+        );
       default:
-        return <PlayerDashboard user={user} onUpdateName={updateName} xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} commitmentArchive={commitmentArchive} achievements={achievements} />;
+        return <PlayerDashboard user={user} onUpdateName={updateName} xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} commitmentArchive={commitmentArchive} rankStatus={rankStatus} goals={goals} healthLog={healthLog} noPhoneBlocks={noPhoneBlocks} onNavigate={handleNavigate} />;
     }
   };
 
@@ -806,6 +865,7 @@ function App() {
         userLevel={user.level}
         userXp={user.xp}
         userXpCap={xpCapForLevel(user.level)}
+        rankStatus={rankStatus}
         onOpenDataModal={() => setDataModalOpen(true)}
         isMobileMenuOpen={mobileMenuOpen}
         onMobileMenuClose={() => setMobileMenuOpen(false)}
@@ -816,28 +876,40 @@ function App() {
         {renderPage()}
       </div>
 
-      <MentorAssistant
-        isOpen={mentorOpen}
-        onToggle={() => setMentorOpen(o => !o)}
-        onClose={() => setMentorOpen(false)}
+      <AssistantDrawer
+        isOpen={assistantOpen}
+        onToggle={() => setAssistantOpen(o => !o)}
+        onClose={() => setAssistantOpen(false)}
         user={user}
         todos={todos}
         habits={habits}
         logs={logs}
-        challenges={challenges}
+        healthLog={healthLog}
+        foodPoints={foodPoints}
+        pomodoroSessions={pomodoroSessions}
+        goals={goals}
+        weeklyReviews={weeklyReviews}
+        xpLog={xpLog}
+        commitmentArchive={commitmentArchive}
         chatHistory={chatHistory}
         setChatHistory={setChatHistory}
-        onApplyAction={handleMentorAction}
+        onApplyAction={handleAssistantAction}
+        draftMessage={assistantDraft}
+        onDraftConsumed={() => setAssistantDraft(null)}
       />
 
       {levelUpModal && (
-        <LevelUpModal newLevel={levelUpModal.newLevel} newRank={levelUpModal.newRank} onClose={() => setLevelUpModal(null)} />
+        <LevelUpModal newLevel={levelUpModal.newLevel} onClose={() => setLevelUpModal(null)} />
+      )}
+      {rankChangeModal && (
+        <RankChangeModal tier={rankChangeModal.tier} direction={rankChangeModal.direction} streakDays={rankChangeModal.streakDays} onClose={() => setRankChangeModal(null)} />
       )}
       {commitmentModal && (
         <CommitmentModal
           commitment={commitmentModal.commitment}
           date={commitmentModal.date}
-          onConfirm={() => setCommitmentModal(null)}
+          onConfirm={() => handleArchiveCommitmentResolve(commitmentModal.date, commitmentModal.commitment, false)}
+          onDeny={() => handleArchiveCommitmentResolve(commitmentModal.date, commitmentModal.commitment, true)}
         />
       )}
       {dataModalOpen && (
@@ -854,7 +926,7 @@ function App() {
       )}
       {achievementToast && (
         <div className="achievement-toast">
-          <span className="achievement-toast-icon">{achievementToast.icon}</span>
+          <span className="achievement-toast-icon"><achievementToast.Icon size={28} /></span>
           <div className="achievement-toast-body">
             <span className="achievement-toast-title">Achievement Unlocked!</span>
             <span className="achievement-toast-label">{achievementToast.label} — {achievementToast.desc}</span>
@@ -865,15 +937,15 @@ function App() {
       {nearestEvent && !eventPopupDismissed && (
         eventPopupMinimized ? (
           <button className="event-popup-mini" onClick={() => setEventPopupMinimized(false)}>
-            🗓 <span>NEXT EVENT</span>
+            <CalendarDays size={14} /> <span>Next event</span>
           </button>
         ) : (
           <div className="event-popup">
             <div className="event-popup-actions">
-              <button className="event-popup-action-btn" onClick={() => setEventPopupMinimized(true)} title="Minimize">▾</button>
-              <button className="event-popup-action-btn" onClick={() => setEventPopupDismissed(true)} title="Dismiss">✕</button>
+              <button className="event-popup-action-btn" onClick={() => setEventPopupMinimized(true)} title="Minimize"><ChevronDown size={14} /></button>
+              <button className="event-popup-action-btn" onClick={() => setEventPopupDismissed(true)} title="Dismiss"><X size={14} /></button>
             </div>
-            <div className="event-popup-label">NEXT EVENT</div>
+            <div className="event-popup-label">Next event</div>
             <div className="event-popup-title">{nearestEvent.title}</div>
             <div className="event-popup-meta">
               <span>{formatEventPopupDate(nearestEvent)}</span>
@@ -888,18 +960,27 @@ function App() {
       {currentWeekPriority && !priorityPopupDismissed && (
         priorityPopupMinimized ? (
           <button className="priority-popup-mini" onClick={() => setPriorityPopupMinimized(false)}>
-            🎯 <span>PRIORITY</span>
+            <Target size={14} /> <span>Priority</span>
           </button>
         ) : (
           <div className="priority-popup">
             <div className="priority-popup-actions">
-              <button className="priority-popup-action-btn" onClick={() => setPriorityPopupMinimized(true)} title="Minimize">▾</button>
-              <button className="priority-popup-action-btn" onClick={() => setPriorityPopupDismissed(true)} title="Dismiss">✕</button>
+              <button className="priority-popup-action-btn" onClick={() => setPriorityPopupMinimized(true)} title="Minimize"><ChevronDown size={14} /></button>
+              <button className="priority-popup-action-btn" onClick={() => setPriorityPopupDismissed(true)} title="Dismiss"><X size={14} /></button>
             </div>
-            <div className="priority-popup-label">🎯 THIS WEEK'S PRIORITY</div>
+            <div className="priority-popup-label"><Target size={14} /> This week's priority</div>
             <div className="priority-popup-text">{currentWeekPriority}</div>
           </div>
         )
+      )}
+
+      {!assistantOpen && (
+        <FloatingAIBar
+          onSubmit={(text) => {
+            setAssistantDraft(text);
+            setAssistantOpen(true);
+          }}
+        />
       )}
 
       {/* Mobile bottom navigation bar */}

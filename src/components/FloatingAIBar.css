@@ -1,0 +1,90 @@
+/* ─── Floating AI Bar (global, all screens) ─────────────────────────────── */
+.ai-bar-wrap {
+  position: fixed;
+  left: var(--sidebar-w);
+  right: 0;
+  bottom: 1.5rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1050;
+  padding: 0 1.5rem;
+  box-sizing: border-box;
+  transition: left 0.22s var(--ease);
+}
+
+.ai-bar {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 0.55rem 0.6rem 0.55rem 1.1rem;
+  box-shadow: var(--glass-shadow), 0 18px 40px rgba(0, 0, 0, 0.55);
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+}
+
+.ai-bar:focus-within {
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow), 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 0 3px var(--accent-wash);
+}
+
+.ai-bar-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.88rem;
+  padding: 0.3rem 0;
+}
+
+.ai-bar-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.ai-bar-send {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: var(--accent-wash);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), opacity var(--duration) var(--ease);
+}
+
+.ai-bar-send:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.ai-bar-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .ai-bar-wrap {
+    left: 0;
+    bottom: calc(60px + 0.75rem);
+    padding: 0 0.75rem;
+  }
+
+  .ai-bar {
+    max-width: 100%;
+  }
+}

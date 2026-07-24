@@ -1,9 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { Target, X } from 'lucide-react';
 import './CommitmentModal.css';
 
 const HOLD_DURATION = 3000; // ms
 
-const CommitmentModal = ({ commitment, date, onConfirm }) => {
+const CommitmentModal = ({ commitment, date, onConfirm, onDeny }) => {
   const [progress, setProgress] = useState(0); // 0–100
   const [holding, setHolding] = useState(false);
   const intervalRef = useRef(null);
@@ -48,7 +49,7 @@ const CommitmentModal = ({ commitment, date, onConfirm }) => {
     <div className="cm-overlay">
       <div className="cm-modal">
         <div className="cm-header">
-          <span className="cm-icon">🎯</span>
+          <span className="cm-icon"><Target size={40} /></span>
           <h2 className="cm-title">Yesterday's Commitment</h2>
           <p className="cm-date">{formatDate(date)}</p>
         </div>
@@ -77,6 +78,10 @@ const CommitmentModal = ({ commitment, date, onConfirm }) => {
             />
           </button>
         </div>
+
+        <button className="cm-deny-btn" onClick={onDeny}>
+          <X size={14} /> I didn't do it
+        </button>
       </div>
     </div>
   );

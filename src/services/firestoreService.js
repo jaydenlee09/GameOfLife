@@ -9,6 +9,7 @@ const DATA_KEYS = [
   'gameOfLife_calendarEvents',
   'gameOfLife_quickEvents',
   'gameOfLife_calendarDayEvents',
+  'gameOfLife_noPhoneBlocks',
   'gameOfLife_commitmentArchive',
   'gameOfLife_challenges_v2',
   'gameOfLife_goals_v1',
@@ -17,8 +18,12 @@ const DATA_KEYS = [
   'gameOfLife_pomodoroSessions',
   'gameOfLife_achievements',
   'gameOfLife_healthLog',
+  'gameOfLife_foodLog',
+  'gameOfLife_foodPoints',
   'gameOfLife_weeklyReviews',
   'gameOfLife_shop',
+  'gameOfLife_brainDump',
+  'gameOfLife_brainDumpConnections',
 ];
 
 const SHOP_KEY = 'gameOfLife_shop';

@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
+import { Sparkle } from 'lucide-react';
 import './LevelUpModal.css';
 
-const LevelUpModal = ({ newLevel, newRank, onClose }) => {
+const LevelUpModal = ({ newLevel, onClose }) => {
   // Play a triumphant ascending chime
   useEffect(() => {
     try {
@@ -39,19 +40,9 @@ const LevelUpModal = ({ newLevel, newRank, onClose }) => {
 
         {/* Content */}
         <div className="levelup-content">
-          <p className="levelup-pre">✦ LEVEL UP ✦</p>
+          <p className="levelup-pre"><Sparkle size={14} /> Level Up <Sparkle size={14} /></p>
           <h1 className="levelup-number">{newLevel}</h1>
-          {newRank ? (
-            <div className="levelup-rank-up">
-              <img src={newRank.badge} alt={newRank.name} className="levelup-rank-badge" />
-              <p className="levelup-rank-name" style={{ color: newRank.color }}>
-                {newRank.name.toUpperCase()}
-              </p>
-              <p className="levelup-sub">New rank unlocked!</p>
-            </div>
-          ) : (
-            <p className="levelup-sub">You're getting stronger.</p>
-          )}
+          <p className="levelup-sub">You're getting stronger.</p>
           <button className="levelup-btn" onClick={onClose}>Let's Go!</button>
         </div>
 

@@ -1,42 +1,48 @@
+import {
+  Star, Sparkles, Sparkle, Crown, CheckSquare, ClipboardList, Award, Zap,
+  Target, Flame, LoaderPinwheel, Dumbbell, Handshake, PenLine, BookOpen, Crosshair, TrendingUp,
+} from 'lucide-react';
+
 export const ACHIEVEMENTS = [
   // Level milestones
-  { id: 'level_5',  label: 'Rookie',     desc: 'Reach Level 5',   icon: '⭐', tier: 'bronze' },
-  { id: 'level_10', label: 'Veteran',    desc: 'Reach Level 10',  icon: '🌟', tier: 'silver' },
-  { id: 'level_20', label: 'Elite',      desc: 'Reach Level 20',  icon: '💫', tier: 'gold'   },
-  { id: 'level_50', label: 'Legendary',  desc: 'Reach Level 50',  icon: '👑', tier: 'platinum' },
+  { id: 'level_5',  label: 'Rookie',     desc: 'Reach Level 5',   Icon: Star, tier: 'bronze' },
+  { id: 'level_10', label: 'Veteran',    desc: 'Reach Level 10',  Icon: Sparkles, tier: 'silver' },
+  { id: 'level_20', label: 'Elite',      desc: 'Reach Level 20',  Icon: Sparkle, tier: 'gold'   },
+  { id: 'level_50', label: 'Legendary',  desc: 'Reach Level 50',  Icon: Crown, tier: 'platinum' },
 
   // Task milestones
-  { id: 'tasks_10',  label: 'Getting Started', desc: 'Complete 10 tasks',  icon: '✅', tier: 'bronze' },
-  { id: 'tasks_50',  label: 'Task Master',     desc: 'Complete 50 tasks',  icon: '📋', tier: 'silver' },
-  { id: 'tasks_100', label: 'Century',         desc: 'Complete 100 tasks', icon: '💯', tier: 'gold'   },
+  { id: 'tasks_10',  label: 'Getting Started', desc: 'Complete 10 tasks',  Icon: CheckSquare, tier: 'bronze' },
+  { id: 'tasks_50',  label: 'Task Master',     desc: 'Complete 50 tasks',  Icon: ClipboardList, tier: 'silver' },
+  { id: 'tasks_100', label: 'Century',         desc: 'Complete 100 tasks', Icon: Award, tier: 'gold'   },
 
   // XP milestones (lifetime positive XP)
-  { id: 'xp_1000',  label: 'XP Initiate', desc: 'Earn 1,000 lifetime XP',  icon: '⚡', tier: 'bronze' },
-  { id: 'xp_5000',  label: 'XP Adept',    desc: 'Earn 5,000 lifetime XP',  icon: '⚡', tier: 'silver' },
-  { id: 'xp_10000', label: 'XP Master',   desc: 'Earn 10,000 lifetime XP', icon: '⚡', tier: 'gold'   },
+  { id: 'xp_1000',  label: 'XP Initiate', desc: 'Earn 1,000 lifetime XP',  Icon: Zap, tier: 'bronze' },
+  { id: 'xp_5000',  label: 'XP Adept',    desc: 'Earn 5,000 lifetime XP',  Icon: Zap, tier: 'silver' },
+  { id: 'xp_10000', label: 'XP Master',   desc: 'Earn 10,000 lifetime XP', Icon: Zap, tier: 'gold'   },
 
   // Focus milestones
-  { id: 'focus_5h',   label: 'Deep Work',   desc: 'Log 5 hours of focus',   icon: '🎯', tier: 'bronze' },
-  { id: 'focus_25h',  label: 'Flow State',  desc: 'Log 25 hours of focus',  icon: '🔥', tier: 'silver' },
-  { id: 'focus_100h', label: 'Time Warper', desc: 'Log 100 hours of focus', icon: '🌀', tier: 'gold'   },
+  { id: 'focus_5h',   label: 'Deep Work',   desc: 'Log 5 hours of focus',   Icon: Target, tier: 'bronze' },
+  { id: 'focus_25h',  label: 'Flow State',  desc: 'Log 25 hours of focus',  Icon: Flame, tier: 'silver' },
+  { id: 'focus_100h', label: 'Time Warper', desc: 'Log 100 hours of focus', Icon: LoaderPinwheel, tier: 'gold'   },
 
   // Habit streaks
-  { id: 'habit_streak_7',  label: 'Creature of Habit', desc: 'Achieve a 7-day habit streak',  icon: '🔥', tier: 'bronze' },
-  { id: 'habit_streak_30', label: 'Iron Will',          desc: 'Achieve a 30-day habit streak', icon: '💪', tier: 'gold'   },
+  { id: 'habit_streak_7',  label: 'Creature of Habit', desc: 'Achieve a 7-day habit streak',  Icon: Flame, tier: 'bronze' },
+  { id: 'habit_streak_30', label: 'Iron Will',          desc: 'Achieve a 30-day habit streak', Icon: Dumbbell, tier: 'gold'   },
 
   // Commitments
-  { id: 'commitments_7', label: 'Word is Bond', desc: 'Keep 7 commitments in a row', icon: '🤝', tier: 'silver' },
-
-  // Challenges
-  { id: 'challenges_5',  label: 'Challenge Accepted', desc: 'Complete 5 challenges',  icon: '⚔️', tier: 'bronze' },
-  { id: 'challenges_20', label: 'Champion',            desc: 'Complete 20 challenges', icon: '🏆', tier: 'gold'   },
+  { id: 'commitments_7', label: 'Word is Bond', desc: 'Keep 7 commitments in a row', Icon: Handshake, tier: 'silver' },
 
   // Journal
-  { id: 'journal_7',  label: 'Reflective',  desc: 'Write 7 journal entries',  icon: '📝', tier: 'bronze' },
-  { id: 'journal_30', label: 'Chronicler',  desc: 'Write 30 journal entries', icon: '📚', tier: 'silver' },
+  { id: 'journal_7',  label: 'Reflective',  desc: 'Write 7 journal entries',  Icon: PenLine, tier: 'bronze' },
+  { id: 'journal_30', label: 'Chronicler',  desc: 'Write 30 journal entries', Icon: BookOpen, tier: 'silver' },
+
+  // Goals
+  { id: 'goals_5',       label: 'Goal Getter',    desc: 'Complete 5 goals',           Icon: Target, tier: 'bronze' },
+  { id: 'goals_20',      label: 'Goal Crusher',   desc: 'Complete 20 goals',          Icon: Crosshair, tier: 'gold'   },
+  { id: 'milestones_25', label: 'Steady Climber', desc: 'Complete 25 goal milestones', Icon: TrendingUp, tier: 'bronze' },
 ];
 
-const getBestHabitStreak = (habits) => {
+export const getBestHabitStreak = (habits) => {
   let best = 0;
   for (const habit of habits) {
     const dates = Object.keys(habit.history || {}).filter(d => habit.history[d]).sort();
@@ -68,15 +74,18 @@ const getCommitmentStreak = (commitmentArchive) => {
   return streak;
 };
 
-export const computeAchievementData = (user, habits, xpLog, pomodoroSessions, commitmentArchive, challenges, logs) => ({
+export const computeAchievementData = (user, habits, xpLog, pomodoroSessions, commitmentArchive, logs, goals = []) => ({
   levelReached: user.level,
-  taskCount: xpLog.filter(e => e.source === 'task').length,
-  lifetimeXp: xpLog.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0),
+  // Prefer the monotonic counters on `user`; fall back to the (truncated) xpLog for
+  // any state written before those counters existed.
+  taskCount: user.lifetimeTaskCount ?? xpLog.filter(e => e.source === 'task').length,
+  lifetimeXp: user.lifetimeXp ?? xpLog.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0),
   focusMinutes: pomodoroSessions.filter(s => s.completed).reduce((s, p) => s + Math.floor(p.durationSecs / 60), 0),
   bestHabitStreak: getBestHabitStreak(habits),
   commitmentStreak: getCommitmentStreak(commitmentArchive),
-  challengeCount: challenges.filter(c => c.completed).length,
   journalCount: Object.values(logs).filter(e => (e.proud?.some(p => p?.trim())) || (e.emotions?.length > 0)).length,
+  goalsCompleted: goals.filter(g => g.completed).length,
+  milestonesCompleted: goals.reduce((s, g) => s + (g.milestones || []).filter(m => m.completed).length, 0),
 });
 
 export const checkAchievements = (data) => {
@@ -97,10 +106,11 @@ export const checkAchievements = (data) => {
     habit_streak_7:  data.bestHabitStreak >= 7,
     habit_streak_30: data.bestHabitStreak >= 30,
     commitments_7: data.commitmentStreak >= 7,
-    challenges_5:  data.challengeCount >= 5,
-    challenges_20: data.challengeCount >= 20,
     journal_7:  data.journalCount >= 7,
     journal_30: data.journalCount >= 30,
+    goals_5:  data.goalsCompleted >= 5,
+    goals_20: data.goalsCompleted >= 20,
+    milestones_25: data.milestonesCompleted >= 25,
   };
   return checks;
 };

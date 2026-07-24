@@ -1,29 +1,32 @@
-import React from 'react';
+import React, { useState, useLayoutEffect } from 'react';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TIER_ICONS } from '../utils/rankMeta';
 import './Navbar.css';
 
+const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
+
 const NAV_LINKS = [
+  { id: 'welcome',    label: 'Home',        icon: <HomeIcon /> },
   { id: 'statistics', label: 'Statistics',  icon: <StatIcon /> },
   { id: 'tasks',      label: 'Tasks',       icon: <TaskIcon /> },
-  { id: 'challenges', label: 'Challenges',  icon: <BoltIcon /> },
   { id: 'daily-log',  label: 'Daily Log',   icon: <LogIcon /> },
   { id: 'timer',      label: 'Timer',       icon: <TimerIcon /> },
   { id: 'calendar',   label: 'Calendar',    icon: <CalIcon /> },
   { id: 'goals',      label: 'Goals',       icon: <TargetIcon /> },
-  { id: 'health',     label: 'Health',      icon: <HeartIcon /> },
   { id: 'review',     label: 'Review',      icon: <ReviewIcon /> },
   { id: 'shop',       label: 'Shop',        icon: <ShopIcon /> },
+  { id: 'brain-dump', label: 'Brain Dump',  icon: <BrainDumpIcon /> },
 ];
 
-const getRankGradient = (level) => {
-  if (level <= 5)  return 'linear-gradient(90deg, #a0522d, #cd7f32)';
-  if (level <= 10) return 'linear-gradient(90deg, #a8a8a8, #e8e8e8)';
-  if (level <= 20) return 'linear-gradient(90deg, #f59e0b, #fbbf24)';
-  if (level <= 30) return 'linear-gradient(90deg, #22d3ee, #67e8f9)';
-  if (level <= 45) return 'linear-gradient(90deg, #a855f7, #c084fc)';
-  if (level <= 60) return 'linear-gradient(90deg, #ea580c, #f97316)';
-  if (level <= 80) return 'linear-gradient(90deg, #dc2626, #ef4444)';
-  return 'linear-gradient(90deg, #ef4444, #fbbf24, #ef4444)';
-};
+export function HomeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M2 7L8 1.5L14 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M3.5 6V14H12.5V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="6.5" y="9.5" width="3" height="4.5" fill="currentColor" opacity="0.6"/>
+    </svg>
+  );
+}
 
 export function StatIcon() {
   return (
@@ -40,14 +43,6 @@ export function TaskIcon() {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="1" width="14" height="14" rx="3" stroke="currentColor" strokeWidth="1.5"/>
       <path d="M4.5 8L7 10.5L11.5 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-export function BoltIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M9 1L3 9H8L7 15L13 7H8L9 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
@@ -95,14 +90,6 @@ export function TargetIcon() {
   );
 }
 
-export function HeartIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.5 3 2 4.75 2C6.1 2 7.25 2.8 8 4C8.75 2.8 9.9 2 11.25 2C13 2 14.5 3.5 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
 export function ReviewIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -118,6 +105,16 @@ export function ShopIcon() {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <path d="M3 5H13L12.3 13.2C12.25 13.65 11.87 14 11.42 14H4.58C4.13 14 3.75 13.65 3.7 13.2L3 5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
       <path d="M5.5 5V3.5C5.5 2.12 6.62 1 8 1C9.38 1 10.5 2.12 10.5 3.5V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+export function BrainDumpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M4.5 11.5C2.84 11.5 1.5 10.16 1.5 8.5C1.5 6.98 2.62 5.72 4.08 5.53C4.4 3.53 6.13 2 8.2 2C10.4 2 12.2 3.7 12.4 5.86C13.66 6.1 14.5 7.2 14.5 8.5C14.5 10.16 13.16 11.5 11.5 11.5H4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <circle cx="6" cy="13.5" r="0.75" fill="currentColor"/>
+      <circle cx="9" cy="14" r="0.75" fill="currentColor"/>
     </svg>
   );
 }
@@ -141,12 +138,34 @@ function GearIcon() {
   );
 }
 
-const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose, firebaseUser, onSignOut }) => {
+const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose, firebaseUser, onSignOut }) => {
   const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
-  const rankGrad = getRankGradient(userLevel ?? 1);
+  const RankIcon = rankStatus ? TIER_ICONS[rankStatus.tier.icon] : null;
+
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true');
+
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty(
+      '--sidebar-w',
+      collapsed ? 'var(--sidebar-w-collapsed)' : '220px'
+    );
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+  }, [collapsed]);
 
   const SidebarFooter = () => (
     <div className="sidebar-footer">
+      {rankStatus && (
+        <button
+          className="sidebar-rank-chip"
+          onClick={() => onNavigate('statistics')}
+          title={`${rankStatus.tier.name} — ${rankStatus.streakDays}-day streak`}
+        >
+          <span className="sidebar-rank-icon-ring" style={{ '--tier-color': rankStatus.tier.color }}>
+            {RankIcon && <RankIcon size={14} color={rankStatus.tier.color} />}
+          </span>
+          <span className="sidebar-rank-name" style={{ color: rankStatus.tier.color }}>{rankStatus.tier.name}</span>
+        </button>
+      )}
       <div className="sidebar-xp-section">
         <div className="sidebar-xp-header">
           <span className="sidebar-xp-level">LVL {userLevel ?? 1}</span>
@@ -155,7 +174,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
         <div className="sidebar-xp-track">
           <div
             className="sidebar-xp-fill"
-            style={{ width: `${pct}%`, background: rankGrad }}
+            style={{ width: `${pct}%` }}
           />
         </div>
       </div>
@@ -176,7 +195,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
         <span className="sidebar-username" title={firebaseUser?.email || userEmail}>
           {userEmail || firebaseUser?.displayName || 'Player'}
         </span>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div className="sidebar-user-actions">
           {onOpenDataModal && (
             <button className="sidebar-gear" onClick={onOpenDataModal} title="Data & Shortcuts">
               <GearIcon />
@@ -200,7 +219,17 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <button
+          className="sidebar-collapse-toggle"
+          onClick={() => setCollapsed(c => !c)}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+        </button>
+
         <div className="sidebar-brand">
           <div className="sidebar-brand-dot" />
           <span className="sidebar-brand-text">GameOfLife</span>
@@ -212,6 +241,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
               key={id}
               className={`sidebar-link ${activePage === id ? 'active' : ''}`}
               onClick={() => onNavigate(id)}
+              title={collapsed ? label : undefined}
             >
               <span className="sidebar-link-icon">{icon}</span>
               <span className="sidebar-link-label">{label}</span>
@@ -229,7 +259,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
           <div className="mobile-drawer-backdrop" onClick={onMobileMenuClose} />
 
           <div className="mobile-drawer">
-            <button className="mobile-drawer-close" onClick={onMobileMenuClose}>✕</button>
+            <button className="mobile-drawer-close" onClick={onMobileMenuClose}><X size={14} /></button>
 
             <div className="mobile-drawer-brand">
               <div className="sidebar-brand-dot" />

@@ -1,82 +1,75 @@
 import React, { useState, useMemo } from 'react';
 import './WeeklyReviewPage.css';
+import {
+  ChevronLeft, ChevronRight, Pin, ArrowRight, Check, Bot, Construction, TrendingUp,
+  CheckSquare, Target, Zap,
+} from 'lucide-react';
+import {
+  toggleMilestone,
+  toggleGoalCompleted,
+  cloneGoalForward,
+  GOAL_XP_BY_PERIOD,
+  MILESTONE_XP,
+} from '../utils/goalUtils';
+import { computeWeekStats, getMondayKey, formatWeekRange, getWeekDays } from '../utils/weekStatsUtils';
 
-const getLocalDateKey = (offsetDays = 0) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-};
-
-const getMondayKey = (offsetWeeks = 0) => {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1 - day) + offsetWeeks * 7;
-  d.setDate(d.getDate() + diff);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-};
-
-const formatWeekRange = (mondayKey) => {
-  const mon = new Date(mondayKey + 'T00:00:00');
-  const sun = new Date(mon);
-  sun.setDate(sun.getDate() + 6);
-  const opts = { month: 'short', day: 'numeric' };
-  return `${mon.toLocaleDateString('en-US', opts)} – ${sun.toLocaleDateString('en-US', opts)}`;
-};
-
-const computeWeekStats = (mondayKey, xpLog, pomodoroSessions, habits, todos, logs, challenges) => {
-  const mon = new Date(mondayKey + 'T00:00:00');
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(mon);
-    d.setDate(d.getDate() + i);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  });
-
-  const xpEarned     = xpLog.filter(e => days.includes(e.date) && e.amount > 0).reduce((s, e) => s + e.amount, 0);
-  const tasksCompleted = xpLog.filter(e => days.includes(e.date) && e.source === 'task').length;
-  const habitsCompleted = xpLog.filter(e => days.includes(e.date) && e.source === 'habit' && e.amount > 0).length;
-  const focusMinutes  = pomodoroSessions.filter(s => days.includes(s.date) && s.completed).reduce((s, p) => s + Math.floor(p.durationSecs / 60), 0);
-  const challengesDone = challenges.filter(c => c.completed && c.startedAt && days.some(d => {
-    const cDate = new Date(c.startedAt).toISOString().slice(0,10);
-    return d === cDate;
-  })).length;
-
-  // Top emotion
-  const emotionCount = {};
-  for (const d of days) {
-    for (const e of (logs[d]?.emotions || [])) emotionCount[e] = (emotionCount[e] || 0) + 1;
-  }
-  const topEmotion = Object.entries(emotionCount).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
-
-  return { xpEarned, tasksCompleted, habitsCompleted, focusMinutes, challengesDone, topEmotion };
-};
-
-const STAT_ITEMS = [
-  { key: 'xpEarned',       icon: '⚡', label: 'XP Earned',         fmt: v => `${v} XP` },
-  { key: 'tasksCompleted', icon: '✅', label: 'Tasks Done',         fmt: v => `${v}` },
-  { key: 'habitsCompleted',icon: '🔥', label: 'Habit Completions',  fmt: v => `${v}` },
-  { key: 'focusMinutes',   icon: '⏱️', label: 'Focus Time',         fmt: v => v >= 60 ? `${Math.floor(v/60)}h ${v%60}m` : `${v}m` },
-  { key: 'challengesDone', icon: '⚔️', label: 'Challenges Done',    fmt: v => `${v}` },
-];
-
-const getWeekDays = (mondayKey) => {
-  const mon = new Date(mondayKey + 'T00:00:00');
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(mon);
-    d.setDate(d.getDate() + i);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  });
-};
-
-const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, challenges = [] }) => {
+const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, setGoals, onUpdateStat }) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const mondayKey = getMondayKey(weekOffset);
   const isCurrentWeek = weekOffset === 0;
   const saved = weeklyReviews[mondayKey];
 
   const stats = useMemo(
-    () => computeWeekStats(mondayKey, xpLog, pomodoroSessions, habits, todos, logs, challenges),
-    [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, Object.keys(logs).length, challenges.length]
+    () => computeWeekStats(mondayKey, xpLog, pomodoroSessions, habits, todos, logs, goals, healthLog),
+    [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, Object.keys(logs).length, goals, healthLog]
   );
+
+  const weekGoals = useMemo(() => {
+    const weekly = goals.filter(g => g.period === 'weekly' && g.periodKey === mondayKey);
+    const pinned = weekly.filter(g => g.pinned);
+    return pinned.length > 0 ? pinned : weekly;
+  }, [goals, mondayKey]);
+
+  const awardGoalXp = (goal) => {
+    if (!onUpdateStat) return;
+    const attrs = goal.attributes?.length ? goal.attributes : ['discipline'];
+    const xpTotal = GOAL_XP_BY_PERIOD[goal.period] || GOAL_XP_BY_PERIOD.weekly;
+    const xpEach = Math.floor(xpTotal / attrs.length);
+    attrs.forEach(attr => onUpdateStat(attr, xpEach, { source: 'goal', label: goal.title }));
+  };
+
+  const awardMilestoneXp = (goal, milestoneText) => {
+    if (!onUpdateStat) return;
+    const attrs = goal.attributes?.length ? goal.attributes : ['discipline'];
+    attrs.forEach(attr => onUpdateStat(attr, MILESTONE_XP, { source: 'milestone', label: milestoneText }));
+  };
+
+  const handleToggleGoalComplete = (goal) => {
+    const { goal: updated, shouldAwardXp } = toggleGoalCompleted(goal);
+    setGoals(prev => prev.map(g => g.id === goal.id ? updated : g));
+    if (shouldAwardXp) awardGoalXp(goal);
+  };
+
+  const handleToggleMilestone = (goal, milestoneId) => {
+    const { goal: updatedGoal, justCompleted, milestoneText } = toggleMilestone(goal, milestoneId);
+    const allDone = updatedGoal.milestones.length > 0 && updatedGoal.milestones.every(m => m.completed);
+    let finalGoal = updatedGoal;
+    let shouldAwardGoalXp = false;
+    if (allDone && !updatedGoal.completed) {
+      const result = toggleGoalCompleted(updatedGoal);
+      finalGoal = result.goal;
+      shouldAwardGoalXp = result.shouldAwardXp;
+    }
+    setGoals(prev => prev.map(g => g.id === goal.id ? finalGoal : g));
+    if (justCompleted) awardMilestoneXp(goal, milestoneText);
+    if (shouldAwardGoalXp) awardGoalXp(goal);
+  };
+
+  const handleCarryForward = (goal) => {
+    const nextMondayKey = getMondayKey(1);
+    const cloned = cloneGoalForward(goal, nextMondayKey);
+    setGoals(prev => [cloned, ...prev.map(g => g.id === goal.id ? { ...g, carriedForwardId: cloned.id } : g)]);
+  };
 
   const [wentWell,     setWentWell]     = useState(saved?.wentWell     || '');
   const [heldBack,     setHeldBack]     = useState(saved?.heldBack     || '');
@@ -159,43 +152,83 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
 
   return (
     <div className="review-page">
-      <h1 className="section-page-title">WEEKLY REVIEW</h1>
+      <h1 className="section-page-title">Weekly Review</h1>
 
       <div className="review-layout">
         {/* ── Main Review ──────────────────────────────────────────────────── */}
         <div className="review-main">
           {/* Week nav */}
           <div className="review-week-nav">
-            <button className="review-nav-btn" onClick={() => handleWeekChange(-1)}>◀</button>
+            <button className="review-nav-btn" onClick={() => handleWeekChange(-1)}><ChevronLeft size={16} /></button>
             <div className="review-week-info">
               <span className="review-week-label">{isCurrentWeek ? 'This Week' : 'Past Week'}</span>
               <span className="review-week-range">{formatWeekRange(mondayKey)}</span>
             </div>
-            <button className="review-nav-btn" onClick={() => handleWeekChange(1)} disabled={isCurrentWeek}>▶</button>
+            <button className="review-nav-btn" onClick={() => handleWeekChange(1)} disabled={isCurrentWeek}><ChevronRight size={16} /></button>
           </div>
 
-          {/* Auto stats */}
-          <div className="review-stats-grid">
-            {STAT_ITEMS.map(({ key, icon, label, fmt }) => (
-              <div key={key} className="review-stat-card">
-                <span className="review-stat-icon">{icon}</span>
-                <span className="review-stat-value">{fmt(stats[key])}</span>
-                <span className="review-stat-label">{label}</span>
-              </div>
-            ))}
-            {stats.topEmotion && (
-              <div className="review-stat-card">
-                <span className="review-stat-icon">😊</span>
-                <span className="review-stat-value">{stats.topEmotion}</span>
-                <span className="review-stat-label">Top Mood</span>
-              </div>
-            )}
-          </div>
+          {/* Goal Check-In */}
+          {weekGoals.length > 0 && (
+            <div className="review-goal-checkin">
+              <h3 className="review-goal-checkin-title"><Target size={18} /> Goal Check-In</h3>
+              {weekGoals.map((goal) => {
+                const isComplete = !!goal.completed;
+                return (
+                  <div key={goal.id} className={`review-goal-item ${isComplete ? 'review-goal-item--complete' : ''}`}>
+                    <div className="review-goal-header">
+                      <label className="review-goal-title-row">
+                        <input
+                          type="checkbox"
+                          checked={isComplete}
+                          onChange={() => handleToggleGoalComplete(goal)}
+                        />
+                        <span className="review-goal-title">{goal.title}</span>
+                      </label>
+                      {goal.pinned && <span className="review-goal-pin" title="Pinned focus goal"><Pin size={14} /></span>}
+                    </div>
+
+                    {goal.milestones?.length > 0 && (
+                      <div className="review-goal-milestones">
+                        {goal.milestones.map((m) => (
+                          <label key={m.id} className={`review-goal-milestone ${m.completed ? 'review-goal-milestone--done' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={m.completed}
+                              onChange={() => handleToggleMilestone(goal, m.id)}
+                            />
+                            <span>{m.text}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    {(goal.obstacle?.trim() || goal.ifThenPlan?.trim()) && (
+                      <div className="review-goal-woop">
+                        {goal.obstacle?.trim() && <p><strong>Obstacle:</strong> {goal.obstacle}</p>}
+                        {goal.ifThenPlan?.trim() && <p><strong>If → then:</strong> {goal.ifThenPlan}</p>}
+                      </div>
+                    )}
+
+                    {!isComplete && isCurrentWeek && (
+                      <button
+                        type="button"
+                        className="review-goal-carry-btn"
+                        disabled={!!goal.carriedForwardId}
+                        onClick={() => handleCarryForward(goal)}
+                      >
+                        {goal.carriedForwardId ? <><Check size={14} /> Carried to next week</> : <>Carry to next week <ArrowRight size={14} /></>}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* AI Improvement Insight */}
           <div className="review-ai-insight">
             <div className="review-ai-header">
-              <span className="review-ai-title">🤖 AI Pattern Analysis</span>
+              <span className="review-ai-title"><Bot size={16} /> AI Pattern Analysis</span>
               <button
                 className="review-ai-btn"
                 onClick={analyzeImprovements}
@@ -223,7 +256,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
           {/* Reflection prompts */}
           <div className="review-prompts">
             <div className="review-prompt-group">
-              <label className="review-prompt-label">✅ What went well this week?</label>
+              <label className="review-prompt-label"><CheckSquare size={16} /> What went well this week?</label>
               <textarea
                 className="review-textarea"
                 placeholder="Wins, breakthroughs, proud moments..."
@@ -233,7 +266,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
               />
             </div>
             <div className="review-prompt-group">
-              <label className="review-prompt-label">🚧 What held me back?</label>
+              <label className="review-prompt-label"><Construction size={16} /> What held me back?</label>
               <textarea
                 className="review-textarea"
                 placeholder="Obstacles, bad habits, missed opportunities..."
@@ -243,7 +276,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
               />
             </div>
             <div className="review-prompt-group">
-              <label className="review-prompt-label">📈 What do I need to improve on next week?</label>
+              <label className="review-prompt-label"><TrendingUp size={16} /> What do I need to improve on next week?</label>
               <textarea
                 className="review-textarea"
                 placeholder="Skills to sharpen, habits to build, behaviors to change..."
@@ -253,7 +286,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
               />
             </div>
             <div className="review-prompt-group">
-              <label className="review-prompt-label">🎯 #1 Priority for next week</label>
+              <label className="review-prompt-label"><Target size={16} /> #1 Priority for next week</label>
               <textarea
                 className="review-textarea review-textarea--highlight"
                 placeholder="The single most important thing to focus on..."
@@ -265,13 +298,13 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
           </div>
 
           <button className={`review-save-btn ${justSaved ? 'saved' : ''}`} onClick={handleSave}>
-            {justSaved ? '✓ Review Saved!' : 'Save Review'}
+            {justSaved ? <><Check size={14} /> Review Saved!</> : 'Save Review'}
           </button>
         </div>
 
         {/* ── Past Reviews ─────────────────────────────────────────────────── */}
         <div className="review-sidebar">
-          <h3 className="review-sidebar-title">PAST REVIEWS</h3>
+          <h3 className="review-sidebar-title">Past Reviews</h3>
           {pastReviews.length === 0 ? (
             <p className="review-sidebar-empty">No reviews yet. Complete your first one!</p>
           ) : (
@@ -289,8 +322,8 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
                 }}
               >
                 <span className="review-past-range">{formatWeekRange(key)}</span>
-                {r.stats && <span className="review-past-xp">⚡ {r.stats.xpEarned} XP</span>}
-                {r.priority && <p className="review-past-priority">🎯 {r.priority}</p>}
+                {r.stats && <span className="review-past-xp"><Zap size={12} /> {r.stats.xpEarned} XP</span>}
+                {r.priority && <p className="review-past-priority"><Target size={12} /> {r.priority}</p>}
               </div>
             ))
           )}

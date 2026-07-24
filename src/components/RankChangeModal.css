@@ -1,0 +1,174 @@
+/* ─── Overlay ────────────────────────────────────────────────────────────── */
+.rankchange-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(8px);
+  animation: rankchange-fadeIn 0.3s ease;
+}
+
+/* ─── Modal card ─────────────────────────────────────────────────────────── */
+.rankchange-modal {
+  position: relative;
+  width: 320px;
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: rankchange-scaleIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* ─── Glow ring ──────────────────────────────────────────────────────────── */
+.rankchange-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--tier-color);
+}
+
+.rankchange-modal--up .rankchange-ring {
+  box-shadow:
+    0 0 30px color-mix(in srgb, var(--tier-color) 40%, transparent),
+    0 0 80px color-mix(in srgb, var(--tier-color) 20%, transparent),
+    inset 0 0 40px color-mix(in srgb, var(--tier-color) 13%, transparent);
+  animation: rankchange-pulse 1.6s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--tier-color) 7%, transparent) 0%, transparent 70%);
+}
+
+/* Down transitions get a calm, static ring — no pulse, no glow — deliberately
+   less visually loud than an up transition, but not punitive either. */
+.rankchange-modal--down .rankchange-ring {
+  border-color: #64748b;
+  opacity: 0.5;
+}
+
+/* ─── Particles (up only) ───────────────────────────────────────────────── */
+.rankchange-particles {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.rankchange-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tier-color);
+  transform-origin: 0 0;
+  animation: rankchange-particle 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation-delay: calc(var(--i) * 0.045s);
+  opacity: 0;
+}
+
+@keyframes rankchange-particle {
+  0%   { transform: rotate(calc(var(--i) * 36deg)) translateY(-18px) scale(1); opacity: 1; }
+  100% { transform: rotate(calc(var(--i) * 36deg)) translateY(-140px) scale(0); opacity: 0; }
+}
+
+/* ─── Content ────────────────────────────────────────────────────────────── */
+.rankchange-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  padding: 0 1.5rem;
+}
+
+.rankchange-pre {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin: 0;
+  animation: rankchange-slideDown 0.5s 0.2s both;
+}
+
+.rankchange-modal--up .rankchange-pre { color: var(--tier-color); }
+
+.rankchange-badge-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--tier-color);
+  background: color-mix(in srgb, var(--tier-color) 12%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: rankchange-badgePop 0.55s 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.rankchange-name {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+  animation: rankchange-slideDown 0.5s 0.3s both;
+}
+
+.rankchange-sub {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 220px;
+  animation: rankchange-slideDown 0.5s 0.35s both;
+}
+
+.rankchange-btn {
+  margin-top: 0.75rem;
+  background: var(--tier-color);
+  color: #0b0f14;
+  border: none;
+  border-radius: 50px;
+  padding: 0.6rem 1.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, filter var(--duration) var(--ease);
+  animation: rankchange-slideDown 0.5s 0.4s both;
+}
+
+.rankchange-modal--down .rankchange-btn { background: #64748b; color: #fff; }
+
+.rankchange-btn:hover  { filter: brightness(1.1); }
+.rankchange-btn:active { transform: scale(0.95); }
+
+/* ─── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes rankchange-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes rankchange-scaleIn {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes rankchange-pulse {
+  0%, 100% { box-shadow: 0 0 30px color-mix(in srgb, var(--tier-color) 40%, transparent), 0 0 80px color-mix(in srgb, var(--tier-color) 20%, transparent); }
+  50%      { box-shadow: 0 0 50px color-mix(in srgb, var(--tier-color) 55%, transparent), 0 0 120px color-mix(in srgb, var(--tier-color) 30%, transparent); }
+}
+
+@keyframes rankchange-badgePop {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes rankchange-slideDown {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}

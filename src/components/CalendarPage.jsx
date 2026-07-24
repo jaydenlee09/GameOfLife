@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import STAT_META from './statMeta';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle } from 'lucide-react';
+import { xpForBlockMinutes } from '../utils/xpUtils';
+import {
+  toDateKey, buildDayEventTargetMs, fmtRemaining,
+  normalizeEvent, expandEventsForDates, isInstanceCompleted,
+  cloneSubEvents, cloneBonusTasks, normalizeBonusTask,
+} from '../utils/calendarUtils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SLOT_HEIGHT = 16;
@@ -24,44 +30,6 @@ const fmtTime = (h, m) => {
   const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
 };
-const toDateKey = (date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-const parseDateKey = (dateKey) => {
-  const [y, m, d] = String(dateKey || '').split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return { y, m, d };
-};
-const buildDayEventTargetMs = (dateKey, timeHHMM) => {
-  const parts = parseDateKey(dateKey);
-  if (!parts) return null;
-  let hour = 23;
-  let minute = 59;
-  if (typeof timeHHMM === 'string' && /^\d{2}:\d{2}$/.test(timeHHMM)) {
-    const [h, m] = timeHHMM.split(':').map(Number);
-    if (Number.isFinite(h) && Number.isFinite(m)) {
-      hour = Math.min(23, Math.max(0, h));
-      minute = Math.min(59, Math.max(0, m));
-    }
-  }
-  return new Date(parts.y, parts.m - 1, parts.d, hour, minute, 0, 0).getTime();
-};
-const fmtRemaining = (targetMs, nowMs) => {
-  if (!targetMs || !nowMs) return '';
-  const diffMs = targetMs - nowMs;
-  if (diffMs <= 0) return 'Passed';
-  const totalMins = Math.max(0, Math.ceil(diffMs / 60000));
-  const days = Math.floor(totalMins / (60 * 24));
-  const hours = Math.floor((totalMins - days * 24 * 60) / 60);
-  const mins = totalMins % 60;
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${mins}m`;
-  return `${mins}m`;
-};
-
 const daysUntil = (targetMs, nowMs) => {
   if (!targetMs || !nowMs) return null;
   const diff = targetMs - nowMs;
@@ -80,23 +48,6 @@ const slotToMinutes = (slot) => slot * 15;
 const minsFromEvent = (ev) => ev.startHour * 60 + ev.startMin;
 const minsEndFromEvent = (ev) => ev.endHour * 60 + ev.endMin;
 const overlaps = (a, b) => minsFromEvent(a) < minsEndFromEvent(b) && minsFromEvent(b) < minsEndFromEvent(a);
-const cloneSubEvents = (subEvents = []) => subEvents.map((subEvent) => ({ ...subEvent }));
-const normalizeBonusTask = (task = {}, index = 0) => ({
-  id: task.id ?? `bonus-${index}-${task.title || 'task'}`,
-  title: task.title || '',
-  xpAmount: Number(task.xpAmount) || 10,
-  attributes: Array.isArray(task.attributes) ? [...task.attributes] : [],
-  completed: Boolean(task.completed),
-  completedDates: Array.isArray(task.completedDates) ? [...task.completedDates] : [],
-});
-const cloneBonusTasks = (bonusTasks = []) => bonusTasks.map((task, index) => normalizeBonusTask(task, index));
-const normalizeEvent = (ev = {}) => ({
-  ...ev,
-  attributes: Array.isArray(ev.attributes) ? [...ev.attributes] : [],
-  subEvents: cloneSubEvents(ev.subEvents || []),
-  bonusTasks: cloneBonusTasks(ev.bonusTasks || []),
-  completedDates: Array.isArray(ev.completedDates) ? [...ev.completedDates] : [],
-});
 
 const buildColumns = (events) => {
   if (!events.length) return [];
@@ -127,42 +78,13 @@ const buildColumns = (events) => {
   return result;
 };
 
-const expandEventsForDates = (storedEvents, dateKeys) => {
-  const result = [];
-  for (const ev of storedEvents) {
-    const normalizedEvent = normalizeEvent(ev);
-    if (normalizedEvent.recurrence === 'none' || !normalizedEvent.recurrence) {
-      if (dateKeys.includes(normalizedEvent.date)) result.push({ ...normalizedEvent, _instanceDate: normalizedEvent.date });
-    } else if (normalizedEvent.recurrence === 'daily') {
-      for (const dk of dateKeys) {
-        if (dk >= normalizedEvent.date) result.push({ ...normalizedEvent, _instanceDate: dk, _isVirtual: dk !== normalizedEvent.date });
-      }
-    } else if (normalizedEvent.recurrence === 'weekly') {
-      const evDay = new Date(normalizedEvent.date + 'T00:00:00').getDay();
-      for (const dk of dateKeys) {
-        const dkDay = new Date(dk + 'T00:00:00').getDay();
-        if (dk >= normalizedEvent.date && dkDay === evDay) result.push({ ...normalizedEvent, _instanceDate: dk, _isVirtual: dk !== normalizedEvent.date });
-      }
-    }
-  }
-  return result.filter(ev => {
-    if (ev._exceptDates?.includes(ev._instanceDate)) return false;
-    if (ev._forwardDeleteFrom && ev._instanceDate >= ev._forwardDeleteFrom) return false;
-    return true;
-  });
-};
-
-const isInstanceCompleted = (ev) => {
-  if (ev.recurrence === 'none' || !ev.recurrence) return ev.completed;
-  return ev.completedDates?.includes(ev._instanceDate);
-};
 const isBonusTaskCompleted = (task, ev) => {
   if (ev.recurrence === 'none' || !ev.recurrence) return Boolean(task.completed);
   return task.completedDates?.includes(ev._instanceDate);
 };
 const primaryColor = (ev) => {
-  if (!ev.attributes?.length) return '#fbbf24';
-  return STAT_META[ev.attributes[0]]?.color || '#fbbf24';
+  if (!ev.attributes?.length) return '#38bdf8';
+  return STAT_META[ev.attributes[0]]?.color || '#38bdf8';
 };
 const buildDetachedInstanceEvent = (ev, overrides = {}) => {
   const normalizedEvent = normalizeEvent(ev);
@@ -215,7 +137,7 @@ const defaultForm = (o = {}) => ({
   startHour: 9, startMin: 0, endHour: 10, endMin: 0,
   xpAmount: 20, attributes: [], recurrence: 'none', notes: '', subEvents: [], bonusTasks: [], ...o,
 });
-const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', color: '#fbbf24' });
+const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', color: '#38bdf8' });
 const defaultNoPhoneForm = (o = {}) => ({
   date: toDateKey(new Date()), startHour: 8, startMin: 0, endHour: 9, endMin: 0,
   label: 'No Phone', recurrence: 'none', ...o,
@@ -241,7 +163,7 @@ export default function CalendarPage({
   const [anchor, setAnchor] = useState(() => new Date());
   const [modal, setModal] = useState(null);
   const [dayEventModal, setDayEventModal] = useState(null); // { mode: 'create'|'edit', dateKey, id? }
-  const [dayEventForm, setDayEventForm] = useState({ title: '', time: '', color: '#fbbf24' });
+  const [dayEventForm, setDayEventForm] = useState({ title: '', time: '', color: '#38bdf8' });
   const [dayEventErr, setDayEventErr] = useState('');
   const [form, setForm] = useState(defaultForm());
   const [editingId, setEditingId] = useState(null);
@@ -363,7 +285,7 @@ export default function CalendarPage({
 
   const openDayEventCreate = (dateKey) => {
     setDayEventErr('');
-    setDayEventForm({ title: '', time: '', color: '#fbbf24' });
+    setDayEventForm({ title: '', time: '', color: '#38bdf8' });
     setDayEventModal({ mode: 'create', dateKey });
   };
 
@@ -373,7 +295,7 @@ export default function CalendarPage({
     setDayEventForm({
       title: item.title || '',
       time: item.time || '',
-      color: item.color || '#fbbf24',
+      color: item.color || '#38bdf8',
     });
     setDayEventModal({ mode: 'edit', dateKey, id: item.id });
   };
@@ -381,7 +303,7 @@ export default function CalendarPage({
   const closeDayEventModal = () => {
     setDayEventModal(null);
     setDayEventErr('');
-    setDayEventForm({ title: '', time: '', color: '#fbbf24' });
+    setDayEventForm({ title: '', time: '', color: '#38bdf8' });
   };
 
   const closeModal = () => { setModal(null); setEditingId(null); setEditScope(null); setDeleteScope(null); setNewSubEvent(''); setNewBonusTask(defaultBonusTaskForm()); };
@@ -392,7 +314,7 @@ export default function CalendarPage({
     if (!dateKey) return;
     if (!title) { setDayEventErr('Title is required.'); return; }
     const time = (dayEventForm.time || '').trim();
-    const color = (dayEventForm.color || '#fbbf24').trim();
+    const color = (dayEventForm.color || '#38bdf8').trim();
     if (typeof setCalendarDayEvents === 'function') {
       setCalendarDayEvents((prev) => {
         const base = prev && typeof prev === 'object' ? prev : {};
@@ -562,6 +484,25 @@ export default function CalendarPage({
     setNoPhoneDeleteScope(null);
   };
 
+  // ─── No-Phone adherence: honoring a block earns XP, so it's a tracked commitment ──
+  const isNoPhoneHonored = (block) => (block.recurrence==='none'||!block.recurrence)
+    ? !!block.honored
+    : (block.honoredDates||[]).includes(block._instanceDate);
+
+  const honorNoPhoneBlock = (block, e) => {
+    e.stopPropagation();
+    if (isNoPhoneHonored(block)) return;
+    // Staying off your phone builds Discipline + Focus — earned from the block's length.
+    const each = Math.max(1, Math.floor(xpForBlockMinutes(minsEndFromEvent(block) - minsFromEvent(block)) / 2));
+    onUpdateStat('discipline', each, { source: 'nophone', label: block.label || 'No-phone time honored' });
+    onUpdateStat('focus',      each, { source: 'nophone', label: block.label || 'No-phone time honored' });
+    if (block.recurrence==='none'||!block.recurrence) {
+      setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,honored:true}:b));
+    } else {
+      setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,honoredDates:[...(b.honoredDates||[]),block._instanceDate]}:b));
+    }
+  };
+
   // ─── No-Phone Drag-to-create ───────────────────────────────────────────────────
   const handleNoPhoneSlotMouseDown = (dateKey, slot) => {
     if (!noPhoneMode) return;
@@ -590,7 +531,14 @@ export default function CalendarPage({
   const completeEvent = (ev, e) => {
     e.stopPropagation();
     if (isInstanceCompleted(ev)) return;
-    ev.attributes.forEach(attr=>onUpdateStat(attr, ev.xpAmount));
+    // XP is EARNED from the block's scheduled length and split across its attributes,
+    // so it can't be inflated by typing a big number or piling on attributes.
+    const attrs = ev.attributes || [];
+    if (attrs.length > 0) {
+      const total = xpForBlockMinutes(minsEndFromEvent(ev) - minsFromEvent(ev));
+      const each = Math.max(1, Math.floor(total / attrs.length));
+      attrs.forEach(attr => onUpdateStat(attr, each, { source: 'calendar', label: ev.title }));
+    }
     if (ev.recurrence==='none'||!ev.recurrence) setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completed:true}:e));
     else setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completedDates:[...(e.completedDates||[]),ev._instanceDate]}:e));
   };
@@ -693,7 +641,7 @@ export default function CalendarPage({
   const handleSlotDrop = (e, date, slot) => {
     e.preventDefault();
     if (draggingEvent) {
-      const { ev, startSlot } = draggingEvent;
+      const { ev } = draggingEvent;
       const durationSlots = (minsEndFromEvent(ev) - minsFromEvent(ev)) / 15;
       let newStartSlot = slot;
       let newEndSlot = newStartSlot + durationSlots;
@@ -824,7 +772,7 @@ export default function CalendarPage({
           id: item?.id,
           title: item?.title || 'Untitled',
           time: item?.time || null,
-          color: item?.color || '#fbbf24',
+          color: item?.color || '#38bdf8',
           targetMs,
         });
       }
@@ -885,7 +833,6 @@ export default function CalendarPage({
             return candidates[0] || null;
           })();
           const soonestRemaining = soonest ? fmtRemaining(soonest.targetMs, nowMs) : '';
-          const dayTaskCount = (todosByDate[dk] || []).length;
           return (
             <div key={i} className={`cal-day-header ${isToday?'cal-day-header--today':''}`}>
               <span className="cal-day-name">{DAYS_LABEL[d.getDay()]}</span>
@@ -903,12 +850,12 @@ export default function CalendarPage({
                 >
                   {!soonest?.evt ? (
                     <>
-                      <span className="cal-dayevents-mini-label">＋ Add event</span>
+                      <span className="cal-dayevents-mini-label"><Plus size={11} strokeWidth={3} /> Add event</span>
                     </>
                   ) : (
                     <>
                       <span className="cal-dayevents-mini-top">
-                        <span className="cal-dayevents-mini-dot" style={{ '--mini-color': soonest.evt.color || '#fbbf24' }} />
+                        <span className="cal-dayevents-mini-dot" style={{ '--mini-color': soonest.evt.color || '#38bdf8' }} />
                         <span className="cal-dayevents-mini-title">{soonest.evt.title || 'Untitled'}</span>
                       </span>
                       <span className="cal-dayevents-mini-meta">{soonestRemaining}</span>
@@ -916,15 +863,37 @@ export default function CalendarPage({
                   )}
                 </button>
               )}
-              {!nextEventMinimized && dayTaskCount > 0 && (
-                <div className="cal-day-task-badge">
-                  {dayTaskCount} task{dayTaskCount !== 1 ? 's' : ''}
-                </div>
-              )}
             </div>
           );
         })}
       </div>
+      {dates.some((d) => (todosByDate[toDateKey(d)] || []).length > 0) && (
+        <div className="cal-alldaytasks-row" style={{ gridTemplateColumns: `64px repeat(${dates.length}, minmax(0, 1fr))` }}>
+          <div className="cal-alldaytasks-gutter" />
+          {dates.map((d, i) => {
+            const dk = toDateKey(d);
+            const dayTasks = todosByDate[dk] || [];
+            return (
+              <div key={i} className="cal-alldaytasks-col">
+                {dayTasks.slice(0, 3).map((task) => (
+                  <div
+                    key={task.id}
+                    className="cal-month-chip cal-month-chip--task"
+                    style={{ '--chip-color': taskPrimaryColor(task) }}
+                    onClick={(e) => e.stopPropagation()}
+                    title={task.text}
+                  >
+                    {task.text}
+                  </div>
+                ))}
+                {dayTasks.length > 3 && (
+                  <div className="cal-month-more">+{dayTasks.length - 3} more</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="cal-scroll-area" ref={gridRef}>
         <div className="cal-time-grid" style={{ height: TOTAL_HEIGHT, gridTemplateColumns: `64px repeat(${dates.length}, minmax(0, 1fr))` }}>
           <div className="cal-time-gutter">
@@ -968,14 +937,21 @@ export default function CalendarPage({
                   const startMin=minsFromEvent(block), endMin=minsEndFromEvent(block);
                   const top=(startMin/(24*60))*TOTAL_HEIGHT;
                   const height=Math.max(((endMin-startMin)/(24*60))*TOTAL_HEIGHT,8);
+                  const honored=isNoPhoneHonored(block);
                   return (
                     <div
                       key={`np-${block.id}-${block._instanceDate}-${bi}`}
-                      className="cal-nophone-band"
+                      className={`cal-nophone-band${honored?' cal-nophone-band--honored':''}`}
                       style={{top,height}}
                     >
                       <div className="cal-nophone-chip" onClick={(e)=>{e.stopPropagation();openNoPhoneEdit(block);}}>
-                        <span className="cal-nophone-label">📵 {block.label || 'No Phone'} {fmtTime(block.startHour,block.startMin)}–{fmtTime(block.endHour,block.endMin)}</span>
+                        <span className="cal-nophone-label"><PhoneOff size={10} strokeWidth={3} /> {block.label || 'No Phone'} {fmtTime(block.startHour,block.startMin)}–{fmtTime(block.endHour,block.endMin)}</span>
+                        <button
+                          className={`cal-nophone-honor${honored?' is-honored':''}`}
+                          onClick={(e)=>honorNoPhoneBlock(block,e)}
+                          title={honored?'Honored — you earned XP':'Mark honored (earn XP)'}
+                          aria-label="Mark honored"
+                        ><Check size={11} strokeWidth={3} /></button>
                         <button className="cal-nophone-delete" onClick={(e)=>requestDeleteNoPhone(block,e)} title="Delete" aria-label="Delete">
                           <X size={11} strokeWidth={3} />
                         </button>
@@ -1034,7 +1010,7 @@ export default function CalendarPage({
                                   onClick={(e)=>completeBonusTask(ev, normalizedTask, e)}
                                   title={bonusDone ? `Uncheck bonus task: ${normalizedTask.title}` : `Complete bonus task: ${normalizedTask.title}`}
                                 >
-                                  <span className="cal-event-bonus-check">{bonusDone?'✓':'○'}</span>
+                                  <span className="cal-event-bonus-check">{bonusDone ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={3} />}</span>
                                   <span className="cal-event-bonus-label">{normalizedTask.title}</span>
                                 </button>
                               );
@@ -1043,9 +1019,9 @@ export default function CalendarPage({
                         )}
                       </div>
                       <div className="cal-event-actions">
-                        <button className={`cal-event-btn cal-event-complete ${done?'cal-event-complete--done':''}`} onClick={(e)=>completeEvent(ev,e)} title={done?'Completed':'Mark complete'}>{done?'✓':'○'}</button>
+                        <button className={`cal-event-btn cal-event-complete ${done?'cal-event-complete--done':''}`} onClick={(e)=>completeEvent(ev,e)} title={done?'Completed':'Mark complete'}>{done ? <Check size={11} strokeWidth={3} /> : <Circle size={11} strokeWidth={3} />}</button>
                         <button className="cal-event-btn cal-event-duplicate" onClick={(e)=>duplicateEvent(ev,e)} title="Duplicate"><Copy size={11} strokeWidth={3} /></button>
-                        <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete">✕</button>
+                        <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete"><X size={11} strokeWidth={3} /></button>
                       </div>
                     </div>
                   );
@@ -1078,7 +1054,7 @@ export default function CalendarPage({
                 onClick={()=>{setAnchor(d);setView('day');}}>
                 <div className="cal-month-daynum-row">
                   <div className={`cal-month-daynum ${isToday?'cal-month-daynum--today':''}`}>{d.getDate()}</div>
-                  {(noPhoneByDate[dk]||[]).length>0 && <span className="cal-month-nophone-dot" title="No-phone time scheduled">📵</span>}
+                  {(noPhoneByDate[dk]||[]).length>0 && <span className="cal-month-nophone-dot" title="No-phone time scheduled"><PhoneOff size={10} /></span>}
                 </div>
 
                 <button
@@ -1089,7 +1065,7 @@ export default function CalendarPage({
                 >
                   <div className="cal-month-dayevents-head">
                     <span className="cal-month-dayevents-label">Events</span>
-                    <span className="cal-month-dayevents-add">＋</span>
+                    <span className="cal-month-dayevents-add"><Plus size={11} strokeWidth={3} /></span>
                   </div>
                   <div className="cal-month-dayevents-list">
                     {dayReminders.length===0 && (
@@ -1097,7 +1073,7 @@ export default function CalendarPage({
                     )}
                     {dayReminders.slice(0,2).map((evt)=>{
                       const targetMs = buildDayEventTargetMs(dk, evt.time);
-                      const color = evt.color || '#fbbf24';
+                      const color = evt.color || '#38bdf8';
                       return (
                         <button
                           key={evt.id}
@@ -1170,7 +1146,7 @@ export default function CalendarPage({
           <p className="cal-sidebar-hint">Drag onto the calendar to place</p>
           <div className="cal-sidebar-list">
             {quickEvents.map(tmpl=>(
-              <div key={tmpl.id} className="cal-tmpl-card" style={{'--tmpl-color':tmpl.color||'#fbbf24'}}
+              <div key={tmpl.id} className="cal-tmpl-card" style={{'--tmpl-color':tmpl.color||'#38bdf8'}}
                 draggable onDragStart={(e)=>handleTemplateDragStart(e,tmpl)} onDragEnd={handleDragEnd}>
                 <div className="cal-tmpl-info">
                   <div className="cal-tmpl-title">{tmpl.title}</div>
@@ -1357,7 +1333,7 @@ export default function CalendarPage({
           <div className="cal-modal" onClick={e=>e.stopPropagation()}>
             <div className="cal-modal-header">
               <h3>{modal==='create'?'New Time Block':'Edit Time Block'}</h3>
-              <button className="cal-modal-close" onClick={closeModal}>✕</button>
+              <button className="cal-modal-close" onClick={closeModal}><X size={14} /></button>
             </div>
             <div className="cal-modal-body">
               <div className="cal-field">
@@ -1379,11 +1355,24 @@ export default function CalendarPage({
                 </div>
               </div>
               <div className="cal-field">
-                <label className="cal-label">XP per attribute</label>
-                <input className="cal-input cal-input--xp" type="number" min="1" max="500" value={form.xpAmount} onChange={e=>setForm(f=>({...f,xpAmount:e.target.value}))}/>
+                <label className="cal-label">Reward</label>
+                {(() => {
+                  const dur = (form.endHour*60+form.endMin) - (form.startHour*60+form.startMin);
+                  const n = (form.attributes||[]).length;
+                  const total = dur > 0 ? xpForBlockMinutes(dur) : 0;
+                  const each = n > 0 ? Math.max(1, Math.floor(total / n)) : 0;
+                  return (
+                    <div className="cal-xp-earned">
+                      {n > 0
+                        ? <span><strong>+{each} XP</strong> to each of {n} attribute{n!==1?'s':''} · {total} total</span>
+                        : <span>Pick an attribute below to earn its {total} XP</span>}
+                      <span className="cal-xp-earned-note">earned from the block's length · 1 XP/min</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="cal-field">
-                <label className="cal-label">Attributes (full XP to each)</label>
+                <label className="cal-label">Attributes (XP split across them)</label>
                 {renderAttrPills(form.attributes, toggleAttr)}
               </div>
               <div className="cal-field">
@@ -1396,7 +1385,7 @@ export default function CalendarPage({
                   {(form.subEvents||[]).map(se=>(
                     <div key={se.id} className="cal-subevent-row">
                       <span className="cal-subevent-name">{se.title}</span>
-                      <button type="button" className="cal-subevent-del" onClick={()=>removeSubEvent(se.id)}>✕</button>
+                      <button type="button" className="cal-subevent-del" onClick={()=>removeSubEvent(se.id)}><X size={12} /></button>
                     </div>
                   ))}
                 </div>
@@ -1431,14 +1420,14 @@ export default function CalendarPage({
                           onClick={()=>toggleBonusTaskCompletion(completionEvent, normalizedTask)}
                           title={bonusDone ? `Uncheck ${normalizedTask.title}` : `Mark ${normalizedTask.title} complete`}
                         >
-                          {bonusDone?'✓':'○'}
+                          {bonusDone ? <Check size={12} /> : <Circle size={12} />}
                         </button>
                       )}
                       <div className="cal-bonus-main">
                         <span className="cal-bonus-name">{normalizedTask.title}</span>
                         <span className="cal-bonus-meta">+{normalizedTask.xpAmount} XP to {normalizedTask.attributes.map((attr)=>STAT_META[attr]?.label || attr).join(', ')}</span>
                       </div>
-                      <button type="button" className="cal-subevent-del" onClick={()=>removeBonusTask(normalizedTask.id)}>✕</button>
+                      <button type="button" className="cal-subevent-del" onClick={()=>removeBonusTask(normalizedTask.id)}><X size={12} /></button>
                     </div>
                   )})}
                 </div>
@@ -1452,17 +1441,6 @@ export default function CalendarPage({
                         value={newBonusTask.title}
                         onChange={(e)=>setNewBonusTask((current)=>({...current,title:e.target.value}))}
                         onKeyDown={(e)=>{if(e.key==='Enter'){e.preventDefault();addBonusTask();}}}
-                      />
-                    </div>
-                    <div className="cal-field">
-                      <label className="cal-label">XP</label>
-                      <input
-                        className="cal-input cal-input--xp"
-                        type="number"
-                        min="1"
-                        max="500"
-                        value={newBonusTask.xpAmount}
-                        onChange={(e)=>setNewBonusTask((current)=>({...current,xpAmount:e.target.value}))}
                       />
                     </div>
                     <span className="cal-month-dayevents-add" aria-hidden="true">
@@ -1488,9 +1466,6 @@ export default function CalendarPage({
                 {modal==='create'?'Add Time Block':'Save Changes'}
               </button>
             </div>
-                        <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete" aria-label="Delete">
-                          <Trash2 size={13} strokeWidth={3} />
-                        </button>
           </div>
         </div>
       )}
@@ -1509,12 +1484,6 @@ export default function CalendarPage({
                 <X size={16} strokeWidth={3} />
               </button>
             </div>
-                                  <button type="button" className="cal-subevent-del" onClick={()=>removeSubEvent(se.id)} aria-label="Remove">
-                                    <X size={14} strokeWidth={3} />
-                                  </button>
-                                  <button type="button" className="cal-subevent-del" onClick={()=>removeBonusTask(normalizedTask.id)} aria-label="Remove">
-                                    <X size={14} strokeWidth={3} />
-                                  </button>
             <button className="cal-btn cal-btn--ghost cal-scope-cancel" onClick={()=>setEditScope(null)}>Cancel</button>
           </div>
         </div>
@@ -1545,7 +1514,7 @@ export default function CalendarPage({
           <div className="cal-modal" onClick={e=>e.stopPropagation()}>
             <div className="cal-modal-header">
               <h3>{tmplModal==='create'?'New Template':'Edit Template'}</h3>
-              <button className="cal-modal-close" onClick={closeTmplModal}>✕</button>
+              <button className="cal-modal-close" onClick={closeTmplModal}><X size={14} /></button>
               <button className="cal-modal-close" onClick={closeDayEventModal} aria-label="Close">
                 <X size={16} strokeWidth={3} />
               </button>
@@ -1561,12 +1530,15 @@ export default function CalendarPage({
                   <input className="cal-input cal-input--xp" type="number" min="5" max="480" step="5" value={tmplForm.duration} onChange={e=>setTmplForm(f=>({...f,duration:Number(e.target.value)}))}/>
                 </div>
                 <div className="cal-field">
-                  <label className="cal-label">XP per attribute</label>
-                  <input className="cal-input cal-input--xp" type="number" min="1" max="500" value={tmplForm.xpAmount} onChange={e=>setTmplForm(f=>({...f,xpAmount:Number(e.target.value)}))}/>
+                  <label className="cal-label">Reward</label>
+                  <div className="cal-xp-earned cal-xp-earned--sm">
+                    <span><strong>+{xpForBlockMinutes(tmplForm.duration || 0)} XP</strong></span>
+                    <span className="cal-xp-earned-note">from duration · split across attributes</span>
+                  </div>
                 </div>
               </div>
               <div className="cal-field">
-                <label className="cal-label">Attributes</label>
+                <label className="cal-label">Attributes (XP split across them)</label>
                 {renderAttrPills(tmplForm.attributes, toggleTmplAttr)}
               </div>
               <div className="cal-field">
@@ -1598,7 +1570,7 @@ export default function CalendarPage({
           <div className="cal-modal" onClick={e=>e.stopPropagation()}>
             <div className="cal-modal-header">
               <h3>{dayEventModal.mode === 'edit' ? 'Edit Event' : 'New Event'}</h3>
-              <button className="cal-modal-close" onClick={closeDayEventModal}>✕</button>
+              <button className="cal-modal-close" onClick={closeDayEventModal}><X size={14} /></button>
             </div>
             <div className="cal-modal-body">
               <div className="cal-field">
@@ -1661,7 +1633,7 @@ export default function CalendarPage({
           <div className="cal-modal" onClick={e=>e.stopPropagation()}>
             <div className="cal-modal-header">
               <h3>{noPhoneModal.mode === 'edit' ? 'Edit No Phone Time' : 'New No Phone Time'}</h3>
-              <button className="cal-modal-close" onClick={closeNoPhoneModal}>✕</button>
+              <button className="cal-modal-close" onClick={closeNoPhoneModal}><X size={14} /></button>
             </div>
             <div className="cal-modal-body">
               <div className="cal-field">
