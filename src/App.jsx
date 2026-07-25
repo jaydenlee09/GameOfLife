@@ -4,7 +4,7 @@ import { useAuth } from './context/AuthContext'
 import { loadAllUserData, saveDataKey, flushPendingWrites, migrateLocalStorageToFirestore, subscribeToUserData } from './services/firestoreService'
 import PlayerDashboard from './components/PlayerDashboard'
 import WelcomePage from './components/WelcomePage'
-import Navbar, { StatIcon, TaskIcon, TimerIcon, LogIcon, TargetIcon } from './components/Navbar'
+import Navbar, { StatIcon, TaskIcon, LogIcon, TargetIcon, CalIcon } from './components/Navbar'
 import { CalendarDays, X, ChevronDown, Target } from 'lucide-react'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
@@ -989,7 +989,7 @@ function App() {
         {[
           { id: 'statistics', label: 'Stats',   icon: <StatIcon /> },
           { id: 'tasks',      label: 'Tasks',   icon: <TaskIcon /> },
-          { id: 'timer',      label: 'Timer',   icon: <TimerIcon /> },
+          { id: 'calendar',   label: 'Calendar', icon: <CalIcon /> },
           { id: 'daily-log',  label: 'Log',     icon: <LogIcon /> },
           { id: 'goals',      label: 'Goals',   icon: <TargetIcon /> },
         ].map(({ id, label, icon }) => (
