@@ -487,6 +487,21 @@
 }
 
 .cal-event-actions { position: absolute; bottom: 0; right: 0; display: flex; gap: 1px; padding: 1px 3px; justify-content: flex-end; opacity: 0; transition: opacity 0.15s; background: rgba(0,0,0,0.55); border-radius: 0 0 6px 0; z-index: 4; }
+
+.cal-event-resize-handle {
+  position: absolute; left: 0; right: 0; height: 7px; cursor: ns-resize; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+}
+.cal-event-resize-handle--top { top: -1px; }
+.cal-event-resize-handle--bottom { bottom: -1px; }
+.cal-event-resize-handle::after {
+  content: ''; width: 22px; height: 3px; border-radius: 2px;
+  background: var(--ev-color, #38bdf8); opacity: 0; transition: opacity 0.12s;
+}
+.cal-event:hover .cal-event-resize-handle::after { opacity: 0.5; }
+.cal-event-resize-handle:hover::after { opacity: 1; }
+.cal-event--resizing { z-index: 6; filter: brightness(1.2); box-shadow: 0 0 0 2px var(--ev-color, #38bdf8), var(--shadow-sm); }
+.cal-event--resizing .cal-event-actions { opacity: 0; }
 .cal-event-btn { width: 18px; height: 18px; border-radius: 3px; border: none; background: transparent; color: var(--text-secondary); font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.1s; }
 .cal-event-btn svg { display: block; }
 .cal-event-complete:hover, .cal-event-complete--done { color: var(--success); background: var(--success-wash); }

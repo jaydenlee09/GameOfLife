@@ -14,6 +14,7 @@ const SLOT_HEIGHT = 16;
 const SLOTS_PER_HOUR = 4;
 const TOTAL_SLOTS = 96;
 const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
+const MIN_EVENT_SLOTS = 1; // 15 min minimum duration
 const DAYS_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -179,6 +180,8 @@ export default function CalendarPage({
   const [dragOver, setDragOver] = useState(null);
   const [draggingTemplate, setDraggingTemplate] = useState(null);
   const [draggingEvent, setDraggingEvent] = useState(null); // { ev, offsetSlots }
+  const [resizeSession, setResizeSession] = useState(null); // { ev, edge, startStartSlot, startEndSlot, startClientY }
+  const [resizeDeltaSlots, setResizeDeltaSlots] = useState(0);
   const [noPhoneMode, setNoPhoneMode] = useState(false);
   const [npDragStart, setNpDragStart] = useState(null); // { dateKey, slot }
   const [npDragCurrent, setNpDragCurrent] = useState(null); // { dateKey, slot }
@@ -694,6 +697,79 @@ export default function CalendarPage({
 
   const handleDragEnd = () => { setDragOver(null); setDraggingTemplate(null); setDraggingEvent(null); };
 
+  // ─── Event Resize (drag top/bottom edge, snapped to 15-min increments) ───────
+  const resizeSessionRef = useRef(null);
+  resizeSessionRef.current = resizeSession;
+  const resizeDeltaRef = useRef(0);
+
+  const beginEventResize = (e, ev, edge) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startStartSlot = ev.startHour * SLOTS_PER_HOUR + ev.startMin / 15;
+    const startEndSlot = ev.endHour * SLOTS_PER_HOUR + ev.endMin / 15;
+    resizeDeltaRef.current = 0;
+    setResizeDeltaSlots(0);
+    setResizeSession({ ev, edge, startStartSlot, startEndSlot, startClientY: e.clientY });
+  };
+
+  const finalizeEventResize = (session, deltaSlots) => {
+    if (!deltaSlots) return;
+    const { ev, edge, startStartSlot, startEndSlot } = session;
+    let newStartSlot = startStartSlot;
+    let newEndSlot = startEndSlot;
+    if (edge === 'bottom') newEndSlot = startEndSlot + deltaSlots;
+    else newStartSlot = startStartSlot + deltaSlots;
+    newStartSlot = Math.max(0, Math.min(newStartSlot, TOTAL_SLOTS - MIN_EVENT_SLOTS));
+    newEndSlot = Math.max(newStartSlot + MIN_EVENT_SLOTS, Math.min(newEndSlot, TOTAL_SLOTS));
+    const newStartH = Math.floor(newStartSlot / SLOTS_PER_HOUR);
+    const newStartM = (newStartSlot % SLOTS_PER_HOUR) * 15;
+    const newEndH = Math.floor(newEndSlot / SLOTS_PER_HOUR);
+    const newEndM = (newEndSlot % SLOTS_PER_HOUR) * 15;
+    if (ev.recurrence !== 'none' && ev._isVirtual) {
+      // Resizing a recurring instance detaches it into its own one-off event, same as move-drag does.
+      setCalendarEvents(prev => [
+        ...prev.map(e => e.id === ev.id ? { ...e, _exceptDates: [...(e._exceptDates || []), ev._instanceDate] } : e),
+        buildDetachedInstanceEvent(ev, { id: Date.now(), startHour: newStartH, startMin: newStartM, endHour: newEndH, endMin: newEndM }),
+      ]);
+    } else {
+      setCalendarEvents(prev => prev.map(e => e.id === ev.id
+        ? { ...e, startHour: newStartH, startMin: newStartM, endHour: newEndH, endMin: newEndM }
+        : e
+      ));
+    }
+  };
+
+  useEffect(() => {
+    if (!resizeSession) return;
+    const handleMove = (e) => {
+      const session = resizeSessionRef.current;
+      if (!session) return;
+      const rawDeltaSlots = Math.round((e.clientY - session.startClientY) / SLOT_HEIGHT);
+      const duration = session.startEndSlot - session.startStartSlot;
+      let clamped;
+      if (session.edge === 'bottom') {
+        clamped = Math.max(MIN_EVENT_SLOTS - duration, Math.min(TOTAL_SLOTS - session.startEndSlot, rawDeltaSlots));
+      } else {
+        clamped = Math.max(-session.startStartSlot, Math.min(duration - MIN_EVENT_SLOTS, rawDeltaSlots));
+      }
+      resizeDeltaRef.current = clamped;
+      setResizeDeltaSlots(clamped);
+    };
+    const handleUp = () => {
+      const session = resizeSessionRef.current;
+      if (session) finalizeEventResize(session, resizeDeltaRef.current);
+      setResizeSession(null);
+      setResizeDeltaSlots(0);
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resizeSession]);
+
   // ─── Notes Preview (removed) / Sub-events ───────────────────────────────────
   const [newSubEvent, setNewSubEvent] = useState('');
   const addSubEvent = () => {
@@ -965,26 +1041,40 @@ export default function CalendarPage({
                   return <div className="cal-nophone-band cal-nophone-band--preview" style={{top,height}} />;
                 })()}
                 {dayEvents.map((ev,ei)=>{
-                  const startMin=minsFromEvent(ev), endMin=minsEndFromEvent(ev);
+                  const isResizing = resizeSession && resizeSession.ev.id===ev.id && resizeSession.ev._instanceDate===ev._instanceDate;
+                  let startMin=minsFromEvent(ev), endMin=minsEndFromEvent(ev);
+                  if (isResizing) {
+                    const deltaMin = resizeDeltaSlots * 15;
+                    if (resizeSession.edge==='bottom') endMin += deltaMin;
+                    else startMin += deltaMin;
+                  }
                   const top=(startMin/(24*60))*TOTAL_HEIGHT;
                   const height=Math.max(((endMin-startMin)/(24*60))*TOTAL_HEIGHT,18);
                   const left=`calc(${(ev.colIndex/ev.totalCols)*100}% + 2px)`;
                   const width=`calc(${(1/ev.totalCols)*100}% - 4px)`;
                   const color=primaryColor(ev);
                   const done=isInstanceCompleted(ev);
+                  const dispStartH=Math.floor(startMin/60), dispStartM=startMin%60;
+                  const dispEndH=Math.floor(endMin/60), dispEndM=endMin%60;
                   return (
                     <div
                       key={`${ev.id}-${ev._instanceDate}-${ei}`}
-                      className={`cal-event ${done?'cal-event--done':''}`}
+                      className={`cal-event ${done?'cal-event--done':''} ${isResizing?'cal-event--resizing':''}`}
                       style={{top,height,left,width,'--ev-color':color}}
-                      draggable
+                      draggable={!resizeSession}
                       onDragStart={(e)=>handleEventDragStart(e,ev)}
                       onDragEnd={handleDragEnd}
                       onClick={(e)=>{e.stopPropagation();openEdit(ev);}}
                     >
+                      <div
+                        className="cal-event-resize-handle cal-event-resize-handle--top"
+                        draggable={false}
+                        onMouseDown={(e)=>beginEventResize(e,ev,'top')}
+                        onClick={(e)=>e.stopPropagation()}
+                      />
                       <div className="cal-event-inner">
                         <div className="cal-event-title">{ev.title}</div>
-                        {height>30&&<div className="cal-event-time">{fmtTime(ev.startHour,ev.startMin)} – {fmtTime(ev.endHour,ev.endMin)}</div>}
+                        {height>30&&<div className="cal-event-time">{fmtTime(dispStartH,dispStartM)} – {fmtTime(dispEndH,dispEndM)}</div>}
                         {height>48&&ev.attributes.length>0&&(
                           <div className="cal-event-attrs">
                             {ev.attributes.map(a=><span key={a} className="cal-event-attr-dot" style={{background:STAT_META[a]?.color}} title={STAT_META[a]?.label}/>)}
@@ -1023,6 +1113,12 @@ export default function CalendarPage({
                         <button className="cal-event-btn cal-event-duplicate" onClick={(e)=>duplicateEvent(ev,e)} title="Duplicate"><Copy size={11} strokeWidth={3} /></button>
                         <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete"><X size={11} strokeWidth={3} /></button>
                       </div>
+                      <div
+                        className="cal-event-resize-handle cal-event-resize-handle--bottom"
+                        draggable={false}
+                        onMouseDown={(e)=>beginEventResize(e,ev,'bottom')}
+                        onClick={(e)=>e.stopPropagation()}
+                      />
                     </div>
                   );
                 })}
