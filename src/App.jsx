@@ -980,6 +980,7 @@ function App() {
             setAssistantDraft(text);
             setAssistantOpen(true);
           }}
+          onExpand={() => setAssistantOpen(true)}
         />
       )}
 

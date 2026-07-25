@@ -2,8 +2,9 @@ import { useState } from 'react';
 import './FloatingAIBar.css';
 
 // The global entry point for talking to the assistant from any screen — submitting
-// here opens the Assistant drawer and sends this as the first message.
-export default function FloatingAIBar({ onSubmit }) {
+// here opens the Assistant drawer and sends this as the first message. Double-clicking
+// the bar opens the drawer directly, with no message sent.
+export default function FloatingAIBar({ onSubmit, onExpand }) {
   const [value, setValue] = useState('');
 
   const submit = () => {
@@ -22,7 +23,7 @@ export default function FloatingAIBar({ onSubmit }) {
 
   return (
     <div className="ai-bar-wrap">
-      <div className="ai-bar">
+      <div className="ai-bar" onDoubleClick={onExpand}>
         <input
           className="ai-bar-input"
           type="text"
@@ -30,6 +31,7 @@ export default function FloatingAIBar({ onSubmit }) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onDoubleClick={onExpand}
         />
         <button className="ai-bar-send" onClick={submit} disabled={!value.trim()} aria-label="Send">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
