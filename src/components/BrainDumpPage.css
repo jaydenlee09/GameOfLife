@@ -239,4 +239,13 @@
   .bd-page {
     padding: 1.5rem 1.25rem 3rem;
   }
+
+  /* Hover-revealed controls don't exist on touch — show them always so
+     notes/connections can still be deleted and connected on mobile. */
+  .bd-note-delete,
+  .bd-note-handle,
+  .bd-conn-delete {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }

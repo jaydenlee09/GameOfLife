@@ -1131,10 +1131,16 @@ export default function CalendarPage({
 
   // ─── Sidebar ─────────────────────────────────────────────────────────────────
   const renderSidebar = () => (
-    <div className={`cal-sidebar ${sidebarOpen?'cal-sidebar--open':'cal-sidebar--closed'}`}>
-      <button className="cal-sidebar-toggle" onClick={()=>setSidebarOpen(o=>!o)} title={sidebarOpen?'Collapse':'Expand'}>
+    <>
+      <button
+        className={`cal-sidebar-toggle ${sidebarOpen?'cal-sidebar-toggle--open':'cal-sidebar-toggle--closed'}`}
+        onClick={()=>setSidebarOpen(o=>!o)}
+        title={sidebarOpen?'Collapse':'Expand'}
+        aria-label={sidebarOpen?'Collapse sidebar':'Expand sidebar'}
+      >
         {sidebarOpen ? <ChevronLeft size={14} strokeWidth={3} /> : <ChevronRight size={14} strokeWidth={3} />}
       </button>
+      <div className={`cal-sidebar ${sidebarOpen?'cal-sidebar--open':'cal-sidebar--closed'}`}>
       {sidebarOpen&&(
         <div className="cal-sidebar-content">
           <div className="cal-sidebar-header">
@@ -1259,7 +1265,8 @@ export default function CalendarPage({
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 
   // ─── Shared Modal Fields ─────────────────────────────────────────────────────

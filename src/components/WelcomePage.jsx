@@ -61,12 +61,20 @@ const getNextUp = ({ calendarEvents, noPhoneBlocks, calendarDayEvents, now }) =>
     }).filter(Boolean)
   );
 
+  const noPhoneNow = blocks.some((b) => b.startMs <= nowMs && nowMs < b.endMs);
+
+  const activeEvent = events.find((e) => e.startMs <= nowMs && nowMs < e.endMs);
+  if (activeEvent) return { ...activeEvent, isNow: true, noPhoneActive: noPhoneNow };
+
+  const activeBlock = blocks.find((b) => b.startMs <= nowMs && nowMs < b.endMs);
+  if (activeBlock) return { ...activeBlock, isNow: true, noPhoneActive: true };
+
   const candidate = [...events, ...blocks, ...reminders]
     .filter((c) => c.endMs > nowMs)
     .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)[0];
 
   if (!candidate) return null;
-  return { ...candidate, isNow: candidate.kind !== 'reminder' && candidate.startMs <= nowMs };
+  return { ...candidate, isNow: false, noPhoneActive: false };
 };
 
 const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, focus: Timer, log: NotebookText, commitment: Handshake };
@@ -155,6 +163,9 @@ function NextUpCard({ calendarEvents, noPhoneBlocks, calendarDayEvents, onNaviga
       <div className="wp-hero-title">
         <Icon size={20} strokeWidth={2.5} />
         <span>{nextUp.label}</span>
+        {nextUp.isNow && nextUp.noPhoneActive && nextUp.kind !== 'block' && (
+          <span className="wp-hero-badge"><PhoneOff size={11} strokeWidth={2.5} /> No Phone Zone</span>
+        )}
       </div>
       <div className="wp-hero-meta">
         {nextUp.isNow
@@ -211,6 +222,7 @@ function TodayTasksTile({ todos, onNavigate, setTodos, onUpdateStat }) {
               </li>
             ))}
           </ul>
+          {todayTasks.length > 2 && <span className="wp-tile-more">+{todayTasks.length - 2} more</span>}
         </>
       )}
     </div>
@@ -282,23 +294,26 @@ function GoalsTile({ goals, onNavigate }) {
       {activeGoals.length === 0 ? (
         <div className="wp-tile-empty">No active goals</div>
       ) : (
-        <ul className="wp-task-list">
-          {activeGoals.slice(0, 6).map((g) => {
-            const progress = getGoalProgress(g);
-            return (
-              <li key={g.id} className="wp-goal-row">
-                {g.pinned && <span className="wp-goal-pin"><Pin size={12} /></span>}
-                <span className="wp-goal-period">{GOAL_PERIOD_LABEL[g.period]}</span>
-                <span className="wp-goal-title">{g.title}</span>
-                {progress.kind !== 'binary' && (
-                  <span className="wp-goal-progress-bar">
-                    <span className="wp-goal-progress-fill" style={{ width: `${Math.round(progress.ratio * 100)}%` }} />
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className="wp-task-list">
+            {activeGoals.slice(0, 6).map((g) => {
+              const progress = getGoalProgress(g);
+              return (
+                <li key={g.id} className="wp-goal-row">
+                  {g.pinned && <span className="wp-goal-pin"><Pin size={12} /></span>}
+                  <span className="wp-goal-period">{GOAL_PERIOD_LABEL[g.period]}</span>
+                  <span className="wp-goal-title">{g.title}</span>
+                  {progress.kind !== 'binary' && (
+                    <span className="wp-goal-progress-bar">
+                      <span className="wp-goal-progress-fill" style={{ width: `${Math.round(progress.ratio * 100)}%` }} />
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {activeGoals.length > 2 && <span className="wp-tile-more">+{activeGoals.length - 2} more</span>}
+        </>
       )}
     </button>
   );
@@ -347,6 +362,26 @@ function LiveClock({ dateLabel }) {
   );
 }
 
+function CompactClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const h24 = now.getHours();
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12;
+  const mm = String(now.getMinutes()).padStart(2, '0');
+
+  return (
+    <span className="wp-topbar-clock" role="timer" aria-live="off" aria-label={`Current time ${h12}:${mm} ${ampm}`}>
+      {h12}:{mm} {ampm}
+    </span>
+  );
+}
+
 export default function WelcomePage({
   user,
   todos,
@@ -372,6 +407,7 @@ export default function WelcomePage({
       <div className="wp-layout">
         <div className="wp-topbar">
           <h1 className="wp-topbar-greeting">{getGreeting(now.getHours())}, {user?.name || 'there'}</h1>
+          <CompactClock />
         </div>
 
         <div className="wp-top-grid">

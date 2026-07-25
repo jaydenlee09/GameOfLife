@@ -44,6 +44,10 @@
   letter-spacing: -0.01em;
 }
 
+.wp-topbar-clock {
+  display: none;
+}
+
 .wp-top-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -164,7 +168,7 @@
 }
 
 .wp-hero--now {
-  border-color: rgba(48, 209, 88, 0.4);
+  border-color: rgba(56, 189, 248, 0.4);
 }
 
 .wp-hero--empty {
@@ -180,7 +184,7 @@
 }
 
 .wp-hero--now .wp-hero-label {
-  color: var(--success);
+  color: var(--accent);
 }
 
 .wp-hero-title {
@@ -191,6 +195,21 @@
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.01em;
+}
+
+.wp-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--danger);
+  background: var(--danger-wash);
+  border-radius: 999px;
+  padding: 3px 8px;
+  margin-left: 2px;
 }
 
 .wp-hero-meta {
@@ -371,6 +390,10 @@
   white-space: nowrap;
 }
 
+.wp-tile-more {
+  display: none;
+}
+
 .wp-goal-row {
   display: flex;
   align-items: center;
@@ -543,36 +566,228 @@
 }
 
 @media (max-width: 640px) {
+  /* Zero-scroll shell: bound the page to exactly the space below the
+     60px bottom-nav so .content-container (height:auto on mobile) never
+     grows past one screen. overflow:hidden is a safety net, not the
+     primary mechanism — the compacted sizing below is what actually
+     keeps content within budget. */
+  .wp-bg {
+    height: calc(100dvh - 60px);
+    overflow: hidden;
+  }
+
   .wp-layout {
-    padding: 0 1.25rem;
+    padding: 0 1rem;
   }
 
+  /* ── Topbar: greeting + compact inline clock ──────────────────────────── */
   .wp-topbar {
-    padding-top: 1.5rem;
+    padding-top: 0.85rem;
+    justify-content: space-between;
+    align-items: center;
   }
 
+  .wp-topbar-greeting {
+    font-size: 0.92rem;
+  }
+
+  .wp-topbar-clock {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Top grid: Score + Next Up side by side ───────────────────────────── */
   .wp-top-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+  }
+
+  .wp-score-hero {
+    padding: 12px;
+    gap: 8px;
   }
 
   .wp-score-head {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
   }
 
+  .wp-score-ring-wrap {
+    width: 36px;
+    height: 36px;
+  }
+
+  .wp-score-number {
+    font-size: 0.62rem;
+  }
+
+  .wp-score-outof {
+    font-size: 0.42rem;
+  }
+
+  .wp-score-title {
+    font-size: 0.78rem;
+  }
+
+  .wp-score-streak {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+  }
+
+  .wp-score-chips {
+    gap: 4px;
+  }
+
+  .wp-score-chip {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+  }
+
+  /* Keep only the 3 highest-weighted chips (habits/tasks/focus) so the
+     compact card never grows with the number of breakdown categories. */
+  .wp-score-chips .wp-score-chip:nth-child(n+4) {
+    display: none;
+  }
+
+  .wp-hero {
+    padding: 12px;
+    gap: 4px;
+  }
+
+  .wp-hero-label {
+    font-size: 0.6rem;
+  }
+
+  .wp-hero-title {
+    font-size: 0.95rem;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .wp-hero-title span {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .wp-hero-meta,
+  .wp-hero-empty-text {
+    font-size: 0.72rem;
+  }
+
+  .wp-hero-cta {
+    font-size: 0.72rem;
+  }
+
+  /* ── Live clock hero folded into the topbar on mobile ─────────────────── */
   .wp-clock-zone {
-    min-height: 170px;
-    padding: 1rem 0;
+    display: none;
   }
 
-  .wp-clock-time {
-    font-size: clamp(2.1rem, 11vw, 3rem);
-  }
-
+  /* ── Bottom grid: Tasks/Goals/Commitment/Priority as a 2×2 grid ───────── */
   .wp-bottom-grid {
-    grid-template-columns: 1fr;
-    gap: 0.85rem;
-    padding-bottom: 2rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .wp-bottom-side {
+    display: contents;
+  }
+
+  .wp-tile {
+    min-width: 0;
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .wp-tile--tasks {
+    min-height: 0;
+  }
+
+  .wp-tile-header {
+    font-size: 0.62rem;
+    gap: 5px;
+  }
+
+  .wp-tile-headline {
+    font-size: 0.85rem;
+  }
+
+  .wp-tile-text {
+    font-size: 0.75rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .wp-tile-status {
+    font-size: 0.68rem;
+  }
+
+  .wp-tile-empty {
+    font-size: 0.72rem;
+  }
+
+  .wp-task-list {
+    gap: 4px;
+  }
+
+  .wp-task-row {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .wp-task-checkbox {
+    width: 14px;
+    height: 14px;
+  }
+
+  .wp-task-text {
+    min-width: 0;
+    font-size: 0.72rem;
+  }
+
+  /* Only ever show 2 complete rows, regardless of real data volume. */
+  .wp-tile--tasks .wp-task-list li:nth-child(n+3),
+  .wp-tile--goals .wp-task-list li:nth-child(n+3) {
+    display: none;
+  }
+
+  .wp-tile-more {
+    display: block;
+    font-size: 0.66rem;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  .wp-goal-row {
+    min-width: 0;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .wp-goal-period {
+    display: none;
+  }
+
+  .wp-goal-title {
+    min-width: 0;
+    font-size: 0.72rem;
+  }
+
+  .wp-goal-progress-bar {
+    width: 28px;
   }
 }

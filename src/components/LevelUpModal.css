@@ -14,8 +14,8 @@
 /* ─── Modal card ─────────────────────────────────────────────────────────── */
 .levelup-modal {
   position: relative;
-  width: 340px;
-  height: 340px;
+  width: min(340px, 90vw);
+  height: min(340px, 90vw);
   display: flex;
   align-items: center;
   justify-content: center;

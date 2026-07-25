@@ -918,20 +918,12 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked, habits = [], setHabit
 
       {/* ── Left Sidebar: Entry List ── */}
       <aside className={`log-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        <div className="log-sidebar-header">
-          {!sidebarCollapsed && <h2 className="log-sidebar-title"><NotebookText size={18} /> Journal</h2>}
-          <button
-            className="log-sidebar-toggle"
-            onClick={() => setSidebarCollapsed(c => !c)}
-            title={sidebarCollapsed ? 'Expand journal' : 'Collapse journal'}
-            aria-label={sidebarCollapsed ? 'Expand journal' : 'Collapse journal'}
-          >
-            {sidebarCollapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
-          </button>
-        </div>
-
         {!sidebarCollapsed && (
           <>
+            <div className="log-sidebar-header">
+              <h2 className="log-sidebar-title"><NotebookText size={18} /> Journal</h2>
+            </div>
+
             <div className="log-entries-list">
               {sortedDates.length === 0 && (
                 <div className="log-empty-hint">No entries yet.</div>
@@ -977,6 +969,15 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked, habits = [], setHabit
           </>
         )}
       </aside>
+
+      <button
+        className={`log-sidebar-toggle ${sidebarCollapsed ? 'collapsed' : ''}`}
+        onClick={() => setSidebarCollapsed(c => !c)}
+        title={sidebarCollapsed ? 'Expand journal' : 'Collapse journal'}
+        aria-label={sidebarCollapsed ? 'Expand journal' : 'Collapse journal'}
+      >
+        {sidebarCollapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
+      </button>
 
       {/* ── Right Panel: Log Form ── */}
       <main className="log-main">

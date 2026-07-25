@@ -1,5 +1,71 @@
 # Todo
 
+## Done (2026-07-25): Mobile-friendly pass + zero-scroll home page
+
+Full plan: `/Users/jaydenlee/.claude/plans/wondrous-imagining-pine.md`. User wanted the
+whole site mobile-friendly/appealing, with the home page (`WelcomePage`) requiring
+**zero scrolling** on a phone specifically. Confirmed via `AskUserQuestion` that the
+big live-clock hero (a deliberate prior centerpiece) shrinks to a compact inline
+readout in the header on mobile only — desktop/tablet clock is untouched.
+
+- [x] **`WelcomePage.jsx`/`.css` mobile-only rebuild** (all changes scoped inside the
+  existing `@media (max-width: 640px)` block or new CSS-gated elements, zero
+  desktop/tablet change): `.wp-bg` gets `height: calc(100dvh - 60px); overflow:hidden`
+  (matches the `calc(100dvh - 60px)` idiom already used by `CalendarPage.css`/
+  `DailyLogPage.css` for "fill space below the 60px bottom-nav") — this is what
+  actually stops the page from scrolling, since `.content-container` is
+  `height:auto` on mobile for every other page. New `CompactClock` subcomponent
+  (30s-tick, no seconds) renders inline in `.wp-topbar` next to the greeting; the
+  big `LiveClock`/`.wp-clock-zone` gets `display:none` on mobile only (frees
+  ~200px). Both top-grid (Score+NextUp) and bottom-grid (Tasks/Goals/Commitment/
+  Priority) become real 2-column grids on mobile (`.wp-bottom-side{display:contents}`
+  drops Commitment/Priority into the grid's 2nd row with **zero JSX change**).
+  Task/goal lists capped to 2 visible rows via `:nth-child(n+3){display:none}`
+  (not touching the existing `.slice(0,5)`/`.slice(0,6)` literals, which stay
+  shared with desktop) plus a new always-rendered, CSS-gated "+N more" hint.
+  Free-text tiles get a 2-line `-webkit-line-clamp`. Score chips capped to the
+  3 highest-weighted via `nth-child(n+4){display:none}`.
+- [x] **Real bug caught only by screenshotting the populated-data state, not by
+  the scrollHeight/clientHeight check**: `white-space:nowrap` task/goal text
+  (existing ellipsis pattern) has a min-content width equal to its full
+  unwrapped line — as a grid item's default `min-width:auto`, that silently
+  blew out the `.wp-tile` grid column to fit the longest task/goal line,
+  pushing the second column (Goals / Priority) off-screen entirely. The
+  `scrollHeight === clientHeight` metric never caught this since it was a
+  *horizontal* overflow clipped by `.wp-bg`'s own `overflow:hidden`, not a
+  scrollbar. Fixed with `min-width: 0` on `.wp-tile` (and down the chain:
+  `.wp-task-row`/`.wp-task-text`/`.wp-goal-row`/`.wp-goal-title`) — logged in
+  `lessons.md`.
+- [x] **Phase 2 — site-wide mobile-appeal fixes**, scoped to concrete problems
+  found by reading every page's actual mobile CSS (not guessed): `CalendarPage.css`
+  event-action buttons and No-Phone honor/delete controls were hover-only
+  (untappable on touch) — now always-visible ≤768px; Month view's 7-column
+  grid got compacted cell sizing (smaller daynum/chip/padding) instead of
+  staying unadjusted. `BrainDumpPage.css` note-delete/connection-delete/edge-
+  handles were the same hover-only problem — same fix. `TasksPage.css`
+  `.task-checkbox` tap target enlarged to effectively ~36px via an invisible
+  `::before` hit-area extension (visible checkbox size unchanged). `FocusMode.css`
+  `.focus-overlay` (`overflow:hidden`, no fallback) now scrolls on ≤640px so a
+  short/landscape viewport can't permanently clip the Start/Reset controls.
+  `LevelUpModal.css`/`RankChangeModal.css` fixed 340×340/320×320px boxes now
+  `width/height: min(Npx, 90vw)` so they don't touch narrow-Android edges.
+  `DataModal.css`'s `.data-shortcuts` 2-col grid collapses to 1 column ≤480px.
+- [x] `npm run lint` (41 problems, same pre-existing baseline — confirmed zero
+  new issues in any touched file) / `npm run build` clean.
+- [x] Verified end-to-end with temporary Playwright scripts (installed
+  `--no-save`, chromium already cached) against the real dev server (already
+  running from a prior session, reused rather than spawning a new one):
+  `.content-container`/`.wp-bg` `scrollHeight` vs `clientHeight` measured at
+  375×667/390×844/430×932, for both an empty-state and a heavily-populated
+  fixture (6 tasks, 6 goals, long commitment/priority text seeded directly via
+  `localStorage`) — 0px overflow in all 6 combinations, both before *and*
+  after catching/fixing the grid-blowout bug above via screenshot review.
+  Desktop (768/1024/1440px) screenshotted and confirmed pixel-equivalent to
+  before. Phase 2 spot-checked live: Tasks/Calendar(Day+Month)/Brain Dump
+  navigated to via the real bottom-nav "More" drawer, and confirmed
+  `.bd-note-delete`'s computed `opacity` is `1` with no hover. Temporary
+  scripts and the `playwright` devDependency (`--no-save`) removed after.
+
 ## Done (2026-07-24): My Assistant drawer — glass-panel visual redesign
 
 Plan: `/Users/jaydenlee/.claude/plans/silly-munching-eclipse.md`. User feedback: the drawer

@@ -63,7 +63,7 @@
 .cal-nophone-toggle--active { background: var(--danger-wash); border-color: var(--danger); color: var(--danger); }
 
 /* ─── Body (Sidebar + Main) ──────────────────────────────────────────────────── */
-.cal-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.cal-body { display: flex; flex: 1; min-height: 0; overflow: hidden; position: relative; }
 .cal-main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────────── */
@@ -73,20 +73,24 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: width 0.22s var(--ease);
-  position: relative;
+  transition: width 0.22s var(--ease), border-color 0.22s var(--ease);
   overflow: hidden;
 }
 .cal-sidebar--open { width: 220px; }
-.cal-sidebar--closed { width: 32px; }
+.cal-sidebar--closed { width: 0; border-right-color: transparent; }
 
+/* Sits directly on .cal-body (not .cal-sidebar) so it stays visible — and is
+   the only thing visible — once the sidebar collapses to zero width. */
 .cal-sidebar-toggle {
-  position: absolute; top: 10px; right: 6px; z-index: 2;
+  position: absolute; top: 10px; z-index: 20;
   width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--separator);
   background: var(--bg-elevated-2); color: var(--text-secondary); font-size: 0.85rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center; padding: 0;
-  transition: all var(--duration) var(--ease); flex-shrink: 0;
+  transition: left var(--duration) var(--ease), background var(--duration) var(--ease), color var(--duration) var(--ease); flex-shrink: 0;
 }
+.cal-sidebar-toggle--open { left: 192px; }
+.cal-sidebar-toggle--closed { left: 4px; }
+
 .cal-sidebar-toggle:hover { background: var(--bg-elevated-3); color: var(--text-primary); }
 
 .cal-sidebar-toggle svg { display: block; }
@@ -734,6 +738,10 @@
     display: none;
   }
 
+  .cal-sidebar-toggle {
+    display: none;
+  }
+
   .cal-header {
     flex-wrap: wrap;
     padding: 8px 12px;
@@ -742,5 +750,41 @@
 
   .cal-header-left {
     gap: 8px;
+  }
+
+  /* Hover-revealed controls don't exist on touch — show them always. */
+  .cal-event-actions {
+    opacity: 1;
+  }
+
+  .cal-nophone-honor,
+  .cal-nophone-delete {
+    opacity: 1;
+  }
+
+  /* Compact month-view cells so the 7-column grid stays legible instead
+     of squeezing illegibly thin on a phone. */
+  .cal-month-cell {
+    padding: 3px 4px;
+    min-height: 64px;
+  }
+
+  .cal-month-daynum-row {
+    margin-bottom: 2px;
+  }
+
+  .cal-month-daynum {
+    width: 18px;
+    height: 18px;
+    font-size: 0.68rem;
+  }
+
+  .cal-month-chip {
+    font-size: 0.58rem;
+    padding: 1px 4px;
+  }
+
+  .cal-month-more {
+    font-size: 0.56rem;
   }
 }

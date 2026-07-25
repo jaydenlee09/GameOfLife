@@ -223,4 +223,13 @@
   transition: background var(--duration) var(--ease);
   margin-top: 0.5rem;
 }
+
+/* Short/landscape mobile viewports can exceed the centered content's
+   natural height — scroll instead of permanently clipping the controls. */
+@media (max-width: 640px) {
+  .focus-overlay {
+    overflow-y: auto;
+    padding: 1rem 0;
+  }
+}
 .focus-done-btn:hover { background: var(--accent-pressed); }

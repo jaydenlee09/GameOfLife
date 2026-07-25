@@ -1083,4 +1083,17 @@
     position: static;
     margin-top: 1rem;
   }
+
+  /* Enlarge the tap target to ~36px without growing the visible checkbox —
+     an invisible ::before extends the hit area (clicks on it bubble to the
+     checkbox's own onClick since it's a child of that element). */
+  .task-checkbox {
+    position: relative;
+  }
+
+  .task-checkbox::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
 }

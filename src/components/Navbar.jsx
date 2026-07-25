@@ -230,10 +230,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
           {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
 
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-dot" />
-          <span className="sidebar-brand-text">GameOfLife</span>
-        </div>
+        <div className="sidebar-brand" />
 
         <nav className="sidebar-nav">
           {NAV_LINKS.map(({ id, label, icon }) => (
@@ -261,10 +258,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
           <div className="mobile-drawer">
             <button className="mobile-drawer-close" onClick={onMobileMenuClose}><X size={14} /></button>
 
-            <div className="mobile-drawer-brand">
-              <div className="sidebar-brand-dot" />
-              <span className="sidebar-brand-text">GameOfLife</span>
-            </div>
+            <div className="mobile-drawer-brand" />
 
             <nav className="mobile-drawer-nav">
               {NAV_LINKS.map(({ id, label, icon }) => (

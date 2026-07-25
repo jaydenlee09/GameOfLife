@@ -144,3 +144,17 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
+
+@media (max-width: 480px) {
+  .data-shortcuts {
+    grid-template-columns: 1fr;
+  }
+
+  .data-shortcut-row {
+    min-width: 0;
+  }
+
+  .data-shortcut-label {
+    min-width: 0;
+  }
+}
