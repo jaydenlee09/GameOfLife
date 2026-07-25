@@ -8,7 +8,6 @@ import AuthGate from './components/AuthGate.jsx'
 
 function AppShell() {
   const { firebaseUser } = useAuth();
-  return <App />; // TEMP: bypass auth gate for local Statistics-page verification, reverted after
 
   if (firebaseUser === undefined) {
     return (
