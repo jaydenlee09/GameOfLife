@@ -1,6 +1,6 @@
 // ─── Daily Score & Streak ─────────────────────────────────────────────────────
 // The Daily Score is the app's honest headline signal: a 0–10 number COMPUTED
-// from what the user actually did (habits/tasks/screentime/log/commitment). Unlike XP,
+// from what the user actually did (habits/tasks/sleep/log/commitment). Unlike XP,
 // it can't be self-assigned. It powers both the Home hero and the character sheet,
 // and — because every input is date-keyed — it can be computed for any past day,
 // which is what makes the streak possible.
@@ -35,10 +35,10 @@ export const computeDailyScore = (
   const tasksDone   = xpLog.filter(e => e.source === 'task' && e.date === dateKey).length;
   const taskScore   = Math.min(tasksDone / 3, 1) * 10;
 
-  // Screentime: logged and kept at/under 1h (mirrors the "ideal" band in healthUtils) = full score
-  const screentimeHours  = healthLog?.[dateKey]?.screentimeHours;
-  const screentimeLogged = screentimeHours != null;
-  const screentimeScore  = screentimeLogged && screentimeHours <= 1 ? 10 : 0;
+  // Sleep: logged and over 9h = full score
+  const sleepHours  = healthLog?.[dateKey]?.sleepHours;
+  const sleepLogged = sleepHours != null;
+  const sleepScore  = sleepLogged && sleepHours > 9 ? 10 : 0;
 
   // Daily log filled?
   const dayLog      = logs?.[dateKey];
@@ -49,13 +49,13 @@ export const computeDailyScore = (
   const lastCommit  = commitmentArchive.find(a => a.date === prevKey);
   const commitScore = lastCommit?.denied === false || (lastCommit?.confirmedOn && lastCommit.denied !== true) ? 10 : 0;
 
-  const raw = habitScore * 0.3 + taskScore * 0.3 + screentimeScore * 0.2 + logScore * 0.1 + commitScore * 0.1;
+  const raw = habitScore * 0.3 + taskScore * 0.3 + sleepScore * 0.2 + logScore * 0.1 + commitScore * 0.1;
   return {
     score: Math.round(raw * 10) / 10,
     breakdown: {
       habits:     { value: Math.round(habitScore * 10) / 10, weight: 30, label: `${habitsDone}/${habitsTotal} habits` },
       tasks:      { value: Math.round(taskScore  * 10) / 10, weight: 30, label: `${tasksDone} task${tasksDone !== 1 ? 's' : ''} done` },
-      screentime: { value: screentimeScore, weight: 20, label: screentimeLogged ? `${Math.round(screentimeHours * 10) / 10}h screentime` : 'Screentime not logged' },
+      sleep:      { value: sleepScore, weight: 20, label: sleepLogged ? `${Math.round(sleepHours * 10) / 10}h sleep` : 'Sleep not logged' },
       log:        { value: logScore,   weight: 10, label: logFilled ? 'Log filled' : 'Log empty' },
       commitment: { value: commitScore, weight: 10, label: lastCommit ? (commitScore > 0 ? 'Commitment kept' : 'Commitment missed') : 'No commitment' },
     },

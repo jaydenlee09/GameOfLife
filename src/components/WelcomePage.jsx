@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight,
-  Repeat, Smartphone, NotebookText, Handshake, Flame, X, Check, Hourglass, Pin,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Pin,
 } from 'lucide-react';
 import './WelcomePage.css';
 import welcomeBg from '../assets/ApexStudios.png';
@@ -79,7 +79,7 @@ const getNextUp = ({ calendarEvents, noPhoneBlocks, calendarDayEvents, now }) =>
   return null;
 };
 
-const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, screentime: Smartphone, log: NotebookText, commitment: Handshake };
+const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, sleep: Moon, log: NotebookText, commitment: Handshake };
 
 function DailyScoreHero({ habits, xpLog, logs, commitmentArchive, healthLog, onNavigate }) {
   const { score, breakdown } = computeDailyScore(

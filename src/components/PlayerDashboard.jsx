@@ -10,11 +10,11 @@ import RANK_TIERS, { TIER_ICONS } from '../utils/rankMeta';
 import TrendChart from './stats/TrendChart';
 import ConnectedFeatureTiles from './stats/ConnectedFeatureTiles';
 import {
-  CheckSquare, Flame, Swords, Handshake, Timer, Smartphone, Pin, HeartCrack, Zap, Sparkles, Target, Flag,
+  CheckSquare, Flame, Swords, Handshake, Timer, Moon, Pin, HeartCrack, Zap, Sparkles, Target, Flag,
   Smile, Repeat, NotebookText,
 } from 'lucide-react';
 
-const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, screentime: Smartphone, log: NotebookText, commitment: Handshake };
+const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, sleep: Moon, log: NotebookText, commitment: Handshake };
 
 const relativeTime = (ts) => {
   const mins = Math.floor((Date.now() - ts) / 60000);
