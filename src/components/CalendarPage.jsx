@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import STAT_META from './statMeta';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
+import EMOTIONS from '../utils/logMeta';
 import {
   toDateKey, buildDayEventTargetMs, fmtRemaining,
   normalizeEvent, expandEventsForDates, isInstanceCompleted,
@@ -77,6 +78,22 @@ const buildColumns = (events) => {
     for (const ev of cl) ev.totalCols = maxCols;
   }
   return result;
+};
+
+const hasLogContent = (entry) => {
+  if (!entry) return false;
+  return Boolean(
+    (entry.emotions && entry.emotions.length > 0) ||
+    (entry.proud && entry.proud.some((v) => v && v.trim())) ||
+    (entry.improve && entry.improve.some((v) => v && v.trim())) ||
+    (entry.learned && entry.learned.trim()) ||
+    (entry.notes && entry.notes.trim()) ||
+    (entry.commitment && entry.commitment.trim())
+  );
+};
+const formatLogDate = (dateKey) => {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 };
 
 const isBonusTaskCompleted = (task, ev) => {
@@ -159,8 +176,13 @@ export default function CalendarPage({
   setQuickEvents,
   onUpdateStat,
   todos = [],
+  logs = {},
 }) {
-  const [view, setView] = useState(() => window.innerWidth < 768 ? 'day' : 'week');
+  const [view, setView] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_calendarView');
+    if (saved === 'day' || saved === 'week' || saved === 'month') return saved;
+    return window.innerWidth < 768 ? 'day' : 'week';
+  });
   const [anchor, setAnchor] = useState(() => new Date());
   const [modal, setModal] = useState(null);
   const [dayEventModal, setDayEventModal] = useState(null); // { mode: 'create'|'edit', dateKey, id? }
@@ -189,6 +211,7 @@ export default function CalendarPage({
   const [noPhoneForm, setNoPhoneForm] = useState(defaultNoPhoneForm());
   const [noPhoneEditScope, setNoPhoneEditScope] = useState(null);
   const [noPhoneDeleteScope, setNoPhoneDeleteScope] = useState(null);
+  const [logViewerDate, setLogViewerDate] = useState(null);
   const [currentMinute, setCurrentMinute] = useState(() => { const n = new Date(); return n.getHours()*60+n.getMinutes(); });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const gridRef = useRef(null);
@@ -217,6 +240,10 @@ export default function CalendarPage({
   useEffect(() => {
     setNowMs(Date.now());
   }, [view, anchor]);
+
+  useEffect(() => {
+    localStorage.setItem('gameOfLife_calendarView', view);
+  }, [view]);
 
   useEffect(() => {
     if (gridRef.current) {
@@ -302,6 +329,9 @@ export default function CalendarPage({
     });
     setDayEventModal({ mode: 'edit', dateKey, id: item.id });
   };
+
+  const openLogViewer = (dateKey) => setLogViewerDate(dateKey);
+  const closeLogViewer = () => setLogViewerDate(null);
 
   const closeDayEventModal = () => {
     setDayEventModal(null);
@@ -911,7 +941,20 @@ export default function CalendarPage({
           const soonestRemaining = soonest ? fmtRemaining(soonest.targetMs, nowMs) : '';
           return (
             <div key={i} className={`cal-day-header ${isToday?'cal-day-header--today':''}`}>
-              <span className="cal-day-name">{DAYS_LABEL[d.getDay()]}</span>
+              <div className="cal-day-header-top">
+                <span className="cal-day-name">{DAYS_LABEL[d.getDay()]}</span>
+                {hasLogContent(logs?.[dk]) && (
+                  <button
+                    type="button"
+                    className="cal-day-log-btn"
+                    onClick={(e)=>{e.stopPropagation();openLogViewer(dk);}}
+                    title="View daily log"
+                    aria-label="View daily log"
+                  >
+                    <NotebookText size={11} strokeWidth={2.5} />
+                  </button>
+                )}
+              </div>
               <span className={`cal-day-num ${isToday?'cal-day-num--today':''}`}>{d.getDate()}</span>
               {!nextEventMinimized && (
                 <button
@@ -1151,6 +1194,17 @@ export default function CalendarPage({
                 <div className="cal-month-daynum-row">
                   <div className={`cal-month-daynum ${isToday?'cal-month-daynum--today':''}`}>{d.getDate()}</div>
                   {(noPhoneByDate[dk]||[]).length>0 && <span className="cal-month-nophone-dot" title="No-phone time scheduled"><PhoneOff size={10} /></span>}
+                  {hasLogContent(logs?.[dk]) && (
+                    <button
+                      type="button"
+                      className="cal-month-log-dot"
+                      onClick={(e)=>{e.stopPropagation();openLogViewer(dk);}}
+                      title="View daily log"
+                      aria-label="View daily log"
+                    >
+                      <NotebookText size={10} />
+                    </button>
+                  )}
                 </div>
 
                 <button
@@ -1828,6 +1882,76 @@ export default function CalendarPage({
           </div>
         </div>
       )}
+
+      {/* ── Daily Log Viewer (read-only) ── */}
+      {logViewerDate && (() => {
+        const entry = logs?.[logViewerDate] || {};
+        const proudItems = (entry.proud || []).filter((v) => v && v.trim());
+        const improveItems = (entry.improve || []).filter((v) => v && v.trim());
+        return (
+          <div className="cal-modal-overlay" onClick={closeLogViewer}>
+            <div className="cal-modal" onClick={e=>e.stopPropagation()}>
+              <div className="cal-modal-header">
+                <h3><NotebookText size={16} className="cal-logview-title-icon" /> {formatLogDate(logViewerDate)}</h3>
+                <button className="cal-modal-close" onClick={closeLogViewer}><X size={14} /></button>
+              </div>
+              <div className="cal-modal-body cal-logview-body">
+                {entry.emotions?.length > 0 && (
+                  <div className="cal-logview-section">
+                    <span className="cal-logview-label">Feelings</span>
+                    <div className="cal-logview-emotions">
+                      {entry.emotions.map((eid) => {
+                        const em = EMOTIONS.find((e) => e.id === eid);
+                        if (!em) return null;
+                        return (
+                          <span key={eid} className="cal-logview-emotion-chip" style={{ '--chip-color': em.color }}>
+                            <em.Icon size={13} /> {em.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {proudItems.length > 0 && (
+                  <div className="cal-logview-section">
+                    <span className="cal-logview-label">Proud of</span>
+                    <ul className="cal-logview-list">
+                      {proudItems.map((t, i) => <li key={i}>{t}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {improveItems.length > 0 && (
+                  <div className="cal-logview-section">
+                    <span className="cal-logview-label">To improve</span>
+                    <ul className="cal-logview-list">
+                      {improveItems.map((t, i) => <li key={i}>{t}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {entry.learned?.trim() && (
+                  <div className="cal-logview-section">
+                    <span className="cal-logview-label">Learned</span>
+                    <p className="cal-logview-text">{entry.learned}</p>
+                  </div>
+                )}
+                {entry.notes?.trim() && (
+                  <div className="cal-logview-section">
+                    <span className="cal-logview-label">Notes</span>
+                    <p className="cal-logview-text">{entry.notes}</p>
+                  </div>
+                )}
+                {entry.commitment?.trim() && (
+                  <div className="cal-logview-section">
+                    <span className="cal-logview-label">Commitment</span>
+                    <p className="cal-logview-text">{entry.commitment}</p>
+                  </div>
+                )}
+                {!hasLogContent(entry) && <p className="cal-sidebar-empty">No log entry for this day.</p>}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

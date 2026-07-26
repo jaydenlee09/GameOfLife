@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight,
-  Repeat, Timer, NotebookText, Handshake, Flame, X, Check, Hourglass, Pin,
+  Repeat, Smartphone, NotebookText, Handshake, Flame, X, Check, Hourglass, Pin,
 } from 'lucide-react';
 import './WelcomePage.css';
 import welcomeBg from '../assets/ApexStudios.png';
@@ -66,25 +66,27 @@ const getNextUp = ({ calendarEvents, noPhoneBlocks, calendarDayEvents, now }) =>
   const activeEvent = events.find((e) => e.startMs <= nowMs && nowMs < e.endMs);
   if (activeEvent) return { ...activeEvent, isNow: true, noPhoneActive: noPhoneNow };
 
+  // Prefer whatever's coming up next over a bare "No Phone" card — the badge
+  // below already signals the No Phone period is still active.
+  const upcoming = [...events, ...blocks, ...reminders]
+    .filter((c) => c.startMs > nowMs)
+    .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)[0];
+  if (upcoming) return { ...upcoming, isNow: false, noPhoneActive: noPhoneNow };
+
   const activeBlock = blocks.find((b) => b.startMs <= nowMs && nowMs < b.endMs);
   if (activeBlock) return { ...activeBlock, isNow: true, noPhoneActive: true };
 
-  const candidate = [...events, ...blocks, ...reminders]
-    .filter((c) => c.endMs > nowMs)
-    .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)[0];
-
-  if (!candidate) return null;
-  return { ...candidate, isNow: false, noPhoneActive: false };
+  return null;
 };
 
-const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, focus: Timer, log: NotebookText, commitment: Handshake };
+const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, screentime: Smartphone, log: NotebookText, commitment: Handshake };
 
-function DailyScoreHero({ habits, xpLog, pomodoroSessions, logs, commitmentArchive, onNavigate }) {
+function DailyScoreHero({ habits, xpLog, logs, commitmentArchive, healthLog, onNavigate }) {
   const { score, breakdown } = computeDailyScore(
-    habits || [], xpLog || [], pomodoroSessions || [], logs || {}, commitmentArchive || []
+    habits || [], xpLog || [], logs || {}, commitmentArchive || [], healthLog || {}
   );
   const streak = computeStreak(
-    habits || [], xpLog || [], pomodoroSessions || [], logs || {}, commitmentArchive || []
+    habits || [], xpLog || [], logs || {}, commitmentArchive || [], healthLog || {}
   );
   const color = score >= 8 ? '#30d158' : score >= 5 ? '#ff9f0a' : '#ff453a';
   const R = 46;
@@ -163,7 +165,7 @@ function NextUpCard({ calendarEvents, noPhoneBlocks, calendarDayEvents, onNaviga
       <div className="wp-hero-title">
         <Icon size={20} strokeWidth={2.5} />
         <span>{nextUp.label}</span>
-        {nextUp.isNow && nextUp.noPhoneActive && nextUp.kind !== 'block' && (
+        {nextUp.noPhoneActive && nextUp.kind !== 'block' && (
           <span className="wp-hero-badge"><PhoneOff size={11} strokeWidth={2.5} /> No Phone Zone</span>
         )}
       </div>
@@ -229,34 +231,55 @@ function TodayTasksTile({ todos, onNavigate, setTodos, onUpdateStat }) {
   );
 }
 
-function CommitmentTile({ logs, commitmentArchive, onNavigate }) {
+function CommitmentTile({ logs, commitmentArchive, onNavigate, onResolveCommitment }) {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayKey = toDateKey(yesterday);
   const commitmentText = logs?.[yesterdayKey]?.commitment?.trim();
   const record = (commitmentArchive || []).find((a) => a.date === yesterdayKey);
+  const isPending = Boolean(commitmentText) && record?.denied !== true && !record?.confirmedOn;
 
   return (
-    <button className="wp-tile" onClick={() => onNavigate('statistics')}>
-      <div className="wp-tile-header">
-        <Flag size={16} strokeWidth={2.5} />
-        <span>Yesterday's Commitment</span>
-      </div>
-      {commitmentText ? (
-        <>
-          <div className="wp-tile-text">{commitmentText}</div>
-          {record?.denied === true ? (
-            <div className="wp-tile-status wp-tile-status--missed"><X size={14} /> Missed</div>
-          ) : record?.confirmedOn ? (
-            <div className="wp-tile-status wp-tile-status--kept"><Check size={14} /> Kept</div>
-          ) : (
-            <div className="wp-tile-status wp-tile-status--pending"><Hourglass size={14} /> Pending check-in</div>
-          )}
-        </>
-      ) : (
-        <div className="wp-tile-empty">No commitment logged</div>
+    <div className="wp-tile wp-tile--commitment">
+      <button type="button" className="wp-tile-inner" onClick={() => onNavigate('statistics')}>
+        <div className="wp-tile-header">
+          <Flag size={16} strokeWidth={2.5} />
+          <span>Yesterday's Commitment</span>
+        </div>
+        {commitmentText ? (
+          <>
+            <div className="wp-tile-text">{commitmentText}</div>
+            {record?.denied === true ? (
+              <div className="wp-tile-status wp-tile-status--missed"><X size={14} /> Missed</div>
+            ) : record?.confirmedOn ? (
+              <div className="wp-tile-status wp-tile-status--kept"><Check size={14} /> Kept</div>
+            ) : (
+              <div className="wp-tile-status wp-tile-status--pending"><Hourglass size={14} /> Pending check-in</div>
+            )}
+          </>
+        ) : (
+          <div className="wp-tile-empty">No commitment logged</div>
+        )}
+      </button>
+      {isPending && (
+        <div className="wp-commitment-actions">
+          <button
+            type="button"
+            className="wp-commitment-btn wp-commitment-btn--kept"
+            onClick={() => onResolveCommitment(yesterdayKey, commitmentText, false)}
+          >
+            I kept it
+          </button>
+          <button
+            type="button"
+            className="wp-commitment-btn wp-commitment-btn--missed"
+            onClick={() => onResolveCommitment(yesterdayKey, commitmentText, true)}
+          >
+            I didn't do it
+          </button>
+        </div>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -396,8 +419,9 @@ export default function WelcomePage({
   goals,
   habits,
   xpLog,
-  pomodoroSessions,
+  healthLog,
   onNavigate,
+  onResolveCommitment,
 }) {
   const [now] = useState(() => new Date());
   const dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -414,9 +438,9 @@ export default function WelcomePage({
           <DailyScoreHero
             habits={habits}
             xpLog={xpLog}
-            pomodoroSessions={pomodoroSessions}
             logs={logs}
             commitmentArchive={commitmentArchive}
+            healthLog={healthLog}
             onNavigate={onNavigate}
           />
           <NextUpCard
@@ -435,7 +459,7 @@ export default function WelcomePage({
           <TodayTasksTile todos={todos} onNavigate={onNavigate} setTodos={setTodos} onUpdateStat={onUpdateStat} />
           <GoalsTile goals={goals} onNavigate={onNavigate} />
           <div className="wp-bottom-side">
-            <CommitmentTile logs={logs} commitmentArchive={commitmentArchive} onNavigate={onNavigate} />
+            <CommitmentTile logs={logs} commitmentArchive={commitmentArchive} onNavigate={onNavigate} onResolveCommitment={onResolveCommitment} />
             <PriorityTile currentWeekPriority={currentWeekPriority} onNavigate={onNavigate} />
           </div>
         </div>

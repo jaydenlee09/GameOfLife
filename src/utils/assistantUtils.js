@@ -136,7 +136,7 @@ const summarizeWeekly = (weeklyReviews) => {
  */
 export const buildSystemPrompt = (user, todos, habits, logs, extra = {}) => {
   const { healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive } = extra;
-  const rankStatus = computeRankStatus(habits, xpLog, pomodoroSessions, logs, commitmentArchive);
+  const rankStatus = computeRankStatus(habits, xpLog, logs, commitmentArchive, healthLog);
   const { weakest, strongest, all } = analyzeStats(user.stats);
   const xpCap = xpCapForLevel(user.level);
   const xpPercent = Math.round((user.xp / xpCap) * 100);

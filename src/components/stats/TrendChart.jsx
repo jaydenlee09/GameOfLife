@@ -36,13 +36,13 @@ const MODES = {
 
 // One card, three day-by-day metrics (score / screentime / sleep) toggled via
 // a small pill switcher — never averaged, so a single bad day stays visible.
-const TrendChart = ({ habits, xpLog, pomodoroSessions, logs, commitmentArchive, healthLog }) => {
+const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog }) => {
   const [mode, setMode] = useState('score');
   const cfg = MODES[mode];
 
   const data = useMemo(() => {
     if (mode === 'score') {
-      return computeDailyScoreHistory(habits, xpLog, pomodoroSessions, logs, commitmentArchive, 30)
+      return computeDailyScoreHistory(habits, xpLog, logs, commitmentArchive, healthLog, 30)
         .map(({ dateKey, score }) => {
           const [, m, d] = dateKey.split('-').map(Number);
           return { dateKey, value: score, label: `${m}/${d}`, color: scoreColor(score) };
@@ -61,7 +61,7 @@ const TrendChart = ({ habits, xpLog, pomodoroSessions, logs, commitmentArchive, 
       return { dateKey, value: hours, label: `${m}/${d}`, color: getColor(hours) };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, habits.length, xpLog.length, pomodoroSessions.length, Object.keys(logs).length, commitmentArchive.length, healthLog]);
+  }, [mode, habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]);
 
   return (
     <div className="dashboard-card trend-chart-card">

@@ -4,15 +4,17 @@ import STAT_META from './statMeta';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip as RechartTooltip
 } from 'recharts';
-import { computeDailyScore, REQUIRED_STREAK_DAYS } from '../utils/scoreUtils';
+import { computeDailyScore, computeStreak, REQUIRED_STREAK_DAYS } from '../utils/scoreUtils';
 import { computeWeekStats, STAT_ITEMS, getMondayKey } from '../utils/weekStatsUtils';
 import RANK_TIERS, { TIER_ICONS } from '../utils/rankMeta';
 import TrendChart from './stats/TrendChart';
 import ConnectedFeatureTiles from './stats/ConnectedFeatureTiles';
 import {
-  CheckSquare, Flame, Swords, Handshake, Timer, Pin, HeartCrack, Zap, Sparkles, Target, Flag,
-  ChevronDown, ChevronUp, Smile,
+  CheckSquare, Flame, Swords, Handshake, Timer, Smartphone, Pin, HeartCrack, Zap, Sparkles, Target, Flag,
+  Smile, Repeat, NotebookText,
 } from 'lucide-react';
+
+const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, screentime: Smartphone, log: NotebookText, commitment: Handshake };
 
 const relativeTime = (ts) => {
   const mins = Math.floor((Date.now() - ts) / 60000);
@@ -124,48 +126,50 @@ const AttributeRadar = ({ stats }) => {
 };
 
 // ─── Daily Score Badge ────────────────────────────────────────────────────────
-const DailyScoreBadge = ({ score, breakdown }) => {
-  const [open, setOpen] = useState(false);
+const DailyScoreBadge = ({ score, breakdown, streak }) => {
   const color = score >= 8 ? '#30d158' : score >= 5 ? '#ff9f0a' : '#ff453a';
-  const circumference = 2 * Math.PI * 28;
+  const R = 46;
+  const circumference = 2 * Math.PI * R;
   const pct = score / 10;
 
   return (
     <div className="daily-score-wrapper">
-      <div className="daily-score-card" onClick={() => setOpen(o => !o)}>
-        <div className="daily-score-ring-wrap">
-          <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle cx="36" cy="36" r="28" fill="none" stroke="#2a2a2a" strokeWidth="5" />
-            <circle
-              cx="36" cy="36" r="28" fill="none"
-              stroke={color} strokeWidth="5"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference * (1 - pct)}
-              style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.5s ease' }}
-            />
-          </svg>
-          <span className="daily-score-number" style={{ color }}>{score.toFixed(1)}</span>
+      <div className="daily-score-card">
+        <div className="daily-score-head">
+          <div className="daily-score-ring-wrap">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="8" />
+              <circle
+                cx="60" cy="60" r={R} fill="none"
+                stroke={color} strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - pct)}
+                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.6s ease' }}
+              />
+            </svg>
+            <div className="daily-score-ring-center">
+              <span className="daily-score-number" style={{ color }}>{score.toFixed(1)}</span>
+              <span className="daily-score-outof">/ 10</span>
+            </div>
+          </div>
+          <div className="daily-score-body">
+            <span className="daily-score-title">Today's Score</span>
+            <span className="daily-score-streak">
+              {streak > 0 ? <><Flame size={13} /> {streak}-day streak</> : 'No streak yet — clear 6+ to start'}
+            </span>
+          </div>
         </div>
-        <div className="daily-score-label-group">
-          <span className="daily-score-title">Today's Score</span>
-          <span className="daily-score-sub">{open ? <>Hide details <ChevronUp size={12} /></> : <>Show breakdown <ChevronDown size={12} /></>}</span>
+        <div className="daily-score-chips">
+          {Object.entries(breakdown).map(([key, { value, label }]) => {
+            const ChipIcon = SCORE_CHIP_ICON[key];
+            return (
+              <span key={key} className="daily-score-chip" data-tier={value >= 7 ? 'good' : value >= 4 ? 'mid' : 'low'}>
+                <span className="daily-score-chip-icon"><ChipIcon size={12} /></span>{label}
+              </span>
+            );
+          })}
         </div>
       </div>
-      {open && (
-        <div className="daily-score-breakdown">
-          {Object.entries(breakdown).map(([key, { value, weight, label }]) => (
-            <div key={key} className="daily-score-row">
-              <span className="daily-score-row-label">{label}</span>
-              <span className="daily-score-row-weight">{weight}%</span>
-              <div className="daily-score-row-bar-bg">
-                <div className="daily-score-row-bar-fill" style={{ width: `${(value / 10) * 100}%`, background: value >= 7 ? '#30d158' : value >= 4 ? '#ff9f0a' : '#ff453a' }} />
-              </div>
-              <span className="daily-score-row-val">{value.toFixed(1)}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -261,9 +265,15 @@ const PlayerDashboard = ({
   const attributes = user.stats ? Object.entries(user.stats) : [];
 
   const dailyScore = useMemo(() =>
-    computeDailyScore(habits, xpLog, pomodoroSessions, logs, commitmentArchive),
+    computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habits.length, xpLog.length, pomodoroSessions.length, Object.keys(logs).length, commitmentArchive.length]
+    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]
+  );
+
+  const dailyScoreStreak = useMemo(() =>
+    computeStreak(habits, xpLog, logs, commitmentArchive, healthLog),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]
   );
 
   return (
@@ -307,12 +317,12 @@ const PlayerDashboard = ({
           )}
         </div>
 
-        <DailyScoreBadge score={dailyScore.score} breakdown={dailyScore.breakdown} />
+        <DailyScoreBadge score={dailyScore.score} breakdown={dailyScore.breakdown} streak={dailyScoreStreak} />
       </div>
 
       {/* ── TREND CHART + THIS WEEK ──────────────────────────────────────── */}
       <div className="dashboard-trend-row">
-        <TrendChart habits={habits} xpLog={xpLog} pomodoroSessions={pomodoroSessions} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} />
+        <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} />
         <ThisWeek xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} goals={goals} healthLog={healthLog} />
       </div>
 

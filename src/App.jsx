@@ -9,7 +9,6 @@ import { CalendarDays, X, ChevronDown, Target } from 'lucide-react'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
 import LevelUpModal from './components/LevelUpModal'
-import CommitmentModal from './components/CommitmentModal'
 import DailyLogPage from './components/DailyLogPage'
 import { xpCapForLevel } from './utils/xpUtils'
 import RANK_TIERS from './utils/rankMeta'
@@ -296,7 +295,6 @@ function App() {
   // ─── UI State ──────────────────────────────────────────────────────────────────
   const [levelUpModal, setLevelUpModal] = useState(null);
   const [rankChangeModal, setRankChangeModal] = useState(null);
-  const [commitmentModal, setCommitmentModal] = useState(null);
   const [dataModalOpen, setDataModalOpen] = useState(false);
   const [focusModeOpen, setFocusModeOpen] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
@@ -308,9 +306,9 @@ function App() {
   // Navbar recompute it independently) so the transition-detection effect below and
   // every display of it can never silently drift apart.
   const rankStatus = useMemo(
-    () => computeRankStatus(habits, xpLog, pomodoroSessions, logs, commitmentArchive),
+    () => computeRankStatus(habits, xpLog, logs, commitmentArchive, healthLog),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habits.length, xpLog.length, pomodoroSessions.length, Object.keys(logs).length, commitmentArchive.length]
+    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]
   );
 
   useEffect(() => {
@@ -582,20 +580,7 @@ function App() {
       const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
       midnightTimerRef.current = setTimeout(() => {
         setTodos(prev => promoteTomorrowTasks(prev));
-        const newToday = todayStr();
-        localStorage.setItem('gameOfLife_lastDate', newToday);
-        setLogs(currentLogs => {
-          const yesterdayKey = getLocalDateKey(-1);
-          const yesterdayEntry = currentLogs[yesterdayKey];
-          setCommitmentArchive(currentArchive => {
-            const alreadyConfirmed = currentArchive.some(a => a.date === yesterdayKey && a.confirmedOn === newToday);
-            if (yesterdayEntry?.commitment?.trim() && !alreadyConfirmed) {
-              setCommitmentModal({ date: yesterdayKey, commitment: yesterdayEntry.commitment.trim() });
-            }
-            return currentArchive;
-          });
-          return currentLogs;
-        });
+        localStorage.setItem('gameOfLife_lastDate', todayStr());
         scheduleMidnightRollover();
       }, msUntilMidnight);
     };
@@ -628,24 +613,12 @@ function App() {
     });
   };
 
-  useEffect(() => {
-    const yesterdayKey = getLocalDateKey(-1);
-    const todayKey = getLocalDateKey(0);
-    const yesterdayEntry = logs[yesterdayKey];
-    const alreadyConfirmed = commitmentArchive.some(a => a.date === yesterdayKey && a.confirmedOn === todayKey);
-    if (yesterdayEntry?.commitment?.trim() && !alreadyConfirmed) {
-      setCommitmentModal({ date: yesterdayKey, commitment: yesterdayEntry.commitment.trim() });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleArchiveCommitmentResolve = (date, text, denied) => {
     if (!date) return;
     // Keeping your word builds Discipline — route it through the one mutator so it
     // shows up in stats/feed consistently (previously addXp granted global-only XP).
     if (!denied) updateStat('discipline', 10, { source: 'commitment', label: 'Commitment kept' });
     resolveCommitmentRecord(date, text, denied);
-    if (commitmentModal?.date === date) setCommitmentModal(null);
   };
 
 
@@ -732,8 +705,9 @@ function App() {
             goals={goals}
             habits={habits}
             xpLog={xpLog}
-            pomodoroSessions={pomodoroSessions}
+            healthLog={healthLog}
             onNavigate={handleNavigate}
+            onResolveCommitment={handleArchiveCommitmentResolve}
           />
         );
       case 'statistics':
@@ -806,6 +780,7 @@ function App() {
             setQuickEvents={setQuickEvents}
             onUpdateStat={updateStat}
             todos={todos}
+            logs={logs}
           />
         );
       case 'goals':
@@ -903,14 +878,6 @@ function App() {
       )}
       {rankChangeModal && (
         <RankChangeModal tier={rankChangeModal.tier} direction={rankChangeModal.direction} streakDays={rankChangeModal.streakDays} onClose={() => setRankChangeModal(null)} />
-      )}
-      {commitmentModal && (
-        <CommitmentModal
-          commitment={commitmentModal.commitment}
-          date={commitmentModal.date}
-          onConfirm={() => handleArchiveCommitmentResolve(commitmentModal.date, commitmentModal.commitment, false)}
-          onDeny={() => handleArchiveCommitmentResolve(commitmentModal.date, commitmentModal.commitment, true)}
-        />
       )}
       {dataModalOpen && (
         <DataModal onClose={() => setDataModalOpen(false)} />

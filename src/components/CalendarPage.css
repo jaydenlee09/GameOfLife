@@ -305,6 +305,15 @@
 .cal-day-header--today .cal-day-name { color: var(--accent); }
 .cal-day-num { font-size: 1rem; font-weight: 500; color: var(--text-secondary); width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .cal-day-num--today { background: var(--accent); color: #fff; }
+.cal-day-header-top { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; }
+.cal-day-log-btn {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; padding: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid var(--separator); background: var(--bg-elevated-2);
+  color: var(--accent); cursor: pointer; transition: all var(--duration) var(--ease); flex-shrink: 0;
+}
+.cal-day-log-btn:hover { background: var(--bg-elevated-3); border-color: var(--accent); }
+.cal-day-log-btn svg { display: block; }
 
 .cal-dayevents-mini {
   margin-top: 4px;
@@ -539,6 +548,13 @@
 .cal-month-daynum { font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .cal-month-daynum--today { background: var(--accent); color: #fff; }
 .cal-month-nophone-dot { display: flex; align-items: center; color: var(--danger); opacity: 0.85; line-height: 1; }
+.cal-month-log-dot {
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+  border: none; background: transparent; padding: 0; color: var(--accent); opacity: 0.85; cursor: pointer;
+  transition: opacity 0.12s;
+}
+.cal-month-log-dot:hover { opacity: 1; }
+.cal-month-log-dot svg { display: block; }
 
 .cal-month-dayevents {
   width: 100%;
@@ -617,6 +633,20 @@
 .cal-modal-close:hover { background: var(--bg-elevated-3); color: var(--text-primary); }
 .cal-modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
 .cal-modal-err { margin: 0 20px; padding: 7px 12px; border-radius: 7px; background: var(--danger-wash); border: 1px solid rgba(255,69,58,0.3); color: var(--danger); font-size: 0.75rem; font-weight: 500; }
+
+.cal-logview-title-icon { color: var(--accent); vertical-align: -2px; margin-right: 6px; }
+.cal-logview-body { gap: 18px; }
+.cal-logview-section { display: flex; flex-direction: column; gap: 6px; }
+.cal-logview-label { font-size: 0.7rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+.cal-logview-emotions { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-logview-emotion-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 500; color: var(--chip-color); background: color-mix(in srgb, var(--chip-color) 16%, var(--bg-elevated-2));
+  border: 1px solid color-mix(in srgb, var(--chip-color) 35%, transparent);
+}
+.cal-logview-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.cal-logview-list li { font-size: 0.85rem; color: var(--text-primary); line-height: 1.4; }
+.cal-logview-text { margin: 0; font-size: 0.85rem; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; }
 .cal-modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 20px 18px; border-top: 1px solid var(--separator); flex-shrink: 0; }
 
 /* ─── Form Fields ────────────────────────────────────────────────────────────── */
