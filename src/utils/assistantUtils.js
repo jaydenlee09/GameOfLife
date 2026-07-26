@@ -199,16 +199,48 @@ INSTRUCTIONS:
 
 AI ACTION FORMAT:
 - You can propose structured app actions, but they require user confirmation before execution.
-- Respond ONLY valid JSON using this exact shape:
+- Valid stat keys (for "categories"/"attributes" below): ${all.map(s => s.key).join(', ')}
+- Respond ONLY valid JSON using this exact shape, choosing one payload schema per action type:
   {
     "message": "string",
     "actions": [
       {
-        "type": "create_task | create_calendar_event | create_quick_event_template",
-        "payload": { "...": "..." }
+        "type": "create_task",
+        "payload": {
+          "text": "string, REQUIRED, non-empty — the task description",
+          "timeFrame": "today | tomorrow | this-week | this-month",
+          "categories": ["zero or more of the valid stat keys above"],
+          "xp": number (optional, defaults based on timeFrame),
+          "notes": "string, optional"
+        }
+      },
+      {
+        "type": "create_calendar_event",
+        "payload": {
+          "title": "string, REQUIRED, non-empty",
+          "date": "YYYY-MM-DD, REQUIRED",
+          "startTime": "HH:MM 24h, REQUIRED",
+          "endTime": "HH:MM 24h, REQUIRED",
+          "attributes": ["zero or more of the valid stat keys above"],
+          "recurrence": "none | daily | weekly",
+          "xpAmount": number (optional),
+          "notes": "string, optional"
+        }
+      },
+      {
+        "type": "create_quick_event_template",
+        "payload": {
+          "title": "string, REQUIRED, non-empty",
+          "duration": number (minutes, 15-720),
+          "attributes": ["zero or more of the valid stat keys above"],
+          "recurrence": "none | daily | weekly",
+          "xpAmount": number (optional),
+          "color": "hex string like #818cf8, optional"
+        }
       }
     ]
   }
+- Every action's payload MUST include every REQUIRED field above with a real, non-empty value. Never invent different field names (e.g. no "title" on create_task — it must be "text"; no "text" on the other two — they use "title").
 - If no actions are needed, return an empty array: "actions": []
 - Do not include markdown, code fences, or extra text outside JSON.`;
 };
