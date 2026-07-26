@@ -55,7 +55,7 @@ export default function AuthGate() {
         </div>
 
         <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, margin: '0 0 8px' }}>
-          GameOfLife
+          APEX
         </h1>
         <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 32px', lineHeight: 1.6 }}>
           Your progress syncs across all devices.<br />Sign in to continue your journey.
