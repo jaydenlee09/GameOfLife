@@ -59,6 +59,57 @@
 .achievement-toast-title   { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; color: var(--accent); }
 .achievement-toast-label   { font-size: 0.82rem; font-weight: 500; color: var(--text-primary); }
 
+/* ─── Commitment Kept Toast (global) ────────────────────────────────────── */
+.commitment-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  z-index: 9999;
+  animation: toastIn 0.35s var(--ease);
+  box-shadow: var(--shadow-md);
+  max-width: 360px;
+  overflow: visible;
+}
+.commitment-toast-icon  { color: var(--success); flex-shrink: 0; }
+.commitment-toast-body  { display: flex; flex-direction: column; gap: 2px; }
+.commitment-toast-title { font-size: 0.9rem; font-weight: 700; color: var(--success); }
+.commitment-toast-label { font-size: 0.82rem; font-weight: 500; color: var(--text-primary); }
+
+.commitment-toast-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.commitment-toast-confetti span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--success);
+  opacity: 0;
+  animation: confettiBurst 0.9s ease-out forwards;
+}
+.commitment-toast-confetti span:nth-child(1) { background: var(--success); --tx: -70px; --ty: -34px; --rot: 40deg;  animation-delay: 0.05s; }
+.commitment-toast-confetti span:nth-child(2) { background: var(--accent);  --tx: -34px; --ty: -46px; --rot: -60deg; animation-delay: 0.1s; }
+.commitment-toast-confetti span:nth-child(3) { background: var(--warning, #f4b400); --tx: 0px; --ty: -52px; --rot: 90deg; animation-delay: 0s; }
+.commitment-toast-confetti span:nth-child(4) { background: var(--accent);  --tx: 34px; --ty: -46px; --rot: -30deg; animation-delay: 0.12s; }
+.commitment-toast-confetti span:nth-child(5) { background: var(--success); --tx: 70px; --ty: -34px; --rot: 60deg;  animation-delay: 0.06s; }
+.commitment-toast-confetti span:nth-child(6) { background: var(--warning, #f4b400); --tx: 0px; --ty: -60px; --rot: -45deg; animation-delay: 0.16s; }
+@keyframes confettiBurst {
+  0%   { opacity: 1; transform: translate(-50%, -50%) translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) rotate(var(--rot)); }
+}
+
 /* ─── Bottom Navigation Bar (mobile only) ───────────────────────────────── */
 .bottom-nav {
   display: none;
@@ -331,6 +382,11 @@
   }
 
   .achievement-toast {
+    bottom: calc(60px + 0.75rem);
+    max-width: calc(100vw - 2rem);
+  }
+
+  .commitment-toast {
     bottom: calc(60px + 0.75rem);
     max-width: calc(100vw - 2rem);
   }

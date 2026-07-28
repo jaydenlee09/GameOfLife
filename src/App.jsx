@@ -5,7 +5,7 @@ import { loadAllUserData, saveDataKey, flushPendingWrites, migrateLocalStorageTo
 import PlayerDashboard from './components/PlayerDashboard'
 import WelcomePage from './components/WelcomePage'
 import Navbar, { StatIcon, TaskIcon, LogIcon, TargetIcon, CalIcon } from './components/Navbar'
-import { CalendarDays, X, ChevronDown, Target } from 'lucide-react'
+import { CalendarDays, X, ChevronDown, Target, PartyPopper } from 'lucide-react'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
 import LevelUpModal from './components/LevelUpModal'
@@ -298,6 +298,7 @@ function App() {
   const [dataModalOpen, setDataModalOpen] = useState(false);
   const [focusModeOpen, setFocusModeOpen] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
+  const [commitmentToast, setCommitmentToast] = useState(false);
 
   // ─── Rank ──────────────────────────────────────────────────────────────────────
   // Rank is a "maintain" system: it holds a tier only while the Daily Score keeps
@@ -617,7 +618,11 @@ function App() {
     if (!date) return;
     // Keeping your word builds Discipline — route it through the one mutator so it
     // shows up in stats/feed consistently (previously addXp granted global-only XP).
-    if (!denied) updateStat('discipline', 10, { source: 'commitment', label: 'Commitment kept' });
+    if (!denied) {
+      updateStat('discipline', 10, { source: 'commitment', label: 'Commitment kept' });
+      setCommitmentToast(true);
+      setTimeout(() => setCommitmentToast(false), 3200);
+    }
     resolveCommitmentRecord(date, text, denied);
   };
 
@@ -897,6 +902,18 @@ function App() {
           <div className="achievement-toast-body">
             <span className="achievement-toast-title">Achievement Unlocked!</span>
             <span className="achievement-toast-label">{achievementToast.label} — {achievementToast.desc}</span>
+          </div>
+        </div>
+      )}
+      {commitmentToast && (
+        <div className="commitment-toast">
+          <span className="commitment-toast-confetti" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </span>
+          <span className="commitment-toast-icon"><PartyPopper size={26} /></span>
+          <div className="commitment-toast-body">
+            <span className="commitment-toast-title">Kept it!</span>
+            <span className="commitment-toast-label">+10 Discipline XP</span>
           </div>
         </div>
       )}
