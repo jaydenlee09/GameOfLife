@@ -161,6 +161,39 @@ const parseMonthKey = (key) => {
   return new Date(y, m - 1, 1);
 };
 
+const getGoalPeriodEnd = (goal) => {
+  if (!goal) return null;
+  if (goal.period === 'weekly') {
+    const start = parseLocalDateKey(goal.periodKey);
+    if (!start) return null;
+    const end = addDays(start, 6);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }
+  if (goal.period === 'monthly') {
+    const start = parseMonthKey(goal.periodKey);
+    if (!start) return null;
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
+    return end;
+  }
+  if (goal.period === 'yearly') {
+    const year = Number(goal.periodKey);
+    if (!year) return null;
+    return new Date(year, 11, 31, 23, 59, 59, 999);
+  }
+  return null;
+};
+
+// A goal is overdue once its period has fully elapsed and it was never
+// finished — used so it keeps showing up (flagged) instead of quietly
+// vanishing from the current-period column once the week/month/year rolls over.
+const isGoalOverdue = (goal) => {
+  if (!goal || goal.completed) return false;
+  const end = getGoalPeriodEnd(goal);
+  if (!end) return false;
+  return end.getTime() < Date.now();
+};
+
 const formatGoalPeriodLabel = (goal) => {
   if (!goal) return '';
   if (goal.period === 'weekly') {
@@ -474,9 +507,15 @@ const GoalsPage = ({ goals = [], setGoals, setTodos, onUpdateStat, habits = [], 
     const now = new Date();
     return ALL_VIEW_PERIODS.map(({ key, label }) => {
       const colPeriodKey = getPeriodKey(now, key);
+      // Keep goals whose period already ended around if they're unfinished (flagged
+      // overdue below) instead of letting them silently disappear once the period rolls over.
       const items = goals
-        .filter(g => g.period === key && g.periodKey === colPeriodKey)
-        .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+        .filter(g => g.period === key && (g.periodKey === colPeriodKey || isGoalOverdue(g)))
+        .sort((a, b) => {
+          const overdueDiff = (isGoalOverdue(b) ? 1 : 0) - (isGoalOverdue(a) ? 1 : 0);
+          if (overdueDiff !== 0) return overdueDiff;
+          return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+        });
       return { period: key, label, periodLabel: formatPeriodLabel(now, key), items };
     });
   }, [goals, period]);
@@ -654,11 +693,12 @@ const GoalsPage = ({ goals = [], setGoals, setTodos, onUpdateStat, habits = [], 
 
   const renderGoalCard = (goal) => {
     const isComplete = !!goal.completed;
+    const isOverdue = isGoalOverdue(goal);
     const linkedHabits = habits.filter(h => h.goalId === goal.id);
     const unlinkedHabits = habits.filter(h => !h.goalId);
 
     return (
-      <div key={goal.id} className={`gp-card ${isComplete ? 'gp-card--complete' : ''}`}>
+      <div key={goal.id} className={`gp-card ${isComplete ? 'gp-card--complete' : ''} ${isOverdue ? 'gp-card--overdue' : ''}`}>
         <div className="gp-card-top">
           {renderAttrBadges(goal.attributes)}
           <div className="gp-card-actions">
@@ -680,7 +720,12 @@ const GoalsPage = ({ goals = [], setGoals, setTodos, onUpdateStat, habits = [], 
           </div>
           {goal.pinned && <span className="gp-pin-badge" title="Pinned focus goal"><Pin size={14} /></span>}
           {isComplete && <span className="gp-complete-badge">Complete</span>}
+          {isOverdue && <span className="gp-overdue-badge">Overdue</span>}
         </div>
+
+        {isOverdue && (
+          <div className="gp-overdue-meta">Was due {formatGoalPeriodLabel(goal)}</div>
+        )}
 
         {renderProgressBar(goal)}
 

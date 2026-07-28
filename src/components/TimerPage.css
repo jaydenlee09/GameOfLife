@@ -11,7 +11,7 @@
 .timer-layout {
   display: flex;
   gap: 2rem;
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
   align-items: flex-start;
 }
@@ -540,7 +540,7 @@
 /* ─── History Section — liquid glass ─────────────────────────────────────── */
 .timer-history-section {
   position: relative;
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 2rem auto 0;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);

@@ -418,7 +418,7 @@ const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [dayFilter, setDayFilter] = useState(null); // null = show all, or a dateStr like "2026-05-12"
-  const [groupFilter, setGroupFilter] = useState('today'); // 'all' | 'today' | 'this-week' | 'this-month' | 'this-year'
+  const [groupFilter, setGroupFilter] = useState('all'); // 'all' | 'today' | 'this-week' | 'this-month' | 'this-year'
 
   const DUE_SOON_MS = 3 * 24 * 60 * 60 * 1000;
 

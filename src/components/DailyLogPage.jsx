@@ -429,7 +429,7 @@ const CHEAT_MEAL_THRESHOLD = 50;
 // Cheat meals are only "unlocked" once enough points are saved up; below the
 // threshold, eating unhealthy isn't a purchase, it's a flat penalty.
 const FOOD_OPTION_MAP = {
-  healthy:     { label: 'Healthy',           points: 8,   verdict: 'healthy' },
+  healthy:     { label: 'Healthy',           points: 4,   verdict: 'healthy' },
   neutral:     { label: 'Neutral',           points: 0,   verdict: 'neutral' },
   small_cheat: { label: 'Small Cheat Meal',  points: -30, verdict: 'unhealthy' },
   large_cheat: { label: 'Large Cheat Meal',  points: -40, verdict: 'unhealthy' },

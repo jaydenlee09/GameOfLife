@@ -262,6 +262,14 @@
   border-color: rgba(48, 209, 88, 0.3);
 }
 
+.gp-card--overdue {
+  border-color: rgba(255, 69, 58, 0.5);
+}
+
+.gp-card--overdue:hover {
+  border-color: rgba(255, 69, 58, 0.65);
+}
+
 .gp-card-top {
   display: flex;
   align-items: flex-start;
@@ -280,6 +288,7 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  padding: 0;
   background: none;
   border: 1px solid var(--separator-strong);
   color: var(--text-secondary);
@@ -349,6 +358,25 @@
   padding: 4px 8px;
   border-radius: 999px;
   flex-shrink: 0;
+}
+
+.gp-overdue-badge {
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--danger);
+  border: 1px solid rgba(255, 69, 58, 0.4);
+  background: var(--danger-wash);
+  padding: 4px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.gp-overdue-meta {
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-top: -6px;
 }
 
 .gp-badges {
