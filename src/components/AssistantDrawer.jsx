@@ -58,6 +58,12 @@ export default function AssistantDrawer({
   weeklyReviews,
   xpLog,
   commitmentArchive,
+  calendarEvents,
+  noPhoneBlocks,
+  calendarDayEvents,
+  achievements,
+  shop,
+  brainDumpNotes,
   chatHistory,
   setChatHistory,
   onApplyAction,
@@ -85,8 +91,14 @@ export default function AssistantDrawer({
   }, [draftMessage]);
 
   const systemPrompt = useMemo(
-    () => buildSystemPrompt(user, todos, habits, logs, { healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive }),
-    [user, todos, habits, logs, healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive],
+    () => buildSystemPrompt(user, todos, habits, logs, {
+      healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive,
+      calendarEvents, noPhoneBlocks, calendarDayEvents, achievements, shop, brainDumpNotes,
+    }),
+    [
+      user, todos, habits, logs, healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive,
+      calendarEvents, noPhoneBlocks, calendarDayEvents, achievements, shop, brainDumpNotes,
+    ],
   );
 
   const renderText = (text) => {

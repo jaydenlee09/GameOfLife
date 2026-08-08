@@ -871,6 +871,12 @@ function App() {
         weeklyReviews={weeklyReviews}
         xpLog={xpLog}
         commitmentArchive={commitmentArchive}
+        calendarEvents={calendarEvents}
+        noPhoneBlocks={noPhoneBlocks}
+        calendarDayEvents={calendarDayEvents}
+        achievements={achievements}
+        shop={shop}
+        brainDumpNotes={brainDumpNotes}
         chatHistory={chatHistory}
         setChatHistory={setChatHistory}
         onApplyAction={handleAssistantAction}

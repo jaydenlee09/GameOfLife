@@ -1,5 +1,7 @@
 import { xpCapForLevel } from './xpUtils';
 import { computeRankStatus } from './scoreUtils';
+import { toDateKey, expandEventsForDates, isInstanceCompleted } from './calendarUtils';
+import { ACHIEVEMENTS } from './achievementsMeta';
 
 const STAT_LABELS = {
   strength:     'Strength',
@@ -130,12 +132,85 @@ const summarizeWeekly = (weeklyReviews) => {
   return parts.length ? parts.join(' | ') : 'Weekly review logged.';
 };
 
+const fmtTime = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+/** Summarize today's + tomorrow's calendar: time blocks, no-phone blocks, and reminders */
+const summarizeCalendar = (calendarEvents, noPhoneBlocks, calendarDayEvents) => {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayKey = toDateKey(now);
+  const tomorrowKey = toDateKey(tomorrow);
+  const dateKeys = [todayKey, tomorrowKey];
+
+  const events = expandEventsForDates(calendarEvents || [], dateKeys);
+  const blocks = expandEventsForDates(noPhoneBlocks || [], dateKeys);
+  const byStart = (a, b) => (a.startHour * 60 + a.startMin) - (b.startHour * 60 + b.startMin);
+
+  const dayBlock = (dateKey, label) => {
+    const lines = [];
+    events
+      .filter(ev => ev._instanceDate === dateKey)
+      .sort(byStart)
+      .forEach(ev => {
+        const attrs = ev.attributes?.length ? ` [${ev.attributes.join(', ')}]` : '';
+        const done = isInstanceCompleted(ev) ? ' (done)' : '';
+        lines.push(`  ${fmtTime(ev.startHour, ev.startMin)}-${fmtTime(ev.endHour, ev.endMin)} ${ev.title}${attrs}${done}`);
+      });
+    blocks
+      .filter(b => b._instanceDate === dateKey)
+      .sort(byStart)
+      .forEach(b => {
+        const done = isInstanceCompleted(b) ? ' (done)' : '';
+        lines.push(`  No Phone: ${fmtTime(b.startHour, b.startMin)}-${fmtTime(b.endHour, b.endMin)}${done}`);
+      });
+    (calendarDayEvents?.[dateKey] || [])
+      .slice()
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+      .forEach(r => lines.push(`  Reminder: ${r.title}${r.time ? ` @ ${r.time}` : ''}`));
+    return lines.length ? `${label}:\n${lines.join('\n')}` : `${label}: nothing scheduled.`;
+  };
+
+  return `${dayBlock(todayKey, 'Today')}\n${dayBlock(tomorrowKey, 'Tomorrow')}`;
+};
+
+/** Summarize unlocked achievements */
+const summarizeAchievements = (achievements) => {
+  const unlocked = Object.keys(achievements || {}).filter(id => achievements[id]);
+  if (!unlocked.length) return 'None unlocked yet.';
+  const labels = unlocked.map(id => ACHIEVEMENTS.find(a => a.id === id)?.label || id);
+  return `${unlocked.length}/${ACHIEVEMENTS.length} unlocked: ${labels.join(', ')}`;
+};
+
+/** Summarize the wishlist/reward shop */
+const summarizeShop = (shop) => {
+  const items = shop?.items || [];
+  if (!items.length) return 'Wishlist is empty.';
+  const unpurchased = items.filter(i => !i.purchased);
+  const top = unpurchased
+    .slice()
+    .sort((a, b) => (b.priority === 'high') - (a.priority === 'high'))
+    .slice(0, 5)
+    .map(i => `${i.name} ($${Number(i.price).toFixed(2)}${i.priority ? `, ${i.priority} priority` : ''})`);
+  return top.length ? `Wishlist (${unpurchased.length} unpurchased): ${top.join('; ')}` : 'All wishlist items purchased.';
+};
+
+/** Summarize brain dump notes */
+const summarizeBrainDump = (brainDumpNotes) => {
+  if (!brainDumpNotes?.length) return 'No brain dump notes.';
+  const texts = brainDumpNotes.map(n => n.text?.trim()).filter(Boolean).slice(0, 15);
+  return texts.length ? texts.join(' | ') : 'No brain dump notes.';
+};
+
 /**
  * Builds the system prompt for the Gemini-backed assistant.
  * Injects the player's full game state so the assistant has real context.
  */
 export const buildSystemPrompt = (user, todos, habits, logs, extra = {}) => {
-  const { healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive } = extra;
+  const {
+    healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive,
+    calendarEvents, noPhoneBlocks, calendarDayEvents, achievements, shop, brainDumpNotes,
+  } = extra;
   const rankStatus = computeRankStatus(habits, xpLog, logs, commitmentArchive, healthLog);
   const { weakest, strongest, all } = analyzeStats(user.stats);
   const xpCap = xpCapForLevel(user.level);
@@ -175,6 +250,9 @@ ACTIVE TASKS & HABITS:
 ${summarizeTasks(todos)}
 Habits: ${summarizeHabits(habits)}
 
+CALENDAR (time blocks, No Phone blocks, reminders):
+${summarizeCalendar(calendarEvents, noPhoneBlocks, calendarDayEvents)}
+
 GOALS:
 ${summarizeGoals(goals)}
 
@@ -190,7 +268,17 @@ ${summarizeWeekly(weeklyReviews)}
 RECENT JOURNAL (last 7 days):
 ${summarizeLogs(logs)}
 
+ACHIEVEMENTS:
+${summarizeAchievements(achievements)}
+
+WISHLIST / REWARD SHOP:
+${summarizeShop(shop)}
+
+BRAIN DUMP NOTES:
+${summarizeBrainDump(brainDumpNotes)}
+
 INSTRUCTIONS:
+- When ${user.name} asks how their day/schedule looks, read straight from the CALENDAR section above — it already covers today and tomorrow. An empty day means the CALENDAR section says "nothing scheduled," not that you lack the data.
 - When ${user.name} first opens this chat (or asks "how am I doing"), proactively give a brief, pointed status report: call out the weakest stat(s), any neglected tasks, and one concrete thing they should focus on today.
 - When asked about a specific area, go deeper with actionable steps.
 - Reference journal emotions if they reveal stress, anxiety, or burnout — address those directly.
