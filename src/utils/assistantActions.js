@@ -30,6 +30,14 @@ const normalizeDateKey = (value) => {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+const normalizeRecurrenceDays = (value, recurrence) => {
+  if (recurrence !== 'weekly' || !Array.isArray(value)) return [];
+  const days = value
+    .map((day) => Math.floor(toNumber(day, NaN)))
+    .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+  return [...new Set(days)].sort((a, b) => a - b);
+};
+
 const normalizeTaskPayload = (payload, validStats) => {
   const text = toTrimmedString(payload?.text || payload?.title);
   if (!text) throw new Error('Task is missing text.');
@@ -87,6 +95,7 @@ const normalizeCalendarEventPayload = (payload, validStats) => {
   const attributes = requestedAttributes.filter((attribute) => validStats.includes(attribute));
 
   const recurrence = VALID_RECURRENCE.includes(payload?.recurrence) ? payload.recurrence : 'none';
+  const recurrenceDays = normalizeRecurrenceDays(payload?.recurrenceDays, recurrence);
   const xpAmount = clamp(Math.round(toNumber(payload?.xpAmount, 20)), 1, 5000);
 
   return {
@@ -99,6 +108,7 @@ const normalizeCalendarEventPayload = (payload, validStats) => {
     xpAmount,
     attributes,
     recurrence,
+    recurrenceDays,
     notes: toTrimmedString(payload?.notes),
   };
 };
@@ -114,6 +124,7 @@ const normalizeQuickTemplatePayload = (payload, validStats) => {
   const attributes = requestedAttributes.filter((attribute) => validStats.includes(attribute));
 
   const recurrence = VALID_RECURRENCE.includes(payload?.recurrence) ? payload.recurrence : 'none';
+  const recurrenceDays = normalizeRecurrenceDays(payload?.recurrenceDays, recurrence);
   const color = /^#[0-9a-fA-F]{6}$/.test(toTrimmedString(payload?.color)) ? payload.color : '#818cf8';
 
   return {
@@ -122,6 +133,7 @@ const normalizeQuickTemplatePayload = (payload, validStats) => {
     xpAmount,
     attributes,
     recurrence,
+    recurrenceDays,
     color,
   };
 };
@@ -198,6 +210,7 @@ export const applyAssistantAction = (action, { setTodos, setCalendarEvents, setQ
       xpAmount: action.payload.xpAmount,
       attributes: action.payload.attributes,
       recurrence: action.payload.recurrence,
+      recurrenceDays: action.payload.recurrenceDays || [],
       notes: action.payload.notes || '',
       subEvents: [],
       bonusTasks: [],
@@ -216,6 +229,7 @@ export const applyAssistantAction = (action, { setTodos, setCalendarEvents, setQ
       attributes: action.payload.attributes,
       xpAmount: action.payload.xpAmount,
       recurrence: action.payload.recurrence,
+      recurrenceDays: action.payload.recurrenceDays || [],
       color: action.payload.color,
     };
     setQuickEvents((prev) => [...prev, nextTemplate]);

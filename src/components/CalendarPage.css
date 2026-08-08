@@ -685,6 +685,11 @@
 .cal-recur-btn:hover { border-color: var(--separator-strong); color: var(--text-secondary); }
 .cal-recur-btn--active { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
 
+.cal-weekday-row { display: flex; gap: 5px; margin-top: 7px; }
+.cal-weekday-chip { flex: 1; padding: 6px 0; border-radius: 999px; border: 1px solid var(--separator); background: var(--bg-elevated-2); color: var(--text-tertiary); font-size: 0.68rem; font-weight: 600; letter-spacing: 0; cursor: pointer; transition: all 0.14s; text-align: center; }
+.cal-weekday-chip:hover { border-color: var(--separator-strong); color: var(--text-secondary); }
+.cal-weekday-chip--active { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+
 /* ─── Color Swatches ─────────────────────────────────────────────────────────── */
 .cal-color-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .cal-color-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.1s, border-color 0.1s; padding: 0; }

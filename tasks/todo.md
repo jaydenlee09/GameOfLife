@@ -1,5 +1,47 @@
 # Todo
 
+## Done (2026-08-07): Weekly recurrence on specific weekdays
+
+Full plan: `/Users/jaydenlee/.claude/plans/linear-gliding-pebble.md`. Calendar events, Quick
+Templates, and No-Phone blocks previously locked "weekly" recurrence to whatever single
+day-of-week the item's own `date` fell on. Added a `recurrenceDays` field (ints 0-6, Sun=0…Sat=6)
+so users can pick any combination — "every Monday", "every Sat & Sun", etc. Confirmed scope via
+`AskUserQuestion`: applies everywhere weekly repeat exists, and the My Assistant AI schema too.
+
+- [x] `src/utils/calendarUtils.js` — `expandEventsForDates`'s weekly branch now matches against
+      `recurrenceDays` (falling back to the anchor date's own weekday when empty/missing, so all
+      existing stored data behaves identically to before — no migration needed); `normalizeEvent`
+      normalizes the new array field like the other array fields there.
+- [x] `src/components/CalendarPage.jsx` — new shared `renderWeekdayPicker` helper (a row of
+      Su/Mo/Tu/We/Th/Fr/Sa toggle chips, blocks deselecting the last remaining day so an event can
+      never end up with zero recurrence days), rendered under the existing `renderRecurBtns` in all
+      three modals (event/template/no-phone) whenever `recurrence === 'weekly'`. `recurrenceDays`
+      threaded through every place `recurrence` already was (defaults, create, edit, edit-scope
+      "this/this-forward/all", template drag-drop). Sidebar template badge shows weekday
+      abbreviations (e.g. "Mo We Fr") instead of the bare word "weekly" when set.
+- [x] `src/components/CalendarPage.css` — `.cal-weekday-row`/`.cal-weekday-chip` styles matching
+      the existing `.cal-recur-btn` visual language.
+- [x] My Assistant AI extension — `assistantUtils.js` system-prompt schema, `assistantActions.js`
+      (`normalizeRecurrenceDays` clamps/dedupes/sorts ints 0-6 and forces `[]` when recurrence
+      isn't 'weekly'), and `AssistantDrawer.jsx`'s pending-action preview (shows "Mo We" etc.)
+      all updated so natural-language requests like "add gym every Monday and Wednesday" work.
+
+Verified: `npm run lint` — identical 40 pre-existing baseline problems before and after (`git
+stash` diff), zero new issues in any changed file. `npm run build` clean. Two targeted Node
+scripts against the pure logic (`expandEventsForDates`, `prepareAssistantActions`) confirmed: a
+legacy weekly event with no `recurrenceDays` still recurs on exactly its own anchor weekday
+(backward compat), a Mon+Sat event anchored on a Wednesday correctly lands only on Mondays/
+Saturdays going forward (and excludes the anchor date itself, since Wednesday wasn't selected),
+and the assistant-side normalizer correctly deduped/sorted/clamped a deliberately-malformed
+`recurrenceDays` input and zeroed it out for a non-weekly action. End-to-end UI pass via a
+temporary Playwright harness (`src/testCalendarRecur.jsx` + `calendar-recur-test.html`, mounting
+`CalendarPage` directly with mock state, bypassing Firebase auth — same pattern as prior sessions'
+verification) — created a weekly event on a Monday slot, confirmed "Mo" was pre-checked, added
+"Sa", confirmed the last-remaining-day guard blocked removing down to zero, saved, and confirmed
+the event appeared as two separate blocks on the Mon and Sat columns of the same week (and nowhere
+else). Zero console errors captured. Harness files, the scratch Playwright install, and
+screenshots were all removed after verification.
+
 ## Done (2026-07-25): Mobile-friendly pass + zero-scroll home page
 
 Full plan: `/Users/jaydenlee/.claude/plans/wondrous-imagining-pine.md`. User wanted the

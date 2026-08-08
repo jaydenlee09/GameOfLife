@@ -223,6 +223,7 @@ AI ACTION FORMAT:
           "endTime": "HH:MM 24h, REQUIRED",
           "attributes": ["zero or more of the valid stat keys above"],
           "recurrence": "none | daily | weekly",
+          "recurrenceDays": "array of ints 0-6 (Sun=0…Sat=6), OPTIONAL — only used when recurrence is 'weekly'; e.g. every Monday = [1], every Sat & Sun = [0,6]. Omit to repeat on the given date's own weekday.",
           "xpAmount": number (optional),
           "notes": "string, optional"
         }
@@ -234,6 +235,7 @@ AI ACTION FORMAT:
           "duration": number (minutes, 15-720),
           "attributes": ["zero or more of the valid stat keys above"],
           "recurrence": "none | daily | weekly",
+          "recurrenceDays": "array of ints 0-6 (Sun=0…Sat=6), OPTIONAL — only used when recurrence is 'weekly'; e.g. every Monday = [1], every Sat & Sun = [0,6]",
           "xpAmount": number (optional),
           "color": "hex string like #818cf8, optional"
         }

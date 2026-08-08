@@ -59,6 +59,9 @@ export const normalizeEvent = (ev = {}) => ({
   subEvents: cloneSubEvents(ev.subEvents || []),
   bonusTasks: cloneBonusTasks(ev.bonusTasks || []),
   completedDates: Array.isArray(ev.completedDates) ? [...ev.completedDates] : [],
+  // Which weekdays (0=Sun…6=Sat) a 'weekly' recurrence lands on. Empty/missing
+  // falls back to the item's own anchor-date weekday — see expandEventsForDates.
+  recurrenceDays: Array.isArray(ev.recurrenceDays) ? [...ev.recurrenceDays] : [],
 });
 
 export const expandEventsForDates = (storedEvents, dateKeys) => {
@@ -73,9 +76,10 @@ export const expandEventsForDates = (storedEvents, dateKeys) => {
       }
     } else if (normalizedEvent.recurrence === 'weekly') {
       const evDay = new Date(normalizedEvent.date + 'T00:00:00').getDay();
+      const days = normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [evDay];
       for (const dk of dateKeys) {
         const dkDay = new Date(dk + 'T00:00:00').getDay();
-        if (dk >= normalizedEvent.date && dkDay === evDay) result.push({ ...normalizedEvent, _instanceDate: dk, _isVirtual: dk !== normalizedEvent.date });
+        if (dk >= normalizedEvent.date && days.includes(dkDay)) result.push({ ...normalizedEvent, _instanceDate: dk, _isVirtual: dk !== normalizedEvent.date });
       }
     }
   }

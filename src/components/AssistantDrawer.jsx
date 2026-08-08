@@ -20,6 +20,14 @@ const prettyActionType = (type) => {
   return type;
 };
 
+const WEEKDAY_ABBR = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const recurrenceLabel = (payload) => {
+  if (payload.recurrence === 'weekly' && payload.recurrenceDays?.length) {
+    return payload.recurrenceDays.map((d) => WEEKDAY_ABBR[d]).join(' ');
+  }
+  return payload.recurrence;
+};
+
 const actionPreview = (action) => {
   if (action.type === 'create_task') {
     return `${action.payload.text} · ${action.payload.timeFrame} · ${action.payload.xp} XP`;
@@ -27,10 +35,11 @@ const actionPreview = (action) => {
   if (action.type === 'create_calendar_event') {
     const start = `${String(action.payload.startHour).padStart(2, '0')}:${String(action.payload.startMin).padStart(2, '0')}`;
     const end = `${String(action.payload.endHour).padStart(2, '0')}:${String(action.payload.endMin).padStart(2, '0')}`;
-    return `${action.payload.title} · ${action.payload.date} · ${start}-${end}`;
+    const recurrence = action.payload.recurrence !== 'none' ? ` · ${recurrenceLabel(action.payload)}` : '';
+    return `${action.payload.title} · ${action.payload.date} · ${start}-${end}${recurrence}`;
   }
   if (action.type === 'create_quick_event_template') {
-    return `${action.payload.title} · ${action.payload.duration} mins · ${action.payload.recurrence}`;
+    return `${action.payload.title} · ${action.payload.duration} mins · ${recurrenceLabel(action.payload)}`;
   }
   return 'Pending action';
 };

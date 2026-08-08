@@ -17,6 +17,7 @@ const TOTAL_SLOTS = 96;
 const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
 const MIN_EVENT_SLOTS = 1; // 15 min minimum duration
 const DAYS_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']; // index = Date#getDay() (0=Sun…6=Sat)
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -38,6 +39,7 @@ const daysUntil = (targetMs, nowMs) => {
   if (diff <= 0) return 0;
   return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
 };
+const weekdayOfDateKey = (dateKey) => new Date(dateKey + 'T00:00:00').getDay();
 const getMondayOfWeek = (date) => {
   const d = new Date(date);
   const day = d.getDay();
@@ -153,12 +155,12 @@ const buildDetachedNoPhoneInstance = (block, overrides = {}) => {
 const defaultForm = (o = {}) => ({
   title: '', date: toDateKey(new Date()),
   startHour: 9, startMin: 0, endHour: 10, endMin: 0,
-  xpAmount: 20, attributes: [], recurrence: 'none', notes: '', subEvents: [], bonusTasks: [], ...o,
+  xpAmount: 20, attributes: [], recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [], ...o,
 });
-const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', color: '#38bdf8' });
+const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', recurrenceDays: [], color: '#38bdf8' });
 const defaultNoPhoneForm = (o = {}) => ({
   date: toDateKey(new Date()), startHour: 8, startMin: 0, endHour: 9, endMin: 0,
-  label: 'No Phone', recurrence: 'none', ...o,
+  label: 'No Phone', recurrence: 'none', recurrenceDays: [], ...o,
 });
 const defaultBonusTaskForm = () => ({ title: '', xpAmount: 10, attributes: [] });
 const toTimeInput = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
@@ -297,7 +299,7 @@ export default function CalendarPage({
       date,
       startHour: Math.floor(startMins/60), startMin: startMins%60,
       endHour: Math.floor(clampEnd/60), endMin: clampEnd%60,
-      ...(fromTemplate ? { title: fromTemplate.title, attributes: [...fromTemplate.attributes], xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence } : {}),
+      ...(fromTemplate ? { title: fromTemplate.title, attributes: [...fromTemplate.attributes], xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence, recurrenceDays: [...(fromTemplate.recurrenceDays || [])] } : {}),
     }));
     setEditingId(null);
     setNewBonusTask(defaultBonusTaskForm());
@@ -307,7 +309,7 @@ export default function CalendarPage({
   const openEdit = (ev) => {
     if (ev.recurrence !== 'none' && ev._isVirtual) { setEditScope({ show: true, ev }); return; }
     const normalizedEvent = normalizeEvent(ev);
-    setForm({ title: normalizedEvent.title, date: normalizedEvent.date, startHour: normalizedEvent.startHour, startMin: normalizedEvent.startMin, endHour: normalizedEvent.endHour, endMin: normalizedEvent.endMin, xpAmount: normalizedEvent.xpAmount, attributes: [...normalizedEvent.attributes], recurrence: normalizedEvent.recurrence, notes: normalizedEvent.notes || '', subEvents: cloneSubEvents(normalizedEvent.subEvents), bonusTasks: cloneBonusTasks(normalizedEvent.bonusTasks) });
+    setForm({ title: normalizedEvent.title, date: normalizedEvent.date, startHour: normalizedEvent.startHour, startMin: normalizedEvent.startMin, endHour: normalizedEvent.endHour, endMin: normalizedEvent.endMin, xpAmount: normalizedEvent.xpAmount, attributes: [...normalizedEvent.attributes], recurrence: normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes: normalizedEvent.notes || '', subEvents: cloneSubEvents(normalizedEvent.subEvents), bonusTasks: cloneBonusTasks(normalizedEvent.bonusTasks) });
     setEditingId(ev.id);
     setNewBonusTask(defaultBonusTaskForm());
     setModal('edit');
@@ -379,7 +381,7 @@ export default function CalendarPage({
   const buildEventFromForm = (id) => ({
     id: id || Date.now(), title: form.title.trim(), date: form.date,
     startHour: form.startHour, startMin: form.startMin, endHour: form.endHour, endMin: form.endMin,
-    xpAmount: Number(form.xpAmount)||20, attributes: form.attributes, recurrence: form.recurrence,
+    xpAmount: Number(form.xpAmount)||20, attributes: form.attributes, recurrence: form.recurrence, recurrenceDays: form.recurrenceDays||[],
     notes: form.notes||'', subEvents: cloneSubEvents(form.subEvents||[]), bonusTasks: cloneBonusTasks(form.bonusTasks||[]), completed: false, completedDates: [],
   });
 
@@ -393,7 +395,7 @@ export default function CalendarPage({
       setCalendarEvents(prev=>prev.map(ev=>ev.id!==editingId?ev:{
         ...ev, title:form.title.trim(), startHour:form.startHour, startMin:form.startMin,
         endHour:form.endHour, endMin:form.endMin, xpAmount:Number(form.xpAmount)||20,
-        attributes:form.attributes, recurrence:form.recurrence, notes:form.notes||'', subEvents:cloneSubEvents(form.subEvents||[]), bonusTasks:cloneBonusTasks(form.bonusTasks||[]),
+        attributes:form.attributes, recurrence:form.recurrence, recurrenceDays:form.recurrenceDays||[], notes:form.notes||'', subEvents:cloneSubEvents(form.subEvents||[]), bonusTasks:cloneBonusTasks(form.bonusTasks||[]),
       }));
     } else {
       setCalendarEvents(prev=>[
@@ -413,7 +415,7 @@ export default function CalendarPage({
         ? { ...normalizedTask, completed: isBonusTaskCompleted(normalizedTask, ev), completedDates: [] }
         : normalizedTask;
     });
-    setForm({ title:normalizedEvent.title, date:ev._instanceDate, startHour:normalizedEvent.startHour, startMin:normalizedEvent.startMin, endHour:normalizedEvent.endHour, endMin:normalizedEvent.endMin, xpAmount:normalizedEvent.xpAmount, attributes:[...normalizedEvent.attributes], recurrence:normalizedEvent.recurrence, notes:normalizedEvent.notes||'', subEvents:cloneSubEvents(normalizedEvent.subEvents), bonusTasks:instanceBonusTasks });
+    setForm({ title:normalizedEvent.title, date:ev._instanceDate, startHour:normalizedEvent.startHour, startMin:normalizedEvent.startMin, endHour:normalizedEvent.endHour, endMin:normalizedEvent.endMin, xpAmount:normalizedEvent.xpAmount, attributes:[...normalizedEvent.attributes], recurrence:normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes:normalizedEvent.notes||'', subEvents:cloneSubEvents(normalizedEvent.subEvents), bonusTasks:instanceBonusTasks });
     setEditingId(ev.id);
     setEditScope(null);
     setNewBonusTask(defaultBonusTaskForm());
@@ -462,7 +464,8 @@ export default function CalendarPage({
   };
   const openNoPhoneEdit = (block) => {
     if (block.recurrence !== 'none' && block._isVirtual) { setNoPhoneEditScope({ show: true, block }); return; }
-    setNoPhoneForm({ date: block.date, startHour: block.startHour, startMin: block.startMin, endHour: block.endHour, endMin: block.endMin, label: block.label || 'No Phone', recurrence: block.recurrence || 'none' });
+    const recurrenceDays = Array.isArray(block.recurrenceDays) && block.recurrenceDays.length ? block.recurrenceDays : [weekdayOfDateKey(block.date)];
+    setNoPhoneForm({ date: block.date, startHour: block.startHour, startMin: block.startMin, endHour: block.endHour, endMin: block.endMin, label: block.label || 'No Phone', recurrence: block.recurrence || 'none', recurrenceDays });
     setNoPhoneModal({ mode: 'edit', id: block.id });
   };
   const closeNoPhoneModal = () => { setNoPhoneModal(null); setNoPhoneEditScope(null); setNoPhoneDeleteScope(null); };
@@ -471,7 +474,7 @@ export default function CalendarPage({
   const buildNoPhoneFromForm = (id) => ({
     id: id || Date.now(), date: noPhoneForm.date,
     startHour: noPhoneForm.startHour, startMin: noPhoneForm.startMin, endHour: noPhoneForm.endHour, endMin: noPhoneForm.endMin,
-    label: noPhoneForm.label.trim() || 'No Phone', recurrence: noPhoneForm.recurrence,
+    label: noPhoneForm.label.trim() || 'No Phone', recurrence: noPhoneForm.recurrence, recurrenceDays: noPhoneForm.recurrenceDays||[],
   });
   const saveNoPhoneBlock = () => { if (!isNoPhoneFormValid()) return; setNoPhoneBlocks(prev=>[...prev, buildNoPhoneFromForm()]); closeNoPhoneModal(); };
   const updateNoPhoneBlock = (scope='all') => {
@@ -479,7 +482,7 @@ export default function CalendarPage({
     if (scope === 'all') {
       setNoPhoneBlocks(prev=>prev.map(b=>b.id!==noPhoneModal.id?b:{
         ...b, startHour:noPhoneForm.startHour, startMin:noPhoneForm.startMin,
-        endHour:noPhoneForm.endHour, endMin:noPhoneForm.endMin, label:noPhoneForm.label.trim()||'No Phone', recurrence:noPhoneForm.recurrence,
+        endHour:noPhoneForm.endHour, endMin:noPhoneForm.endMin, label:noPhoneForm.label.trim()||'No Phone', recurrence:noPhoneForm.recurrence, recurrenceDays:noPhoneForm.recurrenceDays||[],
       }));
     } else {
       setNoPhoneBlocks(prev=>[
@@ -491,7 +494,8 @@ export default function CalendarPage({
   };
   const handleNoPhoneEditScopeSelect = (scope) => {
     const block = noPhoneEditScope.block;
-    setNoPhoneForm({ date: block._instanceDate, startHour: block.startHour, startMin: block.startMin, endHour: block.endHour, endMin: block.endMin, label: block.label || 'No Phone', recurrence: block.recurrence });
+    const recurrenceDays = Array.isArray(block.recurrenceDays) && block.recurrenceDays.length ? block.recurrenceDays : [weekdayOfDateKey(block.date)];
+    setNoPhoneForm({ date: block._instanceDate, startHour: block.startHour, startMin: block.startMin, endHour: block.endHour, endMin: block.endMin, label: block.label || 'No Phone', recurrence: block.recurrence, recurrenceDays });
     setNoPhoneEditScope(null);
     if (scope === 'this') {
       const newId = Date.now();
@@ -841,7 +845,7 @@ export default function CalendarPage({
 
   // ─── Template CRUD ───────────────────────────────────────────────────────────
   const openTmplCreate = () => { setTmplForm(defaultTmplForm()); setTmplModal('create'); };
-  const openTmplEdit = (tmpl) => { setTmplForm({...tmpl}); setTmplModal({edit:true,id:tmpl.id}); };
+  const openTmplEdit = (tmpl) => { setTmplForm({...defaultTmplForm(), ...tmpl}); setTmplModal({edit:true,id:tmpl.id}); };
   const closeTmplModal = () => setTmplModal(null);
   const saveTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>[...prev,{...tmplForm,id:Date.now(),title:tmplForm.title.trim()}]); closeTmplModal(); };
   const updateTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>prev.map(t=>t.id===tmplModal.id?{...tmplForm,id:tmplModal.id,title:tmplForm.title.trim()}:t)); closeTmplModal(); };
@@ -1308,7 +1312,7 @@ export default function CalendarPage({
                   <div className="cal-tmpl-title">{tmpl.title}</div>
                   <div className="cal-tmpl-meta">
                     {tmpl.duration}min
-                    {tmpl.recurrence!=='none'&&<span className="cal-tmpl-recur">{tmpl.recurrence}</span>}
+                    {tmpl.recurrence!=='none'&&<span className="cal-tmpl-recur">{tmpl.recurrence==='weekly'&&tmpl.recurrenceDays?.length?tmpl.recurrenceDays.map(d=>WEEKDAY_LABELS[d]).join(' '):tmpl.recurrence}</span>}
                   </div>
                   {tmpl.attributes.length>0&&(
                     <div className="cal-tmpl-attrs">
@@ -1443,6 +1447,29 @@ export default function CalendarPage({
     </div>
   );
 
+  // Shown under "Repeat" once 'weekly' is selected. `days` is the effective
+  // (already-defaulted-to-anchor-day) selection, never empty while visible.
+  const renderWeekdayPicker = (days, setDays) => (
+    <div className="cal-weekday-row">
+      {WEEKDAY_LABELS.map((label, idx) => {
+        const active = days.includes(idx);
+        return (
+          <button
+            key={idx}
+            type="button"
+            className={`cal-weekday-chip ${active ? 'cal-weekday-chip--active' : ''}`}
+            onClick={() => {
+              if (active && days.length === 1) return; // keep at least one day selected
+              setDays(active ? days.filter(d => d !== idx) : [...days, idx].sort((a,b)=>a-b));
+            }}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="cal-page">
@@ -1535,6 +1562,10 @@ export default function CalendarPage({
               <div className="cal-field">
                 <label className="cal-label">Repeat</label>
                 {renderRecurBtns(form.recurrence, r=>setForm(f=>({...f,recurrence:r})))}
+                {form.recurrence === 'weekly' && renderWeekdayPicker(
+                  form.recurrenceDays?.length ? form.recurrenceDays : [weekdayOfDateKey(form.date)],
+                  (days) => setForm(f => ({ ...f, recurrenceDays: days })),
+                )}
               </div>
               <div className="cal-field">
                 <label className="cal-label">Sub-Blocks</label>
@@ -1701,6 +1732,10 @@ export default function CalendarPage({
               <div className="cal-field">
                 <label className="cal-label">Repeat</label>
                 {renderRecurBtns(tmplForm.recurrence, r=>setTmplForm(f=>({...f,recurrence:r})))}
+                {tmplForm.recurrence === 'weekly' && renderWeekdayPicker(
+                  tmplForm.recurrenceDays?.length ? tmplForm.recurrenceDays : [new Date().getDay()],
+                  (days) => setTmplForm(f => ({ ...f, recurrenceDays: days })),
+                )}
               </div>
               <div className="cal-field">
                 <label className="cal-label">Color</label>
@@ -1828,6 +1863,10 @@ export default function CalendarPage({
               <div className="cal-field">
                 <label className="cal-label">Repeat</label>
                 {renderRecurBtns(noPhoneForm.recurrence, r=>setNoPhoneForm(f=>({...f,recurrence:r})))}
+                {noPhoneForm.recurrence === 'weekly' && renderWeekdayPicker(
+                  noPhoneForm.recurrenceDays?.length ? noPhoneForm.recurrenceDays : [weekdayOfDateKey(noPhoneForm.date)],
+                  (days) => setNoPhoneForm(f => ({ ...f, recurrenceDays: days })),
+                )}
               </div>
             </div>
             {!isNoPhoneFormValid()&&<p className="cal-modal-err">End time must be after start time.</p>}
