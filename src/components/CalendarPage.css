@@ -495,6 +495,98 @@
   letter-spacing: 0;
 }
 
+/* ─── Time-block hover detail card ─────────────────────────────────────────────
+   position:fixed at the .cal-page root — .cal-event is overflow:hidden inside a
+   scrolling grid, so a nested card would be clipped. pointer-events:none keeps
+   drag / resize / click-to-edit on the block underneath fully intact.
+   z-index sits under the 1000 modal layer. */
+.cal-hovercard {
+  position: fixed; left: 0; top: 0; z-index: 900;
+  width: 268px; box-sizing: border-box;
+  padding: 10px 12px 11px;
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--separator-strong);
+  border-left: 3px solid var(--ev-color, var(--accent));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none;
+  visibility: hidden; opacity: 0;
+  transition: opacity 120ms var(--ease);
+}
+.cal-hovercard-head { display: flex; align-items: flex-start; gap: 6px; }
+.cal-hovercard-title {
+  flex: 1; min-width: 0;
+  font-size: 0.82rem; font-weight: 600; color: var(--text-primary);
+  line-height: 1.25; letter-spacing: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+.cal-hovercard-done {
+  display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+  font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--success); background: var(--success-wash);
+  border-radius: 999px; padding: 2px 7px;
+}
+.cal-hovercard-time {
+  display: flex; align-items: baseline; gap: 7px;
+  font-size: 0.72rem; font-weight: 500; color: var(--text-secondary); letter-spacing: 0;
+}
+.cal-hovercard-dur { color: var(--text-tertiary); font-weight: 400; }
+
+.cal-hovercard-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.cal-hovercard-chip {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.62rem; font-weight: 600; letter-spacing: 0;
+  color: var(--text-secondary); background: var(--bg-elevated-2);
+  border-radius: 5px; padding: 2px 7px;
+}
+.cal-hovercard-chip--xp { color: var(--accent); background: var(--accent-wash); }
+
+.cal-hovercard-section { display: flex; flex-direction: column; gap: 5px; }
+.cal-hovercard-section + .cal-hovercard-section { border-top: 1px solid var(--separator); padding-top: 8px; }
+.cal-hovercard-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.58rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.cal-hovercard-attrs { display: flex; flex-wrap: wrap; gap: 4px; }
+.cal-hovercard-attr {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.63rem; font-weight: 500; letter-spacing: 0;
+  color: var(--attr-color, var(--text-secondary));
+  background: color-mix(in srgb, var(--attr-color, #fff) 12%, transparent);
+  border-radius: 5px; padding: 2px 7px;
+}
+
+.cal-hovercard-list { display: flex; flex-direction: column; gap: 3px; }
+.cal-hovercard-step {
+  font-size: 0.66rem; font-weight: 500; color: var(--text-secondary); letter-spacing: 0;
+  background: var(--bg-elevated-2); border-radius: 4px; padding: 2px 7px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-hovercard-bonus {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.66rem; font-weight: 500; color: var(--text-secondary); letter-spacing: 0;
+  background: var(--bg-elevated-2); border-radius: 4px; padding: 2px 7px;
+}
+.cal-hovercard-bonus--done { color: var(--success); background: var(--success-wash); }
+.cal-hovercard-bonus--done .cal-hovercard-bonus-label { text-decoration: line-through; }
+.cal-hovercard-bonus-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-hovercard-bonus-xp { flex-shrink: 0; color: var(--text-tertiary); font-weight: 600; }
+.cal-hovercard-more { font-size: 0.62rem; color: var(--text-tertiary); padding-left: 2px; }
+
+.cal-hovercard-notes {
+  margin: 0;
+  font-size: 0.68rem; font-weight: 400; line-height: 1.45; letter-spacing: 0;
+  color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden;
+}
+.cal-hovercard-empty { margin: 0; font-size: 0.66rem; color: var(--text-tertiary); letter-spacing: 0; }
+
+/* Hover cards are pointer-driven; touch taps open the full edit modal instead. */
+@media (hover: none) { .cal-hovercard { display: none; } }
+
 .cal-event-actions { position: absolute; bottom: 0; right: 0; display: flex; gap: 1px; padding: 1px 3px; justify-content: flex-end; opacity: 0; transition: opacity 0.15s; background: rgba(0,0,0,0.55); border-radius: 0 0 6px 0; z-index: 4; }
 
 .cal-event-resize-handle {

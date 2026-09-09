@@ -1,5 +1,52 @@
 # Todo
 
+## Done (2026-09-09): Hover detail card for calendar time blocks
+
+Time blocks in the Calendar day/week grid are height-constrained — a 15-min block shows only a
+truncated title, and `notes` (a real field on every event, editable in the modal) was **never
+rendered anywhere on the grid at all**. Hovering a block now surfaces its full details + notes
+without opening the edit modal.
+
+- [x] `src/components/CalendarPage.jsx` — `hoverCard` state + 320ms dwell timer;
+      `onMouseEnter` / `onMouseLeave` / `onMouseDownCapture` on `.cal-event`. Capture-phase
+      mousedown is required because `beginEventResize` calls `stopPropagation()`.
+- [x] Card renders as a `position:fixed` sibling at the `.cal-page` root, NOT nested in the
+      block — `.cal-event` is `overflow:hidden` inside `.cal-scroll-area` (`overflow-y:auto`),
+      so a nested card would be clipped on both axes.
+- [x] `pointer-events:none` so it never intercepts the block's drag / resize / click-to-edit.
+      (Trade-off: notes text isn't selectable — correct for a hover tooltip.)
+- [x] `useLayoutEffect` flip/clamp: prefer right of the block, flip left near the right edge,
+      clamp into the viewport. Fresh measure per hover via a `key` remount + CSS
+      `visibility:hidden` → effect reveals + rAF opacity fade.
+- [x] Re-measures on scroll/resize so the card stays glued to a block moving under the cursor.
+- [x] Suppressed while `resizeSession` / `draggingEvent` / `modal` is active, and on touch
+      (`matchMedia('(hover: hover)')` guard + a `@media (hover: none)` CSS backstop) — tapping
+      already opens the full edit modal there.
+- [x] Content: title + Done badge, full time range + duration, XP total, recurrence (reusing
+      `WEEKDAY_LABELS`), attributes with names + per-attribute XP split, sub-events, bonus tasks
+      with completion state, and **notes** (`white-space:pre-wrap`, clamped to 8 lines).
+- [x] `src/components/CalendarPage.css` — `.cal-hovercard*`, `z-index:900` (under the 1000 modal layer).
+
+Scope: day + week time-grid blocks (`.cal-event`). Month-view chips and no-phone bands untouched.
+
+Verified: `npm run build` clean; `npm run lint` identical 40 problems (12 errors, 28 warnings)
+before and after via `git stash` diff, zero findings in either changed file. Playwright pass on a
+temporary harness (`src/testCalendarHover.jsx` + `calendar-hover-test.html`, mounting
+`CalendarPage` with mock state under `StrictMode`, bypassing Firebase auth — both files removed
+after): card appears on dwell with notes/steps/bonus tasks and disappears on mouseout; a 15-min
+block shows its full detail; a block with no detail shows the empty hint; bottom-of-viewport
+clamp fits exactly (700.75 + 191.25 = 892 = 900−8); right-edge block flips left (block x=1277 →
+card x=999); card stays glued through a mid-viewport scroll (block and card both moved +24.0px);
+click-through still opens "Edit Time Block" and drag-resize through the card still worked
+(64→96px); an 8-line clamp engaged on a 20-line note (clientH 126 vs scrollH 631); day view
+positions correctly; on an iPhone 13 context the card never renders. No console errors.
+
+Note: `offsetWidth`/`offsetHeight` were the first clamp measurement and rounded to whole pixels,
+letting a fractional-height card overhang the viewport by 0.25px — switched to
+`getBoundingClientRect()`.
+
+---
+
 ## Done (2026-08-07): Weekly recurrence on specific weekdays
 
 Full plan: `/Users/jaydenlee/.claude/plans/linear-gliding-pebble.md`. Calendar events, Quick

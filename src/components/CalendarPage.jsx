@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import STAT_META from './statMeta';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
@@ -16,6 +16,10 @@ const SLOTS_PER_HOUR = 4;
 const TOTAL_SLOTS = 96;
 const TOTAL_HEIGHT = TOTAL_SLOTS * SLOT_HEIGHT;
 const MIN_EVENT_SLOTS = 1; // 15 min minimum duration
+const HOVER_CARD_DELAY = 320; // ms of dwell before a block's detail card appears
+const HOVER_CARD_WIDTH = 268; // keep in sync with .cal-hovercard width in CalendarPage.css
+const HOVER_CARD_GAP = 10;    // gap between the block and its card
+const HOVER_CARD_MARGIN = 8;  // min distance the card keeps from the viewport edge
 const DAYS_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']; // index = Date#getDay() (0=Sun…6=Sat)
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -32,6 +36,12 @@ const fmtTime = (h, m) => {
   const suffix = h < 12 ? 'AM' : 'PM';
   const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
+};
+const fmtDuration = (mins) => {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
 };
 const daysUntil = (targetMs, nowMs) => {
   if (!targetMs || !nowMs) return null;
@@ -214,6 +224,10 @@ export default function CalendarPage({
   const [noPhoneEditScope, setNoPhoneEditScope] = useState(null);
   const [noPhoneDeleteScope, setNoPhoneDeleteScope] = useState(null);
   const [logViewerDate, setLogViewerDate] = useState(null);
+  const [hoverCard, setHoverCard] = useState(null); // { ev, rect } — detail card for a hovered time block
+  const hoverTimerRef = useRef(null);
+  const hoverAnchorRef = useRef(null); // the .cal-event element the card is glued to
+  const hoverCardRef = useRef(null);
   const [currentMinute, setCurrentMinute] = useState(() => { const n = new Date(); return n.getHours()*60+n.getMinutes(); });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const gridRef = useRef(null);
@@ -736,6 +750,75 @@ export default function CalendarPage({
   resizeSessionRef.current = resizeSession;
   const resizeDeltaRef = useRef(0);
 
+  // ─── Time-block hover detail card ───────────────────────────────────────────
+  // The card is rendered as a position:fixed sibling at the .cal-page root, not
+  // inside the block: .cal-event is overflow:hidden and lives inside
+  // .cal-scroll-area (overflow-y:auto), so a nested card would be clipped.
+  const cancelHoverCard = () => {
+    clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = null;
+    hoverAnchorRef.current = null;
+    setHoverCard(prev => (prev ? null : prev));
+  };
+
+  const handleEventHoverEnter = (e, ev) => {
+    // Touch taps fire a synthetic mouseenter; there the tap already opens the
+    // full edit modal, so the card is for genuinely hover-capable pointers only.
+    if (!window.matchMedia?.('(hover: hover)').matches) return;
+    if (resizeSession || draggingEvent || noPhoneMode) return;
+    const el = e.currentTarget;
+    clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      hoverAnchorRef.current = el;
+      setHoverCard({ ev, rect: el.getBoundingClientRect() });
+    }, HOVER_CARD_DELAY);
+  };
+
+  useEffect(() => () => clearTimeout(hoverTimerRef.current), []);
+
+  // Keep the card glued to its block while the grid scrolls under the cursor.
+  const hoverCardOpen = Boolean(hoverCard);
+  useEffect(() => {
+    if (!hoverCardOpen) return undefined;
+    const reposition = () => {
+      const el = hoverAnchorRef.current;
+      if (!el || !el.isConnected) { cancelHoverCard(); return; }
+      setHoverCard(prev => (prev ? { ...prev, rect: el.getBoundingClientRect() } : prev));
+    };
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [hoverCardOpen]);
+
+  const hoverCardVisible = Boolean(hoverCard) && !modal && !resizeSession && !draggingEvent;
+
+  // Position after paint: prefer the right of the block, flip left near the right
+  // edge, clamp into the viewport vertically. The card mounts hidden (CSS) and is
+  // revealed here so it is never painted at a stale position.
+  useLayoutEffect(() => {
+    const el = hoverCardRef.current;
+    if (!hoverCardVisible || !el) return undefined;
+    const r = hoverCard.rect;
+    const { width: cw, height: ch } = el.getBoundingClientRect();
+    let left = r.right + HOVER_CARD_GAP;
+    if (left + cw > window.innerWidth - HOVER_CARD_MARGIN) {
+      const flipped = r.left - HOVER_CARD_GAP - cw;
+      left = flipped >= HOVER_CARD_MARGIN ? flipped : Math.max(HOVER_CARD_MARGIN, window.innerWidth - HOVER_CARD_MARGIN - cw);
+    }
+    let top = r.top;
+    if (top + ch > window.innerHeight - HOVER_CARD_MARGIN) top = window.innerHeight - HOVER_CARD_MARGIN - ch;
+    if (top < HOVER_CARD_MARGIN) top = HOVER_CARD_MARGIN;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.visibility = 'visible';
+    // Fade in on the frame after placement so the transition actually runs.
+    const raf = requestAnimationFrame(() => { el.style.opacity = '1'; });
+    return () => cancelAnimationFrame(raf);
+  }, [hoverCardVisible, hoverCard]);
+
   const beginEventResize = (e, ev, edge) => {
     e.stopPropagation();
     e.preventDefault();
@@ -1109,8 +1192,12 @@ export default function CalendarPage({
                       className={`cal-event ${done?'cal-event--done':''} ${isResizing?'cal-event--resizing':''}`}
                       style={{top,height,left,width,'--ev-color':color}}
                       draggable={!resizeSession}
-                      onDragStart={(e)=>handleEventDragStart(e,ev)}
+                      onDragStart={(e)=>{cancelHoverCard();handleEventDragStart(e,ev);}}
                       onDragEnd={handleDragEnd}
+                      onMouseEnter={(e)=>handleEventHoverEnter(e,ev)}
+                      onMouseLeave={cancelHoverCard}
+                      // capture phase: the resize handles stopPropagation on mousedown
+                      onMouseDownCapture={cancelHoverCard}
                       onClick={(e)=>{e.stopPropagation();openEdit(ev);}}
                     >
                       <div
@@ -1423,6 +1510,117 @@ export default function CalendarPage({
     </>
   );
 
+  // ─── Time-Block Hover Detail Card ────────────────────────────────────────────
+  // Everything a block is too short to show: full title, exact times, duration,
+  // XP split, sub-events, bonus tasks and — the one field the grid never renders
+  // anywhere else — the event's notes.
+  const renderEventHoverCard = () => {
+    if (!hoverCardVisible) return null;
+    const ev = hoverCard.ev;
+    const startMin = minsFromEvent(ev), endMin = minsEndFromEvent(ev);
+    const durMin = Math.max(0, endMin - startMin);
+    const totalXp = durMin > 0 ? xpForBlockMinutes(durMin) : 0;
+    const attrs = ev.attributes || [];
+    const perAttrXp = attrs.length ? Math.max(1, Math.floor(totalXp / attrs.length)) : 0;
+    const done = isInstanceCompleted(ev);
+    const subEvents = ev.subEvents || [];
+    const bonusTasks = ev.bonusTasks || [];
+    const notes = (ev.notes || '').trim();
+    const recurDays = ev.recurrenceDays?.length ? ev.recurrenceDays : [weekdayOfDateKey(ev.date)];
+    const recurLabel = ev.recurrence === 'daily'
+      ? 'Every day'
+      : ev.recurrence === 'weekly'
+        ? recurDays.map(d => WEEKDAY_LABELS[d]).join(' ')
+        : null;
+    const hasDetail = attrs.length > 0 || subEvents.length > 0 || bonusTasks.length > 0 || Boolean(notes);
+
+    return (
+      <div
+        key={`${ev.id}-${ev._instanceDate}`}
+        ref={hoverCardRef}
+        className="cal-hovercard"
+        style={{ '--ev-color': primaryColor(ev) }}
+        role="tooltip"
+      >
+        <div className="cal-hovercard-head">
+          <span className="cal-hovercard-title">{ev.title || 'Untitled'}</span>
+          {done && <span className="cal-hovercard-done"><Check size={10} strokeWidth={3} />Done</span>}
+        </div>
+
+        <div className="cal-hovercard-time">
+          <span>{fmtTime(ev.startHour, ev.startMin)} – {fmtTime(ev.endHour, ev.endMin)}</span>
+          <span className="cal-hovercard-dur">{fmtDuration(durMin)}</span>
+        </div>
+
+        <div className="cal-hovercard-chips">
+          <span className="cal-hovercard-chip cal-hovercard-chip--xp">+{totalXp} XP</span>
+          {recurLabel && (
+            <span className="cal-hovercard-chip"><Repeat size={9} strokeWidth={3} />{recurLabel}</span>
+          )}
+        </div>
+
+        {attrs.length > 0 && (
+          <div className="cal-hovercard-section">
+            <span className="cal-hovercard-label">Attributes · +{perAttrXp} XP each</span>
+            <div className="cal-hovercard-attrs">
+              {attrs.map(a => {
+                const meta = STAT_META[a];
+                if (!meta) return null;
+                const Icon = meta.Icon;
+                return (
+                  <span key={a} className="cal-hovercard-attr" style={{ '--attr-color': meta.color }}>
+                    <Icon size={10} />{meta.label}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {subEvents.length > 0 && (
+          <div className="cal-hovercard-section">
+            <span className="cal-hovercard-label">Steps</span>
+            <div className="cal-hovercard-list">
+              {subEvents.slice(0, 6).map(se => (
+                <span key={se.id} className="cal-hovercard-step">{se.title}</span>
+              ))}
+              {subEvents.length > 6 && <span className="cal-hovercard-more">+{subEvents.length - 6} more</span>}
+            </div>
+          </div>
+        )}
+
+        {bonusTasks.length > 0 && (
+          <div className="cal-hovercard-section">
+            <span className="cal-hovercard-label">Bonus tasks</span>
+            <div className="cal-hovercard-list">
+              {bonusTasks.slice(0, 6).map((task, taskIndex) => {
+                const normalizedTask = normalizeBonusTask(task, taskIndex);
+                const bonusDone = isBonusTaskCompleted(normalizedTask, ev);
+                return (
+                  <span key={normalizedTask.id} className={`cal-hovercard-bonus ${bonusDone ? 'cal-hovercard-bonus--done' : ''}`}>
+                    {bonusDone ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={3} />}
+                    <span className="cal-hovercard-bonus-label">{normalizedTask.title}</span>
+                    <span className="cal-hovercard-bonus-xp">+{normalizedTask.xpAmount}</span>
+                  </span>
+                );
+              })}
+              {bonusTasks.length > 6 && <span className="cal-hovercard-more">+{bonusTasks.length - 6} more</span>}
+            </div>
+          </div>
+        )}
+
+        {notes && (
+          <div className="cal-hovercard-section">
+            <span className="cal-hovercard-label"><NotebookText size={10} />Notes</span>
+            <p className="cal-hovercard-notes">{notes}</p>
+          </div>
+        )}
+
+        {!hasDetail && <p className="cal-hovercard-empty">No notes or details yet — click to add some.</p>}
+      </div>
+    );
+  };
+
   // ─── Shared Modal Fields ─────────────────────────────────────────────────────
   const renderAttrPills = (attrs, toggle) => (
     <div className="cal-attr-pills">
@@ -1510,6 +1708,9 @@ export default function CalendarPage({
           {view==='month'&&renderMonthView()}
         </div>
       </div>
+
+      {/* ── Hover detail card for a time block ── */}
+      {renderEventHoverCard()}
 
       {/* ── Create / Edit Event Modal ── */}
       {(modal==='create'||modal==='edit')&&(
