@@ -151,6 +151,70 @@
   z-index: 1;
 }
 
+/* Daily Score chip — headline signal, sits above the rank it feeds */
+.sidebar-score-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-score-ring {
+  position: relative;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Centred over the ring, so the value stays readable when collapsed */
+.sidebar-score-number {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-score-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;   /* let the nowrap children below ellipsis instead of forcing width */
+}
+
+.sidebar-score-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-score-outof {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sidebar-score-chip:hover .sidebar-score-label {
+  color: var(--accent);
+}
+
 /* Rank chip */
 .sidebar-rank-chip {
   display: flex;
@@ -291,11 +355,13 @@
 .sidebar.collapsed .sidebar-link-label,
 .sidebar.collapsed .sidebar-xp-header,
 .sidebar.collapsed .sidebar-username,
-.sidebar.collapsed .sidebar-rank-name {
+.sidebar.collapsed .sidebar-rank-name,
+.sidebar.collapsed .sidebar-score-text {
   display: none;
 }
 
-.sidebar.collapsed .sidebar-rank-chip {
+.sidebar.collapsed .sidebar-rank-chip,
+.sidebar.collapsed .sidebar-score-chip {
   justify-content: center;
 }
 

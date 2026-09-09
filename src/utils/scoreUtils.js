@@ -62,6 +62,11 @@ export const computeDailyScore = (
   };
 };
 
+// Shared traffic-light color for a 0-10 Daily Score, so every surface that shows
+// one (Home hero, character sheet, sidebar chip) grades it identically.
+export const scoreColor = (score) =>
+  score >= 8 ? '#30d158' : score >= 5 ? '#ff9f0a' : '#ff453a';
+
 // Day-by-day score history, oldest first — never averaged/blended, so a dip on any
 // single day stays visible (mirrors the streak's own day-by-day mechanic below).
 export const computeDailyScoreHistory = (

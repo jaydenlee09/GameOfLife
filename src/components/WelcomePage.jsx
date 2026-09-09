@@ -10,7 +10,7 @@ import {
   expandEventsForDates, isInstanceCompleted,
 } from '../utils/calendarUtils';
 import { getGoalProgress } from '../utils/goalUtils';
-import { computeDailyScore, computeStreak } from '../utils/scoreUtils';
+import { computeDailyScore, computeStreak, scoreColor } from '../utils/scoreUtils';
 
 const getGreeting = (hour) => {
   if (hour < 5) return 'Good night';
@@ -88,7 +88,7 @@ function DailyScoreHero({ habits, xpLog, logs, commitmentArchive, healthLog, onN
   const streak = computeStreak(
     habits || [], xpLog || [], logs || {}, commitmentArchive || [], healthLog || {}
   );
-  const color = score >= 8 ? '#30d158' : score >= 5 ? '#ff9f0a' : '#ff453a';
+  const color = scoreColor(score);
   const R = 46;
   const C = 2 * Math.PI * R;
   const pct = score / 10;

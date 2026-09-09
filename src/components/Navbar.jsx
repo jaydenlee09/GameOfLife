@@ -1,6 +1,7 @@
 import React, { useState, useLayoutEffect } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TIER_ICONS } from '../utils/rankMeta';
+import { scoreColor } from '../utils/scoreUtils';
 import './Navbar.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
@@ -138,7 +139,42 @@ function GearIcon() {
   );
 }
 
-const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose, firebaseUser, onSignOut }) => {
+// Today's Daily Score, footer-sized. The number sits INSIDE the ring so a collapsed
+// sidebar still shows the real value rather than just a colored arc.
+function ScoreChip({ score, onNavigate }) {
+  const value = Number.isFinite(score) ? Math.max(0, Math.min(score, 10)) : 0;
+  const color = scoreColor(value);
+  const R = 13;
+  const C = 2 * Math.PI * R;
+
+  return (
+    <button
+      className="sidebar-score-chip"
+      onClick={() => onNavigate('statistics')}
+      title={`Today's Daily Score — ${value.toFixed(1)} / 10`}
+    >
+      <span className="sidebar-score-ring">
+        <svg width="32" height="32" viewBox="0 0 32 32">
+          <circle cx="16" cy="16" r={R} fill="none" stroke="var(--bg-elevated-2)" strokeWidth="2.5" />
+          <circle
+            cx="16" cy="16" r={R} fill="none"
+            stroke={color} strokeWidth="2.5" strokeLinecap="round"
+            strokeDasharray={C} strokeDashoffset={C * (1 - value / 10)}
+            transform="rotate(-90 16 16)"
+            style={{ transition: 'stroke-dashoffset 0.5s var(--ease)' }}
+          />
+        </svg>
+        <span className="sidebar-score-number" style={{ color }}>{value.toFixed(1)}</span>
+      </span>
+      <span className="sidebar-score-text">
+        <span className="sidebar-score-label">Daily Score</span>
+        <span className="sidebar-score-outof">out of 10 today</span>
+      </span>
+    </button>
+  );
+}
+
+const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, dailyScore, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose, firebaseUser, onSignOut }) => {
   const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
   const RankIcon = rankStatus ? TIER_ICONS[rankStatus.tier.icon] : null;
 
@@ -154,6 +190,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
 
   const SidebarFooter = () => (
     <div className="sidebar-footer">
+      <ScoreChip score={dailyScore} onNavigate={onNavigate} />
       {rankStatus && (
         <button
           className="sidebar-rank-chip"

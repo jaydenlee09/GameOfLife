@@ -4,7 +4,7 @@ import STAT_META from './statMeta';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip as RechartTooltip
 } from 'recharts';
-import { computeDailyScore, computeStreak, REQUIRED_STREAK_DAYS } from '../utils/scoreUtils';
+import { computeDailyScore, computeStreak, REQUIRED_STREAK_DAYS, scoreColor } from '../utils/scoreUtils';
 import { computeWeekStats, STAT_ITEMS, getMondayKey } from '../utils/weekStatsUtils';
 import RANK_TIERS, { TIER_ICONS } from '../utils/rankMeta';
 import TrendChart from './stats/TrendChart';
@@ -127,7 +127,7 @@ const AttributeRadar = ({ stats }) => {
 
 // ─── Daily Score Badge ────────────────────────────────────────────────────────
 const DailyScoreBadge = ({ score, breakdown, streak }) => {
-  const color = score >= 8 ? '#30d158' : score >= 5 ? '#ff9f0a' : '#ff453a';
+  const color = scoreColor(score);
   const R = 46;
   const circumference = 2 * Math.PI * R;
   const pct = score / 10;

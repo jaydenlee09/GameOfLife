@@ -1,5 +1,52 @@
 # Todo
 
+## Done (2026-09-09): Daily Score in the sidebar
+
+Goal: surface the Daily Score (0-10, *computed* — see `scoreUtils.js`) in the sidebar footer so it is
+visible from every page, the way Rank already is. Score feeds Rank, so it reads top-down: Score -> Rank
+-> XP -> user.
+
+- [x] `scoreUtils.js`: export a shared `scoreColor(score)` (>=8 green / >=5 orange / else red). Three
+      near-identical copies already exist (`WelcomePage.jsx:91`, `PlayerDashboard.jsx:130`,
+      `stats/TrendChart.jsx:8`) — don't add a 4th. Dedupe the two byte-identical ones; leave
+      TrendChart's alone (it cuts at `STREAK_THRESHOLD`, i.e. 6 not 5 — different on purpose).
+- [x] `App.jsx`: compute `dailyScore` in one `useMemo` beside `rankStatus` and pass it down — same
+      rationale as the existing rank comment (one source of truth, displays can't drift apart).
+      Deps must be the array/object **references** (`habits`, `xpLog`, ...), NOT `.length`: ticking a
+      habit mutates `habits[i].history[dateKey]` without changing `habits.length`, so a length-keyed
+      memo would leave a stale score on screen until reload.
+- [x] `Navbar.jsx`: `sidebar-score-chip` as the first row of `.sidebar-footer`, mirroring the rank
+      chip's ring geometry. Number goes *inside* the ring so the collapsed sidebar still shows the
+      real value, not just a colored arc.
+- [x] `Navbar.css`: style it; when collapsed hide only the text column (same pattern as
+      `.sidebar-rank-name`) and check it in the mobile drawer footer too.
+- [x] Verify in a real browser: expanded / collapsed / mobile drawer, and that the number moves live
+      when a habit is ticked. Then `npm run lint` + `npm run build`.
+
+Verified via a throwaway Vite harness (`sidebar-harness.html` + `src/sidebar-harness.jsx`, both deleted
+after — they were this session's own files, checked against the clean session-start `git status` per the
+2026-07-24 lesson), mounting `Navbar` alone so Firebase auth wasn't in the way:
+
+- Expanded, collapsed and mobile-drawer states all screenshotted. Collapsed hides only the text column
+  and the score ring lands **0.00px** off the rank ring's centre; `scrollWidth === clientWidth` on the
+  footer in every state, so no min-content blowout (2026-07-25 lesson).
+- Live update proven, not assumed: ticking two habits moved the ring 5.0 -> 6.0 -> 7.0 and unticking one
+  took it back to 6.0, with `stroke-dashoffset` exact each time (40.84 of an 81.68 circumference = 50%
+  at 5.0). Confirms the reference-based memo deps; a `.length`-keyed one would have sat at 5.0.
+- Colour crossover checked at both ends: orange #ff9f0a at 5.0-7.9, green #30d158 at 9.0, on the number
+  *and* the arc. `scoreColor` boundaries + the clamp checked in node across
+  `undefined/null/NaN/±Infinity/-3/0/4.9/5/8/10/12`.
+- First measurement of the mobile drawer read "chip below the viewport" — it was taken mid-slide-in, with
+  the drawer still at `translateY(100%)`. Re-measured after force-finishing the animations: chip sits
+  inside both drawer and viewport. (Same shape as the 2026-09-09 boundary-measurement lesson.)
+- `npm run lint` 40 problems / 12 errors — byte-identical to the `git stash` baseline, so nothing new.
+  `npm run build` clean. Real app entry loads with **zero console errors** in a fresh tab.
+
+Left alone deliberately: `stats/TrendChart.jsx` keeps its own score colour (it cuts at `STREAK_THRESHOLD`
+= 6, not 5 — a different, intentional grading), and `rankStatus`'s memo in App.jsx still uses `.length`
+deps, so the rank chip can lag a habit tick until reload. Pre-existing, flagged to the user, not fixed
+here.
+
 ## Done (2026-09-09): Hover detail card for calendar time blocks
 
 Time blocks in the Calendar day/week grid are height-constrained — a 15-min block shows only a

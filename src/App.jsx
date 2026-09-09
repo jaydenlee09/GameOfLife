@@ -12,7 +12,7 @@ import LevelUpModal from './components/LevelUpModal'
 import DailyLogPage from './components/DailyLogPage'
 import { xpCapForLevel } from './utils/xpUtils'
 import RANK_TIERS from './utils/rankMeta'
-import { computeRankStatus } from './utils/scoreUtils'
+import { computeRankStatus, computeDailyScore } from './utils/scoreUtils'
 import RankChangeModal from './components/RankChangeModal'
 import { calcStreakXp, getHabitAttrs } from './utils/habitUtils'
 import CalendarPage from './components/CalendarPage'
@@ -299,6 +299,16 @@ function App() {
   const [focusModeOpen, setFocusModeOpen] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null);
   const [commitmentToast, setCommitmentToast] = useState(false);
+
+  // ─── Daily Score ───────────────────────────────────────────────────────────────
+  // Computed here (not inside Navbar) so the sidebar chip and any other consumer
+  // read one value. Deps are the full state references, not `.length`: ticking a
+  // habit writes `habits[i].history[dateKey]` and leaves the array length alone, so
+  // a length-keyed memo would leave a stale score on screen until the next reload.
+  const dailyScore = useMemo(
+    () => computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog),
+    [habits, xpLog, logs, commitmentArchive, healthLog]
+  );
 
   // ─── Rank ──────────────────────────────────────────────────────────────────────
   // Rank is a "maintain" system: it holds a tier only while the Daily Score keeps
@@ -846,6 +856,7 @@ function App() {
         userXp={user.xp}
         userXpCap={xpCapForLevel(user.level)}
         rankStatus={rankStatus}
+        dailyScore={dailyScore.score}
         onOpenDataModal={() => setDataModalOpen(true)}
         isMobileMenuOpen={mobileMenuOpen}
         onMobileMenuClose={() => setMobileMenuOpen(false)}
