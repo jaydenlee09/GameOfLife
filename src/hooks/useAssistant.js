@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { runAssistantTurn } from '../utils/assistantUtils';
+import { runAssistantTurn, geminiGenerateJson } from '../utils/assistantUtils';
+import { generateLogReview, upsertReview, reviewToChatText } from '../utils/logReview';
 import { getTool, applySliceOp, undoBlocker } from '../utils/assistantTools';
 
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 const ACTIVITY_LIMIT = 100;
 const pad = (n) => String(n).padStart(2, '0');
 const statKeys = (state) => Object.keys(state.user?.stats || {});
+const dateLabel = (dateKey) => {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+};
 
 const friendlyError = (err) => {
   const message = err?.message || String(err);
@@ -40,7 +45,7 @@ const proposalToolAndArgs = (action) => {
  * `setters` maps each op `collection` to its React setter. Both are read through a
  * ref so long-running turns and click handlers always see the latest values.
  */
-export default function useAssistant({ state, setters, setChatHistory, setActivity }) {
+export default function useAssistant({ state, setters, setChatHistory, setActivity, setLogReviews }) {
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; });
 
@@ -156,5 +161,37 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     return { ok: true, message: `Undid: ${entry.label}` };
   }, [commitOp, setActivity]);
 
-  return { send, approve, reject, undo, isLoading, error, clearError: () => setError(null) };
+  // Daily Log review: report-only, so it runs beside chat turns rather than
+  // queueing behind them. Only one review runs at a time.
+  const [reviewingDate, setReviewingDate] = useState(null);
+  const reviewingRef = useRef(false);
+
+  /**
+   * Reviews one day's log, saves the report, and copies it into the chat (after a
+   * hidden user line) so follow-up questions have it as context. Resolves
+   * { ok: true } or { ok: false, error }.
+   */
+  const reviewLog = useCallback(async (dateKey) => {
+    if (reviewingRef.current) return { ok: false, error: 'A review is already running.' };
+    reviewingRef.current = true;
+    setReviewingDate(dateKey);
+    try {
+      const review = await generateLogReview({ state: stateRef.current, dateKey, generate: geminiGenerateJson });
+      setLogReviews((prev) => upsertReview(prev, review));
+      const label = dateLabel(dateKey);
+      setChatHistory((prev) => [
+        ...prev,
+        { id: makeId('msg'), role: 'user', parts: [{ text: `[I submitted my Daily Log for ${label} (${dateKey}) and you reviewed it.]` }], hidden: true },
+        { id: makeId('msg'), role: 'model', parts: [{ text: reviewToChatText(review, label) }], kind: 'log-review' },
+      ]);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    } finally {
+      reviewingRef.current = false;
+      setReviewingDate(null);
+    }
+  }, [setChatHistory, setLogReviews]);
+
+  return { send, approve, reject, undo, reviewLog, reviewingDate, isLoading, error, clearError: () => setError(null) };
 }

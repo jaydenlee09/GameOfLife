@@ -226,6 +226,12 @@ function App() {
     return saved ? { ...EMPTY_CHECKINS, ...JSON.parse(saved) } : EMPTY_CHECKINS;
   });
 
+  // The assistant's report on each submitted Daily Log, keyed by date.
+  const [logReviews, setLogReviews] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_logReviews');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   const [priorityPopupDismissed, setPriorityPopupDismissed] = useState(false);
   const [priorityPopupMinimized, setPriorityPopupMinimized] = useState(false);
 
@@ -389,6 +395,7 @@ function App() {
   useEffect(() => { persist('gameOfLife_assistantMemory', assistantMemory); }, [assistantMemory]);
   useEffect(() => { persist('gameOfLife_assistantActivity', assistantActivity); }, [assistantActivity]);
   useEffect(() => { persist('gameOfLife_assistantCheckins', assistantCheckins); }, [assistantCheckins]);
+  useEffect(() => { persist('gameOfLife_logReviews', logReviews); }, [logReviews]);
 
   // Enable cloud sync only after persist effects for the Firestore load have run.
   // Using state + useEffect guarantees this effect runs AFTER all the persist
@@ -433,6 +440,7 @@ function App() {
         if (data.gameOfLife_assistantMemory && !touched.has('gameOfLife_assistantMemory')) setAssistantMemory(data.gameOfLife_assistantMemory);
         if (data.gameOfLife_assistantActivity && !touched.has('gameOfLife_assistantActivity')) setAssistantActivity(data.gameOfLife_assistantActivity);
         if (data.gameOfLife_assistantCheckins && !touched.has('gameOfLife_assistantCheckins')) setAssistantCheckins({ ...EMPTY_CHECKINS, ...data.gameOfLife_assistantCheckins });
+        if (data.gameOfLife_logReviews && !touched.has('gameOfLife_logReviews')) setLogReviews(data.gameOfLife_logReviews);
       } else {
         // First login — migrate whatever exists in localStorage to the cloud
         migrateLocalStorageToFirestore(firebaseUser.uid, {
@@ -460,6 +468,7 @@ function App() {
           gameOfLife_assistantMemory: assistantMemory,
           gameOfLife_assistantActivity: assistantActivity,
           gameOfLife_assistantCheckins: assistantCheckins,
+          gameOfLife_logReviews: logReviews,
         }).catch(console.error);
       }
       // This load has now made its one decision per key (apply cloud value or
@@ -503,6 +512,7 @@ function App() {
     gameOfLife_assistantMemory: setAssistantMemory,
     gameOfLife_assistantActivity: setAssistantActivity,
     gameOfLife_assistantCheckins: (value) => setAssistantCheckins({ ...EMPTY_CHECKINS, ...value }),
+    gameOfLife_logReviews: setLogReviews,
   });
 
   useEffect(() => {
@@ -759,6 +769,7 @@ function App() {
     setters: assistantSetters,
     setChatHistory,
     setActivity: setAssistantActivity,
+    setLogReviews,
   });
 
   const unreadCheckin = assistantOpen ? null : [...chatHistory].reverse().find(m => m.unread) || null;
@@ -885,6 +896,10 @@ function App() {
             foodPoints={foodPoints}
             setFoodPoints={setFoodPoints}
             onUpdateStat={updateStat}
+            logReviews={logReviews}
+            onSubmitLog={assistant.reviewLog}
+            reviewingDate={assistant.reviewingDate}
+            onOpenAssistant={openAssistant}
           />
         );
       case 'timer':

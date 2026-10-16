@@ -1,5 +1,32 @@
 # Todo
 
+## Done (2026-10-16): Daily Log → My Assistant review report (uncommitted)
+
+Goal: submitting a Daily Log gets an AI report that analyses the day.
+
+**Locked decisions (Q&A 2026-10-16):** new "Submit & get review" button (separate from Hold to
+Commit) · report card saved on that day's log **and** copied into the My Assistant chat for
+follow-ups · scope = the entry + that day's score/habits/health/calendar/commitment, compared with
+the prior 7 days and checked against North Star/goals/memory · **report only**, no tools/actions.
+
+- [x] `src/utils/logReview.js`: gather context by reusing the read tools (get_journal, get_health,
+      get_calendar, get_commitments) + computeDailyScore per day; Gemini JSON-schema call (no tools);
+      normalize; chat-text formatter; entry fingerprint for "edited since review".
+- [x] `geminiGenerateJson` in assistantUtils (shares the client + key check).
+- [x] `useAssistant.reviewLog(dateKey)`: saves the review + appends a hidden user msg and a
+      `kind: 'log-review'` model msg to chat. Per-date loading state; inline error.
+- [x] New synced key `gameOfLife_logReviews` `{[dateKey]: review}` (capped 120 days) — separate
+      doc so the logs doc doesn't grow toward Firestore's 1 MB limit.
+- [x] DailyLogPage: Submit button / loading / error / report card (+ "Ask a follow-up",
+      "Review again", stale notice). Drawer label for the new chat kind.
+- [x] Verify: lint, build, unit-run logReview with stubbed Gemini, real UI with an in-page stub.
+
+**Verified:** logReview unit run (context, normalize, fingerprint, cap) against stubbed Gemini; real
+`@google/genai` SDK serializes `responseSchema` (fetch stubbed); real DailyLogPage + useAssistant in a
+temp harness with in-page Gemini stub: submit → loading → card, chat copy (hidden user + `log-review`
+model msg), stale notice after edit, Review again, Ask a follow-up, 400 error path, past entry, mobile
++ 1280px. **Not live-verified:** local Gemini key still invalid.
+
 ## Done (2026-10-16): My Assistant → a real agent (uncommitted)
 
 Goal: turn My Assistant from a reactive chatbot (one JSON reply, 3 create-only actions, forgets past

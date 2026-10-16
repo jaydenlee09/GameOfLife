@@ -303,6 +303,25 @@ export const geminiGenerate = async ({ contents, systemPrompt, allowTools }) => 
   });
 };
 
+/** One tool-free model call constrained to a JSON `schema` (used by the Daily Log review). */
+export const geminiGenerateJson = async ({ contents, systemPrompt, schema }) => {
+  if (!hasAssistantApiKey()) {
+    throw new Error('Missing Gemini API key. Add VITE_GEMINI_API_KEY to your .env file.');
+  }
+  const ai = await getClient();
+  return ai.models.generateContent({
+    model: MODEL,
+    contents,
+    config: {
+      systemInstruction: systemPrompt,
+      temperature: 0.6,
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+    },
+  });
+};
+
 // ─── The agent loop ───────────────────────────────────────────────────────────
 /**
  * Runs one assistant turn: the model may call tools for several rounds (reading

@@ -27,6 +27,7 @@ const DATA_KEYS = [
   'gameOfLife_assistantMemory',
   'gameOfLife_assistantActivity',
   'gameOfLife_assistantCheckins',
+  'gameOfLife_logReviews',
 ];
 
 const SHOP_KEY = 'gameOfLife_shop';

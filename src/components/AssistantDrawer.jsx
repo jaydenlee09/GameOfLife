@@ -7,6 +7,7 @@ const CHECKIN_LABELS = {
   morning: 'Morning briefing',
   evening: 'Evening debrief',
   weekly: 'Weekly plan',
+  'log-review': 'Daily Log review',
 };
 
 const TABS = [
