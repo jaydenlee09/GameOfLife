@@ -9,8 +9,9 @@ const CHECKIN_LABELS = {
 };
 
 // The global entry point for talking to the assistant from any screen — submitting
-// here opens the Assistant drawer and sends this as the first message. Double-clicking
-// the bar opens the drawer directly, with no message sent. Above the bar it surfaces
+// here opens the Assistant drawer and sends this as the first message. The sparkle
+// button opens the drawer directly with no message sent (double-click does too on
+// desktop, but a phone double-tap just focuses the input). Above the bar it surfaces
 // what the assistant started on its own: an unread check-in, or one rule-based nudge.
 export default function FloatingAIBar({ onSubmit, onExpand, unreadCheckin, nudge, onNudgeAction, onNudgeDismiss }) {
   const [value, setValue] = useState('');
@@ -47,6 +48,9 @@ export default function FloatingAIBar({ onSubmit, onExpand, unreadCheckin, nudge
         </div>
       )}
       <div className="ai-bar" onDoubleClick={onExpand}>
+        <button className="ai-bar-open" onClick={onExpand} aria-label="Open My Assistant" title="Open My Assistant">
+          <Sparkles size={16} />
+        </button>
         <input
           className="ai-bar-input"
           type="text"
