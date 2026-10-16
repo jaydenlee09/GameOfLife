@@ -104,7 +104,7 @@ export default function NotificationSettings({ uid, api = pushService }) {
           )}
           {thisDeviceOn && (
             <button className="notif-test-btn" disabled={busy}
-              onClick={() => run(() => savePushSettings(uid, { ...settings, testRequestedAt: Date.now() }), 'Test queued. It arrives within 5 minutes.')}>
+              onClick={() => run(() => savePushSettings(uid, { ...settings, testRequestedAt: Date.now() }), 'Test queued. It usually arrives within 5–20 minutes.')}>
               <Send size={13} /> Send a test
             </button>
           )}
@@ -139,7 +139,7 @@ export default function NotificationSettings({ uid, api = pushService }) {
                   <select className="notif-time" value={settings.blockLeadMinutes} disabled={!on || busy}
                     aria-label="Minutes before a block"
                     onChange={(e) => update({ blockLeadMinutes: Number(e.target.value) })}>
-                    {[5, 10, 15, 30].map((m) => <option key={m} value={m}>{m} min before</option>)}
+                    {[10, 15, 20, 30, 45].map((m) => <option key={m} value={m}>{m} min before</option>)}
                   </select>
                 )}
               </div>

@@ -1,6 +1,7 @@
-// Bundles functions/src + the app's shared src/utils into lib/index.js.
-// firebase deploy uploads only this folder, so shared code must be inlined.
-// Runs automatically before deploy (see firebase.json predeploy).
+// Bundles functions/src + the app's shared src/utils into lib/:
+//   lib/cli.js   — what GitHub Actions runs (the active setup)
+//   lib/index.js — the optional Firebase Cloud Function (firebase deploy uploads
+//                  only this folder, so shared code must be inlined)
 import { build } from 'esbuild';
 import { readFileSync } from 'node:fs';
 
@@ -22,8 +23,8 @@ const stubLucide = {
 };
 
 await build({
-  entryPoints: ['src/index.js'],
-  outfile: 'lib/index.js',
+  entryPoints: ['src/index.js', 'src/cli.js'],
+  outdir: 'lib',
   bundle: true,
   platform: 'node',
   target: 'node22',
@@ -34,4 +35,4 @@ await build({
   define: { 'import.meta.env': '{}' },
   logLevel: 'warning',
 });
-console.log('built functions/lib/index.js');
+console.log('built functions/lib/index.js + lib/cli.js');

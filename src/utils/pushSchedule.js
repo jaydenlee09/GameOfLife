@@ -21,12 +21,15 @@ export const DEFAULT_PUSH_SETTINGS = {
   tokens: [],                  // [{ token, platform, addedAt }]
   types: { morning: true, evening: true, streak: true, blocks: true, commitment: true },
   times: { morning: '07:30', commitment: '13:00', evening: '20:30', streak: '21:00' },
-  blockLeadMinutes: 10,
+  blockLeadMinutes: 20,        // generous: GitHub Actions ticks often run late
   testRequestedAt: null,       // set by "Send a test"; the next tick sends one
 };
 
 // How long after its set time a daily push may still go out (covers late ticks).
 const WINDOW_MINUTES = { morning: 180, commitment: 240, evening: 180, streak: 150 };
+// A late tick that lands just after a block started still says so, rather than
+// silently skipping it.
+const BLOCK_GRACE_MINUTES = 5;
 
 const pad = (n) => String(n).padStart(2, '0');
 const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -131,13 +134,14 @@ export const decidePushes = (now, rawSettings, state, pushState = {}) => {
     const upcoming = (events, kind) => expandEventsForDates(events || [], [today]).forEach((ev) => {
       const start = ev.startHour * 60 + ev.startMin;
       const until = start - nowMin;
-      if (until <= 0 || until > lead || isInstanceCompleted(ev)) return;
+      if (until <= -BLOCK_GRACE_MINUTES || until > lead || isInstanceCompleted(ev)) return;
       const id = `${kind}_${ev.id}_${today}_${fmt(ev.startHour, ev.startMin)}`;
       if (!fresh(id)) return;
       const range = `${fmt(ev.startHour, ev.startMin)}–${fmt(ev.endHour, ev.endMin)}`;
+      const when = until > 0 ? `in ${until} min` : 'starting now';
       pushes.push(kind === 'block'
-        ? { id, type: 'blocks', title: `${ev.title} in ${until} min`, body: `Time block ${range}. Wrap up what you're doing.`, page: 'calendar' }
-        : { id, type: 'blocks', title: `No Phone block in ${until} min`, body: `${range}. Put the phone away before it starts.`, page: 'calendar' });
+        ? { id, type: 'blocks', title: `${ev.title} ${when}`, body: `Time block ${range}. ${until > 0 ? "Wrap up what you're doing." : 'Switch over now.'}`, page: 'calendar' }
+        : { id, type: 'blocks', title: `No Phone block ${when}`, body: `${range}. Put the phone away${until > 0 ? ' before it starts' : ' now'}.`, page: 'calendar' });
     });
     upcoming(state.calendarEvents, 'block');
     upcoming(state.noPhoneBlocks, 'nophone');

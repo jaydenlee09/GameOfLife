@@ -1,5 +1,26 @@
 # Todo
 
+## Done (2026-10-16): Run push notifications from GitHub Actions instead of Cloud Functions
+
+Why: user wants the least setup and no card on file (repo is public → Actions minutes are free).
+Same push logic (`runPushTick`); only the trigger changes. Cloud Function entry stays as the
+documented upgrade path if on-time delivery ever matters more.
+
+- [x] `functions/src/cli.js`: one tick from env `FIREBASE_SERVICE_ACCOUNT` (JSON) + `GEMINI_API_KEY`;
+      exits 0 with a notice when secrets are missing (no failure-email spam before setup).
+      Share `makeGenerate` between both entry points.
+- [x] `.github/workflows/push-notifications.yml`: cron every 5 min + manual run, no overlapping runs.
+- [x] GitHub runs late: heads-up default 20 min, and a block that started ≤5 min ago still gets
+      a "starting now" push instead of being silently skipped.
+- [x] Alerts copy ("test arrives within ~20 min"), README rewritten around the Actions setup.
+- [x] Verify: cli against fakes / missing-secret path, schedule tests, lint, builds. Ask before push
+      (push to main also redeploys the site if the host auto-deploys).
+
+**Verified:** cli missing-secret path exits 0 quietly, bad JSON exits 1 with a clear message; schedule
+tests incl. late-tick "starting now", 20-min default, custom lead, test push once/within an hour;
+server tick tests unchanged-pass; workflow YAML parses; lint + both builds. **Not verified:** a real
+Actions run (needs push + the user's two GitHub secrets) and a real push on the iPhone.
+
 ## Built, not deployed (2026-10-16): Push notifications to iPhone (Cloud Functions + FCM)
 
 Goal: My Assistant reaches you when APEX is closed.

@@ -5,7 +5,8 @@
   "main": "lib/index.js",
   "engines": { "node": "22" },
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "tick": "node lib/cli.js"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",

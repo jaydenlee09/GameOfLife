@@ -1,0 +1,40 @@
+# Sends APEX push notifications (functions/src/cli.js).
+# GitHub runs scheduled workflows late (often 5–20 min) and occasionally skips
+# one; the push logic tolerates that (time windows + dedupe by id). GitHub also
+# pauses schedules after 60 days without commits to the repo — re-enable it from
+# the Actions tab if that email arrives.
+name: Push notifications
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # "Run workflow" button, for testing
+
+# Never run two ticks at once: they'd both see a push as unsent and send it twice.
+concurrency:
+  group: push-notifications
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm run tick
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
