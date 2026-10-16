@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sparkles, X, AlertTriangle, Loader2, Send, Check, Undo2, Trash2, Pencil } from 'lucide-react';
 import { MEMORY_KINDS, MEMORY_LIMIT } from '../utils/assistantTools';
+import NotificationSettings from './NotificationSettings';
 import './AssistantDrawer.css';
 
 const CHECKIN_LABELS = {
@@ -14,6 +15,7 @@ const TABS = [
   { id: 'chat', label: 'Chat' },
   { id: 'memory', label: 'Memory' },
   { id: 'activity', label: 'Activity' },
+  { id: 'alerts', label: 'Alerts' },
 ];
 
 const makeMemoryId = () => `mem_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
@@ -54,6 +56,7 @@ export default function AssistantDrawer({
   hasNorthStar,
   draftMessage,
   onDraftConsumed,
+  uid,
 }) {
   const { send, approve, reject, undo, isLoading, error } = assistant;
   const [tab, setTab] = useState('chat');
@@ -298,6 +301,8 @@ export default function AssistantDrawer({
         )}
 
         {tab === 'memory' && <MemoryPanel memory={memory} setMemory={setMemory} />}
+
+        {tab === 'alerts' && <NotificationSettings uid={uid} />}
 
         {tab === 'activity' && (
           <div className="assistant-drawer-messages">

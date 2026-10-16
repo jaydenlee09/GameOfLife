@@ -17,7 +17,7 @@ const STAT_LABELS = {
   productivity: 'Productivity',
 };
 
-const MODEL = 'gemini-2.5-flash';
+export const MODEL = 'gemini-2.5-flash';
 // Tool rounds per user message before the model is forced to answer in text.
 export const MAX_TOOL_ROUNDS = 6;
 // Prior chat messages resent each turn.

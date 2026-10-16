@@ -1,5 +1,43 @@
 # Todo
 
+## Built, not deployed (2026-10-16): Push notifications to iPhone (Cloud Functions + FCM)
+
+Goal: My Assistant reaches you when APEX is closed.
+
+**Locked decisions (Q&A 2026-10-16):** iPhone (installed Home Screen web app, iOS 16.4+) · Firebase
+Cloud Functions (Blaze plan; the user upgrades, I never enter payment) · types: morning brief, evening
+log reminder, streak at risk, time-block heads-up, commitment reminder (no weekly) · hybrid content:
+Gemini writes the morning brief, the rest are templates.
+
+**Design rules:**
+- Server only writes server-owned docs (`gameOfLife_pushState`); it never writes app data like chat,
+  so it can't race the client's whole-blob sync. The client merges the morning brief into chat itself
+  and marks the morning check-in done, so it isn't generated twice.
+- Reuse, don't re-derive: streak/habit/commitment pushes come from `computeNudges` (same rules as
+  in-app nudges); morning brief runs `runAssistantTurn` with **read-only** tools injected.
+- Shared utils use the process timezone, so the function sets `process.env.TZ` to the user's
+  saved timezone before evaluating them.
+- Every send is deduped by id in pushState; windows are "at/after time, within N hours" so a
+  late or skipped tick still delivers once.
+
+- [x] `src/utils/pushSchedule.js`: pure `decidePushes(now, settings, state, pushState)`.
+- [x] `functions/`: scheduled every 5 min; reads settings/state, sends via FCM, prunes dead tokens;
+      esbuild bundles shared `src/utils` (lucide-react stubbed). `firebase.json`, `.firebaserc`.
+- [x] Client: PWA manifest + iOS icons/meta, `public/firebase-messaging-sw.js`,
+      `src/services/pushService.js` (permission, token, settings doc), Notifications tab in the
+      My Assistant drawer, `?page=` deep links + SW click navigation, morning-brief merge.
+- [x] Verify: unit-run decidePushes over a simulated day; bundle loads; send path with mocked
+      messaging; manifest/SW register in the browser; lint + build.
+- [x] User steps (documented): Blaze upgrade + budget alert, VAPID key, `firebase login`,
+      GEMINI secret, deploy, add to Home Screen, enable.
+
+**Verified:** decidePushes over a simulated day (each push once, in window, conditions re-checked);
+server tick against fake Firestore/FCM/Gemini (AI brief via read-only tools, Tokyo TZ, dead-token
+prune, dedupe, Gemini-failure template, no double brief, transient-failure retry); functions bundle
+builds + loads; real SW registers/activates on localhost; Alerts tab at 375px via harness; manifest
++ icons served; lint (no new problems) + both builds. **Not verified:** a real deploy and a real
+push to an iPhone — blocked on the user's Blaze upgrade, VAPID key, `firebase login`.
+
 ## Done (2026-10-16): Daily Log → My Assistant review report (uncommitted)
 
 Goal: submitting a Daily Log gets an AI report that analyses the day.

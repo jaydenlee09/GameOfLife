@@ -17,6 +17,7 @@ import RankChangeModal from './components/RankChangeModal'
 import { calcStreakXp, getHabitAttrs } from './utils/habitUtils'
 import CalendarPage from './components/CalendarPage'
 import AssistantDrawer from './components/AssistantDrawer'
+import { refreshPushToken, listenForegroundPushes, subscribePushState } from './services/pushService'
 import FloatingAIBar from './components/FloatingAIBar'
 import useAssistant from './hooks/useAssistant'
 import { hasAssistantApiKey } from './utils/assistantUtils'
@@ -29,6 +30,9 @@ import BrainDumpPage from './components/BrainDumpPage'
 import FocusMode from './components/FocusMode'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
 import { normalizeGoal } from './utils/goalUtils'
+
+// Every page renderPage() knows, for validating notification deep links.
+const PAGE_IDS = ['welcome', 'statistics', 'tasks', 'daily-log', 'timer', 'calendar', 'goals', 'review', 'shop', 'brain-dump'];
 
 const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -53,8 +57,10 @@ function App() {
   // Firestore Load effect below.
   const touchedSinceLoadStart = useRef(new Set());
 
-  const [currentPage, setCurrentPage] = useState('welcome');
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  // A tapped push notification opens /?page=<page> ('assistant' opens the drawer).
+  const [launchPage] = useState(() => new URLSearchParams(window.location.search).get('page'));
+  const [currentPage, setCurrentPage] = useState(() => (launchPage && PAGE_IDS.includes(launchPage) ? launchPage : 'welcome'));
+  const [assistantOpen, setAssistantOpen] = useState(() => launchPage === 'assistant');
   const [assistantDraft, setAssistantDraft] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -527,6 +533,60 @@ function App() {
     return unsubscribe;
   }, [firebaseUser, cloudSyncReady]);
 
+  // ─── Push notifications ────────────────────────────────────────────────────────
+  // Drop ?page= once it has been applied, so a reload doesn't re-navigate.
+  useEffect(() => {
+    if (launchPage) window.history.replaceState(null, '', window.location.pathname);
+  }, [launchPage]);
+
+  // A notification tapped while APEX is already open: the service worker asks
+  // this window to switch pages.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (event) => {
+      if (event.data?.type !== 'apex-navigate') return;
+      if (event.data.page === 'assistant') setAssistantOpen(true);
+      else if (PAGE_IDS.includes(event.data.page)) setCurrentPage(event.data.page);
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
+
+  useEffect(() => {
+    if (!firebaseUser || !cloudSyncReady) return;
+    refreshPushToken(firebaseUser.uid).catch((err) => console.warn('Push token refresh failed', err));
+    let unsubscribe = null;
+    let cancelled = false;
+    listenForegroundPushes().then((fn) => { if (cancelled) fn(); else unsubscribe = fn; }).catch(() => {});
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, [firebaseUser, cloudSyncReady]);
+
+  // The server writes the morning brief it pushed into its own doc (it never writes
+  // chat, to avoid racing this client's whole-blob sync). Merge it into chat here,
+  // as that day's morning check-in, so the in-app one doesn't run as well. Only
+  // after the cloud load settles, or the merge would count as a local edit and
+  // shadow the cloud chat history.
+  const [pushStateReady, setPushStateReady] = useState(false);
+  useEffect(() => {
+    if (!firebaseUser || !cloudSyncReady) return;
+    let unsubscribe = null;
+    let cancelled = false;
+    subscribePushState(firebaseUser.uid, (pushState) => {
+      const brief = pushState.morningBrief;
+      if (brief?.text && brief.date === getLocalDateKey(0)) {
+        const id = `push_morning_${brief.date}`;
+        setChatHistory(prev => (prev.some(m => m.id === id) ? prev : [
+          ...prev,
+          { id: `${id}_prompt`, role: 'user', parts: [{ text: '[Automatic morning brief, sent to my phone as a notification.]' }], hidden: true },
+          { id, role: 'model', parts: [{ text: brief.text }], kind: 'morning', unread: true },
+        ]));
+        setAssistantCheckins(prev => (prev.morning === brief.date ? prev : { ...prev, morning: brief.date }));
+      }
+      setPushStateReady(true);
+    }).then((fn) => { if (cancelled) fn(); else unsubscribe = fn; }).catch(() => setPushStateReady(true));
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, [firebaseUser, cloudSyncReady]);
+
   // ─── XP Logging ───────────────────────────────────────────────────────────────
   const logXpEvent = useCallback((stat, amount, source = 'manual', label = '') => {
     const today = getLocalDateKey(0);
@@ -777,7 +837,7 @@ function App() {
   // Proactive behaviour re-evaluates on load, whenever the tab becomes visible, and
   // every 5 minutes while it stays open. It waits for the Firestore load (when signed
   // in) so it never acts on stale local data or re-fires a check-in another device ran.
-  const syncSettled = !firebaseUser || cloudSyncReady;
+  const syncSettled = !firebaseUser || (cloudSyncReady && pushStateReady);
   const [clockTick, setClockTick] = useState(() => Date.now());
   useEffect(() => {
     const tick = () => setClockTick(Date.now());
@@ -1009,6 +1069,7 @@ function App() {
         hasNorthStar={!!user.northStar?.vision}
         draftMessage={assistantDraft}
         onDraftConsumed={() => setAssistantDraft(null)}
+        uid={firebaseUser?.uid}
       />
 
       {levelUpModal && (
