@@ -24,6 +24,9 @@ const DATA_KEYS = [
   'gameOfLife_shop',
   'gameOfLife_brainDump',
   'gameOfLife_brainDumpConnections',
+  'gameOfLife_assistantMemory',
+  'gameOfLife_assistantActivity',
+  'gameOfLife_assistantCheckins',
 ];
 
 const SHOP_KEY = 'gameOfLife_shop';

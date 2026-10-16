@@ -18,7 +18,9 @@ import { calcStreakXp, getHabitAttrs } from './utils/habitUtils'
 import CalendarPage from './components/CalendarPage'
 import AssistantDrawer from './components/AssistantDrawer'
 import FloatingAIBar from './components/FloatingAIBar'
-import { applyAssistantAction } from './utils/assistantActions'
+import useAssistant from './hooks/useAssistant'
+import { hasAssistantApiKey } from './utils/assistantUtils'
+import { EMPTY_CHECKINS, getDueCheckin, markCheckinDone, checkinPrompt, computeNudges, dismissNudge } from './utils/assistantTriggers'
 import GoalsPage from './components/GoalsPage'
 import DataModal from './components/DataModal'
 import WeeklyReviewPage from './components/WeeklyReviewPage'
@@ -206,6 +208,24 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // ─── My Assistant (agent) ──────────────────────────────────────────────────────
+  // Long-term memory the agent reads every turn, the log of everything it changed
+  // (for undo), and which proactive check-ins already ran.
+  const [assistantMemory, setAssistantMemory] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_assistantMemory');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [assistantActivity, setAssistantActivity] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_assistantActivity');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [assistantCheckins, setAssistantCheckins] = useState(() => {
+    const saved = localStorage.getItem('gameOfLife_assistantCheckins');
+    return saved ? { ...EMPTY_CHECKINS, ...JSON.parse(saved) } : EMPTY_CHECKINS;
+  });
+
   const [priorityPopupDismissed, setPriorityPopupDismissed] = useState(false);
   const [priorityPopupMinimized, setPriorityPopupMinimized] = useState(false);
 
@@ -366,6 +386,9 @@ function App() {
   useEffect(() => { persist('gameOfLife_shop', shop); }, [shop]);
   useEffect(() => { persist('gameOfLife_brainDump', brainDumpNotes); }, [brainDumpNotes]);
   useEffect(() => { persist('gameOfLife_brainDumpConnections', brainDumpConnections); }, [brainDumpConnections]);
+  useEffect(() => { persist('gameOfLife_assistantMemory', assistantMemory); }, [assistantMemory]);
+  useEffect(() => { persist('gameOfLife_assistantActivity', assistantActivity); }, [assistantActivity]);
+  useEffect(() => { persist('gameOfLife_assistantCheckins', assistantCheckins); }, [assistantCheckins]);
 
   // Enable cloud sync only after persist effects for the Firestore load have run.
   // Using state + useEffect guarantees this effect runs AFTER all the persist
@@ -407,6 +430,9 @@ function App() {
         if (data.gameOfLife_shop && !touched.has('gameOfLife_shop')) setShop(data.gameOfLife_shop);
         if (data.gameOfLife_brainDump && !touched.has('gameOfLife_brainDump')) setBrainDumpNotes(data.gameOfLife_brainDump);
         if (data.gameOfLife_brainDumpConnections && !touched.has('gameOfLife_brainDumpConnections')) setBrainDumpConnections(data.gameOfLife_brainDumpConnections);
+        if (data.gameOfLife_assistantMemory && !touched.has('gameOfLife_assistantMemory')) setAssistantMemory(data.gameOfLife_assistantMemory);
+        if (data.gameOfLife_assistantActivity && !touched.has('gameOfLife_assistantActivity')) setAssistantActivity(data.gameOfLife_assistantActivity);
+        if (data.gameOfLife_assistantCheckins && !touched.has('gameOfLife_assistantCheckins')) setAssistantCheckins({ ...EMPTY_CHECKINS, ...data.gameOfLife_assistantCheckins });
       } else {
         // First login — migrate whatever exists in localStorage to the cloud
         migrateLocalStorageToFirestore(firebaseUser.uid, {
@@ -431,6 +457,9 @@ function App() {
           gameOfLife_shop: shop,
           gameOfLife_brainDump: brainDumpNotes,
           gameOfLife_brainDumpConnections: brainDumpConnections,
+          gameOfLife_assistantMemory: assistantMemory,
+          gameOfLife_assistantActivity: assistantActivity,
+          gameOfLife_assistantCheckins: assistantCheckins,
         }).catch(console.error);
       }
       // This load has now made its one decision per key (apply cloud value or
@@ -471,6 +500,9 @@ function App() {
     gameOfLife_shop: setShop,
     gameOfLife_brainDump: setBrainDumpNotes,
     gameOfLife_brainDumpConnections: setBrainDumpConnections,
+    gameOfLife_assistantMemory: setAssistantMemory,
+    gameOfLife_assistantActivity: setAssistantActivity,
+    gameOfLife_assistantCheckins: (value) => setAssistantCheckins({ ...EMPTY_CHECKINS, ...value }),
   });
 
   useEffect(() => {
@@ -680,6 +712,16 @@ function App() {
     };
   }, []);
 
+  // ─── Assistant drawer open/close ──────────────────────────────────────────────
+  // Check-in replies arrive unread (badge on the AI bar); opening or closing the
+  // drawer means they've been seen.
+  const markAssistantRead = useCallback(() => {
+    setChatHistory(prev => (prev.some(m => m.unread) ? prev.map(m => (m.unread ? { ...m, unread: false } : m)) : prev));
+  }, []);
+  const openAssistant = () => { setAssistantOpen(true); markAssistantRead(); };
+  const closeAssistant = () => { setAssistantOpen(false); markAssistantRead(); };
+  const toggleAssistant = useCallback(() => { setAssistantOpen(o => !o); markAssistantRead(); }, [markAssistantRead]);
+
   // ─── Keyboard Shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
@@ -687,18 +729,89 @@ function App() {
       if (e.altKey) {
         const pageMap = { '1': 'statistics', '2': 'tasks', '3': 'daily-log', '4': 'timer', '5': 'calendar', '6': 'goals', '7': 'review' };
         if (pageMap[e.key]) { e.preventDefault(); setCurrentPage(pageMap[e.key]); return; }
-        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setAssistantOpen(o => !o); return; }
+        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleAssistant(); return; }
         if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFocusModeOpen(true); return; }
         if (e.key === 's' || e.key === 'S') { e.preventDefault(); setCurrentPage('shop'); return; }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, [toggleAssistant]);
+
+  // ─── My Assistant ──────────────────────────────────────────────────────────────
+  // Which React setter each agent op `collection` writes to (see assistantTools.js).
+  const assistantSetters = useMemo(() => ({
+    todos: setTodos,
+    calendarEvents: setCalendarEvents,
+    quickEvents: setQuickEvents,
+    brainDumpNotes: setBrainDumpNotes,
+    goals: setGoals,
+    assistantMemory: setAssistantMemory,
+    user: setUser,
+  }), []);
+
+  const assistant = useAssistant({
+    state: {
+      user, todos, habits, logs, healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog,
+      commitmentArchive, calendarEvents, noPhoneBlocks, calendarDayEvents, achievements, shop, brainDumpNotes,
+      assistantMemory, assistantActivity, chatHistory,
+    },
+    setters: assistantSetters,
+    setChatHistory,
+    setActivity: setAssistantActivity,
+  });
+
+  const unreadCheckin = assistantOpen ? null : [...chatHistory].reverse().find(m => m.unread) || null;
+
+  // Proactive behaviour re-evaluates on load, whenever the tab becomes visible, and
+  // every 5 minutes while it stays open. It waits for the Firestore load (when signed
+  // in) so it never acts on stale local data or re-fires a check-in another device ran.
+  const syncSettled = !firebaseUser || cloudSyncReady;
+  const [clockTick, setClockTick] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = () => setClockTick(Date.now());
+    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
+    const id = setInterval(tick, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
-  // ─── Assistant Action Handler ─────────────────────────────────────────────────────
-  const handleAssistantAction = (action) => {
-    return applyAssistantAction(action, { setTodos, setCalendarEvents, setQuickEvents });
+  // A failed check-in (bad key, rate limit, offline) retries after an hour, not on every tick.
+  const checkinFailedAt = useRef({});
+  useEffect(() => {
+    if (!syncSettled || !hasAssistantApiKey()) return;
+    const now = new Date(clockTick);
+    const due = getDueCheckin(now, assistantCheckins, { logs });
+    if (!due) return;
+    const failedAt = checkinFailedAt.current[due.type];
+    if (failedAt && clockTick - failedAt < 60 * 60 * 1000) return;
+    assistant.send(checkinPrompt(due.type, now), { hidden: true, kind: due.type, silent: true }).then((ok) => {
+      if (ok) setAssistantCheckins(prev => markCheckinDone(prev, due, now));
+      else if (ok === false) checkinFailedAt.current[due.type] = Date.now();
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncSettled, clockTick]);
+
+  const nudges = useMemo(
+    () => (syncSettled
+      ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals }, assistantCheckins)
+      : []),
+    [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, assistantCheckins]
+  );
+  const activeNudge = nudges[0] || null;
+
+  const handleNudgeDismiss = (id) => setAssistantCheckins(prev => dismissNudge(prev, id, new Date()));
+  const handleNudgeAction = (nudge) => {
+    handleNudgeDismiss(nudge.id);
+    if (nudge.cta.type === 'navigate') {
+      handleNavigate(nudge.cta.page);
+    } else {
+      setAssistantDraft(nudge.cta.prompt);
+      openAssistant();
+    }
   };
 
   // ─── Page Renderer ─────────────────────────────────────────────────────────────
@@ -801,6 +914,8 @@ function App() {
       case 'goals':
         return (
           <GoalsPage
+            northStar={user.northStar}
+            onSaveNorthStar={(northStar) => setUser(prev => ({ ...prev, northStar }))}
             goals={goals}
             setGoals={setGoals}
             setTodos={setTodos}
@@ -869,28 +984,14 @@ function App() {
 
       <AssistantDrawer
         isOpen={assistantOpen}
-        onToggle={() => setAssistantOpen(o => !o)}
-        onClose={() => setAssistantOpen(false)}
-        user={user}
-        todos={todos}
-        habits={habits}
-        logs={logs}
-        healthLog={healthLog}
-        foodPoints={foodPoints}
-        pomodoroSessions={pomodoroSessions}
-        goals={goals}
-        weeklyReviews={weeklyReviews}
-        xpLog={xpLog}
-        commitmentArchive={commitmentArchive}
-        calendarEvents={calendarEvents}
-        noPhoneBlocks={noPhoneBlocks}
-        calendarDayEvents={calendarDayEvents}
-        achievements={achievements}
-        shop={shop}
-        brainDumpNotes={brainDumpNotes}
+        onClose={closeAssistant}
         chatHistory={chatHistory}
         setChatHistory={setChatHistory}
-        onApplyAction={handleAssistantAction}
+        assistant={assistant}
+        activity={assistantActivity}
+        memory={assistantMemory}
+        setMemory={setAssistantMemory}
+        hasNorthStar={!!user.northStar?.vision}
         draftMessage={assistantDraft}
         onDraftConsumed={() => setAssistantDraft(null)}
       />
@@ -979,9 +1080,13 @@ function App() {
         <FloatingAIBar
           onSubmit={(text) => {
             setAssistantDraft(text);
-            setAssistantOpen(true);
+            openAssistant();
           }}
-          onExpand={() => setAssistantOpen(true)}
+          onExpand={openAssistant}
+          unreadCheckin={unreadCheckin}
+          nudge={activeNudge}
+          onNudgeAction={handleNudgeAction}
+          onNudgeDismiss={handleNudgeDismiss}
         />
       )}
 

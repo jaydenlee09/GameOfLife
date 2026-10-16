@@ -1,7 +1,9 @@
 import { xpCapForLevel } from './xpUtils';
-import { computeRankStatus } from './scoreUtils';
+import { computeDailyScore, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD } from './scoreUtils';
 import { toDateKey, expandEventsForDates, isInstanceCompleted } from './calendarUtils';
-import { ACHIEVEMENTS } from './achievementsMeta';
+import { getHabitStreak } from './habitUtils';
+import { getGoalProgress } from './goalUtils';
+import { TOOL_DECLARATIONS, getTool, applyOpToState } from './assistantTools';
 
 const STAT_LABELS = {
   strength:     'Strength',
@@ -14,6 +16,12 @@ const STAT_LABELS = {
   creativity:   'Creativity',
   productivity: 'Productivity',
 };
+
+const MODEL = 'gemini-2.5-flash';
+// Tool rounds per user message before the model is forced to answer in text.
+export const MAX_TOOL_ROUNDS = 6;
+// Prior chat messages resent each turn.
+const HISTORY_LIMIT = 20;
 
 /** Returns the "level" of a raw stat XP value (same formula as the app) */
 const statLevel = (rawXp) => {
@@ -41,100 +49,45 @@ const analyzeStats = (stats) => {
   return { weakest, strongest, all: entries };
 };
 
-/** Summarize recent journal logs (last 7 days) */
-const summarizeLogs = (logs) => {
-  if (!logs || Object.keys(logs).length === 0) return 'No journal entries yet.';
-  const keys = Object.keys(logs).sort().reverse().slice(0, 7);
-  return keys.map(dateKey => {
-    const entry = logs[dateKey];
-    const parts = [];
-    if (entry.emotions?.length) parts.push(`Emotions: ${entry.emotions.join(', ')}`);
-    if (entry.proud?.some(p => p?.trim())) parts.push(`Proud of: ${entry.proud.filter(Boolean).join('; ')}`);
-    if (entry.improve?.some(p => p?.trim())) parts.push(`Wants to improve: ${entry.improve.filter(Boolean).join('; ')}`);
-    if (entry.learned?.trim()) parts.push(`Learned: ${entry.learned}`);
-    if (entry.commitment?.trim()) parts.push(`Tomorrow's commitment: ${entry.commitment}`);
-    return `[${dateKey}] ${parts.join(' | ')}`;
-  }).join('\n');
-};
-
-/** Summarize active/incomplete tasks */
-const summarizeTasks = (todos) => {
-  if (!todos?.length) return 'No tasks.';
-  const incomplete = todos.filter(t => !t.completed);
-  const overdue = incomplete.filter(t => t.timeFrame === 'today');
-  const upcoming = incomplete.filter(t => t.timeFrame !== 'today');
-  const lines = [];
-  if (overdue.length) lines.push(`Today's incomplete tasks (${overdue.length}): ${overdue.map(t => t.text).join(', ')}`);
-  if (upcoming.length) lines.push(`Upcoming tasks (${upcoming.length}): ${upcoming.map(t => `${t.text} [${t.timeFrame}]`).join(', ')}`);
-  if (!lines.length) return 'All tasks completed!';
-  return lines.join('\n');
-};
-
-/** Summarize habits */
-const summarizeHabits = (habits) => {
-  if (!habits?.length) return 'No habits tracked.';
-  return habits.map(h => `${h.text} (streak: ${h.streak || 0} days)`).join(', ');
-};
-
-const assistantDateKey = (offset = 0) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-/** Summarize the most recent health entry + food budget */
-const summarizeHealth = (healthLog, foodPoints) => {
-  if (!healthLog || Object.keys(healthLog).length === 0) return 'No health data logged.';
-  const entry = healthLog[assistantDateKey(0)] || healthLog[assistantDateKey(-1)] || {};
-  const parts = [];
-  if (entry.sleepHours) parts.push(`Sleep: ${entry.sleepHours.toFixed(1)}h`);
-  if (entry.energyLevel) parts.push(`Energy: ${entry.energyLevel}/5`);
-  if (entry.workouts?.length) parts.push(`Workouts: ${entry.workouts.map(w => w.type).join(', ')}`);
-  if (entry.screentimeHours != null) parts.push(`Screen time: ${entry.screentimeHours.toFixed(1)}h`);
-  if (entry.waterGlasses) parts.push(`Water: ${entry.waterGlasses} bottles`);
-  if (foodPoints?.balance != null) parts.push(`Food budget: ${foodPoints.balance}`);
-  return parts.length ? parts.join(' | ') : 'Health logged but sparse.';
-};
-
-/** Summarize focus/pomodoro time */
-const summarizeFocus = (pomodoroSessions) => {
-  if (!pomodoroSessions?.length) return 'No focus sessions yet.';
-  const todayKey = assistantDateKey(0);
-  const week = new Set(Array.from({ length: 7 }, (_, i) => assistantDateKey(-i)));
-  const mins = (filter) => pomodoroSessions.filter(filter).reduce((s, p) => s + Math.floor(p.durationSecs / 60), 0);
-  const todayMins = mins(s => s.date === todayKey && s.completed);
-  const weekMins = mins(s => week.has(s.date) && s.completed);
-  return `Focused ${todayMins}m today, ${weekMins}m over the last 7 days.`;
-};
-
-/** Summarize active goals with progress */
-const summarizeGoals = (goals) => {
-  if (!goals?.length) return 'No goals set.';
-  const active = goals.filter(g => !g.completed);
-  if (!active.length) return 'All goals completed — time to set new ones.';
-  return active.slice(0, 8).map(g => {
-    const ms = g.milestones || [];
-    let prog = '';
-    if (ms.length) prog = ` (${ms.filter(m => m.completed).length}/${ms.length} milestones)`;
-    else if (g.targetValue) prog = ` (${g.currentValue || 0}/${g.targetValue}${g.unit ? ' ' + g.unit : ''})`;
-    return `${g.pinned ? '[Pinned] ' : ''}${g.title} [${g.period}]${prog}`;
-  }).join('\n');
-};
-
-/** Summarize the latest weekly review */
-const summarizeWeekly = (weeklyReviews) => {
-  if (!weeklyReviews || Object.keys(weeklyReviews).length === 0) return 'No weekly reviews yet.';
-  const latest = weeklyReviews[Object.keys(weeklyReviews).sort().reverse()[0]];
-  const parts = [];
-  if (latest.priority?.trim()) parts.push(`This week's #1 priority: ${latest.priority}`);
-  if (latest.improvements?.trim()) parts.push(`Wants to improve: ${latest.improvements}`);
-  if (latest.heldBack?.trim()) parts.push(`Held back by: ${latest.heldBack}`);
-  return parts.length ? parts.join(' | ') : 'Weekly review logged.';
-};
-
 const fmtTime = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-/** Summarize today's + tomorrow's calendar: time blocks, no-phone blocks, and reminders */
+const summarizeNorthStar = (northStar) => {
+  if (!northStar?.vision?.trim()) return 'NOT SET YET. Helping them define it is a top priority (see HOW YOU WORK).';
+  const identity = northStar.identity?.length ? `\nIdentity: ${northStar.identity.map((s) => `"${s}"`).join(' · ')}` : '';
+  return `"${northStar.vision}"${identity}`;
+};
+
+const summarizeMemory = (memory) => {
+  if (!memory?.length) return 'Empty — you have not learned anything durable about them yet.';
+  return memory.map((m) => `[${m.id}] (${m.kind}) ${m.text}`).join('\n');
+};
+
+const summarizeToday = (state) => {
+  const inputs = [state.habits || [], state.xpLog || [], state.logs || {}, state.commitmentArchive || [], state.healthLog || {}];
+  const { score, breakdown } = computeDailyScore(...inputs);
+  const rank = computeRankStatus(...inputs);
+  const parts = Object.values(breakdown).map((b) => b.label).join(' · ');
+  const next = rank.nextTier ? ` Next tier: ${rank.nextTier.name} (needs ${rank.nextTier.min}+ daily).` : '';
+  return `Daily Score so far: ${score}/10 (${parts}). Streak counts at ${STREAK_THRESHOLD}+.\nRank: ${rank.tier.name}, ${rank.streakDays}-day streak.${next}`;
+};
+
+const summarizeTasks = (todos) => {
+  const open = (todos || []).filter((t) => !t.completed);
+  if (!open.length) return 'No open tasks.';
+  return open.slice(0, 25).map((t) => `- [${t.id}] ${t.text} (${t.timeFrame})`).join('\n')
+    + (open.length > 25 ? `\n…and ${open.length - 25} more (get_tasks)` : '');
+};
+
+const summarizeHabits = (habits) => {
+  if (!habits?.length) return 'No habits tracked.';
+  const today = getLocalDateKey(0);
+  return habits.map((h) => {
+    const history = h.history || {};
+    return `- ${h.text}: ${history[today] ? 'done today' : 'not yet today'}, streak ${getHabitStreak({ ...h, history })}`;
+  }).join('\n');
+};
+
+/** Today's + tomorrow's calendar: time blocks, no-phone blocks, and reminders */
 const summarizeCalendar = (calendarEvents, noPhoneBlocks, calendarDayEvents) => {
   const now = new Date();
   const tomorrow = new Date(now);
@@ -153,237 +106,264 @@ const summarizeCalendar = (calendarEvents, noPhoneBlocks, calendarDayEvents) => 
       .filter(ev => ev._instanceDate === dateKey)
       .sort(byStart)
       .forEach(ev => {
-        const attrs = ev.attributes?.length ? ` [${ev.attributes.join(', ')}]` : '';
         const done = isInstanceCompleted(ev) ? ' (done)' : '';
-        lines.push(`  ${fmtTime(ev.startHour, ev.startMin)}-${fmtTime(ev.endHour, ev.endMin)} ${ev.title}${attrs}${done}`);
+        lines.push(`  ${fmtTime(ev.startHour, ev.startMin)}-${fmtTime(ev.endHour, ev.endMin)} ${ev.title}${done}`);
       });
     blocks
       .filter(b => b._instanceDate === dateKey)
       .sort(byStart)
       .forEach(b => {
-        const done = isInstanceCompleted(b) ? ' (done)' : '';
+        const done = isInstanceCompleted(b) ? ' (honored)' : '';
         lines.push(`  No Phone: ${fmtTime(b.startHour, b.startMin)}-${fmtTime(b.endHour, b.endMin)}${done}`);
       });
     (calendarDayEvents?.[dateKey] || [])
       .slice()
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
       .forEach(r => lines.push(`  Reminder: ${r.title}${r.time ? ` @ ${r.time}` : ''}`));
-    return lines.length ? `${label}:\n${lines.join('\n')}` : `${label}: nothing scheduled.`;
+    return lines.length ? `${label} (${dateKey}):\n${lines.join('\n')}` : `${label} (${dateKey}): nothing scheduled.`;
   };
 
   return `${dayBlock(todayKey, 'Today')}\n${dayBlock(tomorrowKey, 'Tomorrow')}`;
 };
 
-/** Summarize unlocked achievements */
-const summarizeAchievements = (achievements) => {
-  const unlocked = Object.keys(achievements || {}).filter(id => achievements[id]);
-  if (!unlocked.length) return 'None unlocked yet.';
-  const labels = unlocked.map(id => ACHIEVEMENTS.find(a => a.id === id)?.label || id);
-  return `${unlocked.length}/${ACHIEVEMENTS.length} unlocked: ${labels.join(', ')}`;
-};
-
-/** Summarize the wishlist/reward shop */
-const summarizeShop = (shop) => {
-  const items = shop?.items || [];
-  if (!items.length) return 'Wishlist is empty.';
-  const unpurchased = items.filter(i => !i.purchased);
-  const top = unpurchased
+const summarizeGoals = (goals) => {
+  const active = (goals || []).filter((g) => !g.completed);
+  if (!active.length) return 'No active goals.';
+  return active
     .slice()
-    .sort((a, b) => (b.priority === 'high') - (a.priority === 'high'))
-    .slice(0, 5)
-    .map(i => `${i.name} ($${Number(i.price).toFixed(2)}${i.priority ? `, ${i.priority} priority` : ''})`);
-  return top.length ? `Wishlist (${unpurchased.length} unpurchased): ${top.join('; ')}` : 'All wishlist items purchased.';
+    .sort((a, b) => (b.pinned === true) - (a.pinned === true))
+    .slice(0, 10)
+    .map((g) => {
+      const p = getGoalProgress(g);
+      return `- [${g.id}] ${g.pinned ? '(pinned) ' : ''}${g.title} [${g.period}] ${p.done}/${p.total}${g.unit ? ` ${g.unit}` : ''}`;
+    })
+    .join('\n');
 };
 
-/** Summarize brain dump notes */
-const summarizeBrainDump = (brainDumpNotes) => {
-  if (!brainDumpNotes?.length) return 'No brain dump notes.';
-  const texts = brainDumpNotes.map(n => n.text?.trim()).filter(Boolean).slice(0, 15);
-  return texts.length ? texts.join(' | ') : 'No brain dump notes.';
+const summarizeRecentJournal = (logs, commitmentArchive) => {
+  const today = getLocalDateKey(0);
+  const yesterday = shiftDateKey(today, -1);
+  const lines = [];
+  [[yesterday, 'Yesterday'], [today, 'Today']].forEach(([key, label]) => {
+    const e = logs?.[key];
+    if (!e) { lines.push(`${label}: no Daily Log entry.`); return; }
+    const parts = [];
+    if (e.emotions?.length) parts.push(`felt ${e.emotions.join(', ')}`);
+    if (e.proud?.some((p) => p?.trim())) parts.push(`proud of: ${e.proud.filter((p) => p?.trim()).join('; ')}`);
+    if (e.improve?.some((p) => p?.trim())) parts.push(`wants to improve: ${e.improve.filter((p) => p?.trim()).join('; ')}`);
+    lines.push(`${label}: ${parts.join(' | ') || 'entry started, mostly empty.'}`);
+  });
+  const record = (commitmentArchive || []).find((c) => c.date === yesterday);
+  const commitmentText = logs?.[yesterday]?.commitment?.trim() || record?.text;
+  if (commitmentText) {
+    const status = record?.denied === true ? 'MISSED' : record?.confirmedOn ? 'kept' : 'not marked yet';
+    lines.push(`Commitment for today (made yesterday): "${commitmentText}" — ${status}.`);
+  } else {
+    lines.push('No commitment was made for today.');
+  }
+  return lines.join('\n');
+};
+
+const summarizeWeekPriority = (weeklyReviews) => {
+  const keys = Object.keys(weeklyReviews || {}).sort();
+  const latest = keys.length ? weeklyReviews[keys[keys.length - 1]] : null;
+  return latest?.priority?.trim() ? `"${latest.priority.trim()}" (from the ${keys[keys.length - 1]} review)` : 'None set.';
 };
 
 /**
- * Builds the system prompt for the Gemini-backed assistant.
- * Injects the player's full game state so the assistant has real context.
+ * Builds the system prompt: a compact snapshot of what matters right now, plus how
+ * to behave. Everything deeper (history, health, journal ranges, brain dump …) is
+ * one read tool away, which keeps every round of the agent loop cheap.
  */
-export const buildSystemPrompt = (user, todos, habits, logs, extra = {}) => {
-  const {
-    healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog, commitmentArchive,
-    calendarEvents, noPhoneBlocks, calendarDayEvents, achievements, shop, brainDumpNotes,
-  } = extra;
-  const rankStatus = computeRankStatus(habits, xpLog, logs, commitmentArchive, healthLog);
-  const { weakest, strongest, all } = analyzeStats(user.stats);
-  const xpCap = xpCapForLevel(user.level);
-  const xpPercent = Math.round((user.xp / xpCap) * 100);
+export const buildSystemPrompt = (state) => {
+  const { user } = state;
+  const now = new Date();
+  const { weakest, strongest, all } = analyzeStats(user.stats || {});
+  const nowLine = `${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, ${fmtTime(now.getHours(), now.getMinutes())} local time (today is ${getLocalDateKey(0)})`;
 
-  const statsBlock = all.map(s => `  ${s.label}: Lv ${s.level} (${s.xp} XP)`).join('\n');
-  const weakBlock = weakest.map(s => `  - ${s.label} (Lv ${s.level})`).join('\n');
-  const strongBlock = strongest.map(s => `  - ${s.label} (Lv ${s.level})`).join('\n');
+  return `You are ${user.name}'s personal coach and assistant inside their self-improvement app "APEX". You are an agent: you can look things up and take real actions in the app with your tools. Your one job is to help ${user.name} become the person described in their North Star — every suggestion, plan and nudge should move them toward it.
 
-  return `You are ${user.name}'s personal life assistant inside their self-improvement app called "APEX". Your role is to be a direct, no-nonsense, deeply invested assistant — like a personal trainer meets life coach. You use the RPG game framing naturally (stats, levels, XP) because that's how ${user.name} tracks their real life.
+YOUR PERSONA — DIRECT COACH:
+- Honest and specific. If they are slipping, say so plainly and point at the data that shows it. No sugarcoating, no lecturing, no shaming.
+- Genuinely in their corner: name real wins and momentum when they happen.
+- Never generic. Every piece of advice cites their actual numbers, tasks, goals, journal or memory.
+- Concise by default (a few short lines). Go deeper only when asked or when planning.
+- Light RPG flavor is fine (stats, levels, XP) but don't overdo it. Call calendar items "time blocks".
+- End every reply with ONE clear next action.
+- Formatting: plain text with line breaks; **bold** is supported; "- " bullets are fine. No headings, tables or code blocks.
 
-YOUR PERSONA:
-- You are direct, honest, and encouraging — you call out weak areas without being harsh
-- You celebrate wins and streak momentum
-- You proactively notice patterns in journal entries, weak stats, and neglected tasks
-- You give specific, actionable advice tied to the player's actual data
-- You never give generic advice — always reference their real stats, tasks, or journal context
-- Keep responses concise and punchy unless the player asks for depth
-- You may use light RPG language (e.g., "level up your discipline", "your focus bar is low") but don't overdo it
-- Refer to calendar items as "time blocks" or "calendar blocks", not "events".
+NOW: ${nowLine}
 
-PLAYER PROFILE:
-Name: ${user.name}
-Level: ${user.level} | Rank: ${rankStatus.tier.name} (${rankStatus.streakDays}-day streak)
-XP: ${user.xp} / ${xpCap} (${xpPercent}% to next level)
+NORTH STAR (who ${user.name} is becoming):
+${summarizeNorthStar(user.northStar)}
 
-CURRENT STATS:
-${statsBlock}
+LONG-TERM MEMORY (what you've learned about them; ids in brackets):
+${summarizeMemory(state.assistantMemory)}
 
-WEAKEST STATS (needs attention):
-${weakBlock}
+TODAY:
+${summarizeToday(state)}
 
-STRONGEST STATS (leverageable):
-${strongBlock}
+CHARACTER: Level ${user.level} (${user.xp}/${xpCapForLevel(user.level)} XP)
+Weakest stats: ${weakest.map((s) => `${s.label} Lv ${s.level}`).join(', ')}
+Strongest stats: ${strongest.map((s) => `${s.label} Lv ${s.level}`).join(', ')}
 
-ACTIVE TASKS & HABITS:
-${summarizeTasks(todos)}
-Habits: ${summarizeHabits(habits)}
+OPEN TASKS (ids in brackets):
+${summarizeTasks(state.todos)}
 
-CALENDAR (time blocks, No Phone blocks, reminders):
-${summarizeCalendar(calendarEvents, noPhoneBlocks, calendarDayEvents)}
+HABITS:
+${summarizeHabits(state.habits)}
 
-GOALS:
-${summarizeGoals(goals)}
+CALENDAR:
+${summarizeCalendar(state.calendarEvents, state.noPhoneBlocks, state.calendarDayEvents)}
 
-FOCUS TIME:
-${summarizeFocus(pomodoroSessions)}
+ACTIVE GOALS (ids in brackets):
+${summarizeGoals(state.goals)}
 
-HEALTH:
-${summarizeHealth(healthLog, foodPoints)}
+DAILY LOG & COMMITMENT:
+${summarizeRecentJournal(state.logs, state.commitmentArchive)}
 
-LATEST WEEKLY REVIEW:
-${summarizeWeekly(weeklyReviews)}
+THIS WEEK'S #1 PRIORITY: ${summarizeWeekPriority(state.weeklyReviews)}
 
-RECENT JOURNAL (last 7 days):
-${summarizeLogs(logs)}
+VALID STAT KEYS: ${all.map((s) => s.key).join(', ')}
 
-ACHIEVEMENTS:
-${summarizeAchievements(achievements)}
-
-WISHLIST / REWARD SHOP:
-${summarizeShop(shop)}
-
-BRAIN DUMP NOTES:
-${summarizeBrainDump(brainDumpNotes)}
-
-INSTRUCTIONS:
-- When ${user.name} asks how their day/schedule looks, read straight from the CALENDAR section above — it already covers today and tomorrow. An empty day means the CALENDAR section says "nothing scheduled," not that you lack the data.
-- When ${user.name} first opens this chat (or asks "how am I doing"), proactively give a brief, pointed status report: call out the weakest stat(s), any neglected tasks, and one concrete thing they should focus on today.
-- When asked about a specific area, go deeper with actionable steps.
-- Reference journal emotions if they reveal stress, anxiety, or burnout — address those directly.
-- If their commitment streak is broken (no recent journal entries), call it out.
-- Always end responses with a clear next action.
-
-AI ACTION FORMAT:
-- You can propose structured app actions, but they require user confirmation before execution.
-- Valid stat keys (for "categories"/"attributes" below): ${all.map(s => s.key).join(', ')}
-- Respond ONLY valid JSON using this exact shape, choosing one payload schema per action type:
-  {
-    "message": "string",
-    "actions": [
-      {
-        "type": "create_task",
-        "payload": {
-          "text": "string, REQUIRED, non-empty — the task description",
-          "timeFrame": "today | tomorrow | this-week | this-month",
-          "categories": ["zero or more of the valid stat keys above"],
-          "xp": number (optional, defaults based on timeFrame),
-          "notes": "string, optional"
-        }
-      },
-      {
-        "type": "create_calendar_event",
-        "payload": {
-          "title": "string, REQUIRED, non-empty",
-          "date": "YYYY-MM-DD, REQUIRED",
-          "startTime": "HH:MM 24h, REQUIRED",
-          "endTime": "HH:MM 24h, REQUIRED",
-          "attributes": ["zero or more of the valid stat keys above"],
-          "recurrence": "none | daily | weekly",
-          "recurrenceDays": "array of ints 0-6 (Sun=0…Sat=6), OPTIONAL — only used when recurrence is 'weekly'; e.g. every Monday = [1], every Sat & Sun = [0,6]. Omit to repeat on the given date's own weekday.",
-          "xpAmount": number (optional),
-          "notes": "string, optional"
-        }
-      },
-      {
-        "type": "create_quick_event_template",
-        "payload": {
-          "title": "string, REQUIRED, non-empty",
-          "duration": number (minutes, 15-720),
-          "attributes": ["zero or more of the valid stat keys above"],
-          "recurrence": "none | daily | weekly",
-          "recurrenceDays": "array of ints 0-6 (Sun=0…Sat=6), OPTIONAL — only used when recurrence is 'weekly'; e.g. every Monday = [1], every Sat & Sun = [0,6]",
-          "xpAmount": number (optional),
-          "color": "hex string like #818cf8, optional"
-        }
-      }
-    ]
-  }
-- Every action's payload MUST include every REQUIRED field above with a real, non-empty value. Never invent different field names (e.g. no "title" on create_task — it must be "text"; no "text" on the other two — they use "title").
-- If no actions are needed, return an empty array: "actions": []
-- Do not include markdown, code fences, or extra text outside JSON.`;
+HOW YOU WORK:
+- Look before you speak: if the snapshot above doesn't cover something (past days, health, journal history, score trend, focus time, brain dump, wishlist), call a read tool instead of guessing or saying you lack data. An empty CALENDAR day means nothing is scheduled.
+- Act when it helps: when they ask you to plan, schedule, capture or organize something, do it with tools rather than describing what they could do. Check get_calendar before scheduling so blocks don't collide.
+- Safe actions (create task / time block / template, brain dump note, goal milestone, remember/forget) apply immediately and the user can undo them. Edits and deletes (update/delete task, move/delete time block, update goal, set North Star) only become proposals the user approves in the chat — say they're waiting for approval, never claim they're done.
+- Never say you did something unless a tool call for it succeeded. If a tool returns an error, fix the arguments or tell them plainly.
+- XP is earned, never handed out: you cannot complete tasks, tick habits, complete time blocks or resolve commitments. Remind them to do it themselves.
+- Memory: when you learn something durable (a recurring pattern, how they like to work, life context, a notable win), call remember. Keep memory accurate — forget entries that are outdated or wrong. Don't store one-off details.
+- North Star: if it's not set, help them articulate it in their own words through a short conversation, then propose it with set_north_star. Measure plans and advice against it.
+- Weakest stats, a broken streak, a missed commitment or stress in the journal are things to address directly, with one concrete fix.`;
 };
 
-const parseAssistantResponse = (rawText) => {
-  const fallbackText = rawText || 'No response received.';
-  if (!rawText) return { text: fallbackText, actions: [] };
-
-  try {
-    const parsed = JSON.parse(rawText);
-    const text = typeof parsed.message === 'string' && parsed.message.trim()
-      ? parsed.message
-      : fallbackText;
-    const actions = Array.isArray(parsed.actions) ? parsed.actions : [];
-    return { text, actions };
-  } catch {
-    return { text: fallbackText, actions: [] };
+// ─── Chat history → Gemini contents ───────────────────────────────────────────
+// Stored messages keep their own extra fields (ids, actions, flags); Gemini only
+// gets role + text. Actions a past reply took are appended as a note so the model
+// can follow up on them ("undo that", "move it to 6pm").
+const describeMessage = (msg) => {
+  let text = msg.parts?.map((p) => p.text).filter(Boolean).join('\n') || '';
+  if (msg.role === 'model') {
+    const notes = [];
+    if (msg.actionsTaken?.length) notes.push(`Actions I took: ${msg.actionsTaken.map((a) => a.label).join('; ')}`);
+    const proposals = (msg.proposedActions || []).filter((a) => a.label);
+    if (proposals.length) notes.push(`Proposals: ${proposals.map((a) => `${a.label} [${a.status}]`).join('; ')}`);
+    if (notes.length) text += `\n\n(${notes.join(' | ')})`;
   }
+  return text;
 };
 
-/**
- * Sends a message to Gemini 2.5 Flash via the @google/genai SDK.
- * Returns: { text: string, actions: array }
- * history: array of { role: 'user'|'model', parts: [{ text }] }
- * caps history at 20 messages before sending
- */
-export const sendToAssistant = async (history, userMessage, systemPrompt) => {
+export const toGeminiContents = (history, userMessage) => {
+  const messages = [
+    ...(history || []).slice(-HISTORY_LIMIT).map((msg) => ({ role: msg.role === 'model' ? 'model' : 'user', text: describeMessage(msg) })),
+    { role: 'user', text: userMessage },
+  ].filter((m) => m.text.trim());
+
+  // Gemini expects user/model turns to alternate and to open with a user turn.
+  const contents = [];
+  messages.forEach(({ role, text }) => {
+    const last = contents[contents.length - 1];
+    if (last?.role === role) last.parts[0].text += `\n\n${text}`;
+    else contents.push({ role, parts: [{ text }] });
+  });
+  if (contents[0]?.role === 'model') contents.unshift({ role: 'user', parts: [{ text: '(conversation start)' }] });
+  return contents;
+};
+
+// ─── Gemini call ──────────────────────────────────────────────────────────────
+export const hasAssistantApiKey = () => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+  return !!apiKey && apiKey !== 'your_gemini_api_key_here';
+};
+
+let clientPromise = null;
+const getClient = () => {
+  if (!clientPromise) {
+    clientPromise = import('@google/genai').then(({ GoogleGenAI }) => new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY }));
+  }
+  return clientPromise;
+};
+
+/** One model call. `allowTools: false` forces a plain-text answer. */
+export const geminiGenerate = async ({ contents, systemPrompt, allowTools }) => {
+  if (!hasAssistantApiKey()) {
     throw new Error('Missing Gemini API key. Add VITE_GEMINI_API_KEY to your .env file.');
   }
-
-  const { GoogleGenAI } = await import('@google/genai');
-  const ai = new GoogleGenAI({ apiKey });
-
-  // Cap history at last 20 messages to keep prompt efficient
-  const cappedHistory = history.slice(-20);
-
-  const contents = [
-    ...cappedHistory,
-    { role: 'user', parts: [{ text: userMessage }] },
-  ];
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+  const ai = await getClient();
+  return ai.models.generateContent({
+    model: MODEL,
     contents,
     config: {
       systemInstruction: systemPrompt,
-      temperature: 0.8,
+      temperature: 0.7,
       maxOutputTokens: 8192,
-      responseMimeType: 'application/json',
+      tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+      toolConfig: { functionCallingConfig: { mode: allowTools ? 'AUTO' : 'NONE' } },
     },
   });
+};
 
-  return parseAssistantResponse(response.text || '');
+// ─── The agent loop ───────────────────────────────────────────────────────────
+/**
+ * Runs one assistant turn: the model may call tools for several rounds (reading
+ * data, applying safe actions to a working copy of state, proposing edits) before
+ * it answers in text.
+ *
+ * Nothing touches React state here. Safe actions come back in `applied` (each with
+ * its `op` + `inverse`) for the caller to commit all at once, so a turn that fails
+ * halfway applies nothing. Edits/deletes come back in `proposed` for approval.
+ *
+ * Returns { text, applied: [{tool, label, op, inverse}], proposed: [{tool, args, label}] }
+ */
+export const runAssistantTurn = async ({
+  history, userMessage, state, validStats, generate = geminiGenerate, maxRounds = MAX_TOOL_ROUNDS,
+}) => {
+  const systemPrompt = buildSystemPrompt(state);
+  const contents = toGeminiContents(history, userMessage);
+  let working = state;
+  const applied = [];
+  const proposed = [];
+
+  const handleCall = (call) => {
+    const tool = getTool(call.name);
+    if (!tool) return { error: `Unknown tool "${call.name}".` };
+    const args = call.args || {};
+    try {
+      if (tool.tier === 'read') return tool.run(args, { state: working, validStats });
+      const prepared = tool.prepare(args, { state: working, validStats });
+      if (tool.tier === 'auto') {
+        working = applyOpToState(working, prepared.op);
+        applied.push({ tool: tool.name, label: prepared.label, op: prepared.op, inverse: prepared.inverse });
+        return { ok: true, done: prepared.label, ...prepared.result };
+      }
+      proposed.push({ tool: tool.name, args, label: prepared.label });
+      return { status: 'awaiting_user_approval', proposal: prepared.label, note: 'Not applied yet. Tell the user it is waiting for their approval below your message.' };
+    } catch (err) {
+      return { error: err.message || String(err) };
+    }
+  };
+
+  for (let round = 0; ; round++) {
+    const allowTools = round < maxRounds;
+    const response = await generate({ contents, systemPrompt, allowTools });
+    const calls = allowTools ? (response.functionCalls || []) : [];
+
+    if (!calls.length) {
+      const text = (response.text || '').trim();
+      const fallback = applied.length || proposed.length
+        ? [...applied.map((a) => `Done: ${a.label}`), ...proposed.map((p) => `Waiting for your approval: ${p.label}`)].join('\n')
+        : 'No response received.';
+      return { text: text || fallback, applied, proposed };
+    }
+
+    // Echo the model's turn back verbatim: it carries the thought signatures
+    // Gemini 2.5 needs to continue reasoning across tool rounds.
+    contents.push(response.candidates?.[0]?.content || { role: 'model', parts: calls.map((functionCall) => ({ functionCall })) });
+    contents.push({
+      role: 'user',
+      parts: calls.map((call) => ({
+        functionResponse: { ...(call.id ? { id: call.id } : {}), name: call.name, response: handleCall(call) },
+      })),
+    });
+  }
 };

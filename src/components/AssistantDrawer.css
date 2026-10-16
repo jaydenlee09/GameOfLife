@@ -6,11 +6,13 @@
   animation: assistant-spin 1s linear infinite;
 }
 
+/* Above the mobile bottom nav (9000) and the next-event/priority popups (9997-9998)
+   so neither covers the input; toasts (9999, later in the DOM) still show on top. */
 .assistant-drawer-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
-  z-index: 1110;
+  z-index: 9998;
 }
 
 .assistant-drawer {
@@ -26,7 +28,7 @@
   border-radius: var(--radius-lg) 0 0 var(--radius-lg);
   box-shadow: var(--glass-shadow), -14px 0 40px rgba(0, 0, 0, 0.45);
   overflow: hidden;
-  z-index: 1120;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
@@ -318,6 +320,7 @@
 
 .assistant-action-card {
   width: 100%;
+  box-sizing: border-box;
   border: 1px solid rgba(56, 189, 248, 0.25);
   background: var(--accent-wash);
   border-radius: var(--radius-md);
@@ -472,6 +475,265 @@
 .assistant-drawer-send:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.assistant-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.assistant-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.76rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+
+.assistant-tab:hover {
+  color: var(--text-primary);
+}
+
+.assistant-tab--active {
+  background: var(--accent-wash);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: var(--text-primary);
+}
+
+.assistant-tab-count {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+/* ── Check-in tag + actions taken ───────────────────────────────────────── */
+.assistant-checkin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: var(--accent);
+  margin-bottom: 0.1rem;
+}
+
+.assistant-taken-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.assistant-taken-row,
+.assistant-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--separator-strong);
+  background: var(--bg-elevated-2);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.55rem;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.assistant-taken-row--undone .assistant-taken-label {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.assistant-taken-icon {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+.assistant-taken-label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.assistant-undo-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--separator-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+.assistant-undo-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.assistant-undone-tag {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.assistant-notice {
+  border: 1px solid rgba(48, 209, 88, 0.36);
+  background: var(--success-wash);
+  color: var(--success);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.76rem;
+}
+
+.assistant-notice--warn {
+  border-color: rgba(255, 159, 10, 0.4);
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+/* ── Memory + activity panels ───────────────────────────────────────────── */
+.assistant-panel-intro {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.assistant-panel-empty {
+  margin: 1rem 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.assistant-activity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.assistant-activity-meta {
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+}
+
+.assistant-memory-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  border: 1px solid var(--separator-strong);
+  background: var(--bg-elevated-2);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.assistant-memory-kind {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  margin-top: 1px;
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.assistant-memory-kind--win {
+  background: var(--success-wash);
+  color: var(--success);
+}
+
+.assistant-memory-kind--pattern {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+
+.assistant-memory-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.assistant-memory-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.assistant-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.assistant-icon-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated-1);
+}
+
+.assistant-memory-edit {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.assistant-memory-edit textarea,
+.assistant-memory-add input,
+.assistant-memory-add select {
+  font-family: inherit;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.5rem;
+  outline: none;
+}
+
+.assistant-memory-edit textarea {
+  resize: vertical;
+}
+
+.assistant-memory-add {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.assistant-memory-add input {
+  flex: 1;
+  min-width: 0;
+}
+
+.assistant-memory-add button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 @media (max-width: 480px) {

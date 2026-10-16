@@ -55,6 +55,141 @@
   transform: translateY(0);
 }
 
+/* ── North Star ──────────────────────────────────────────────────────────── */
+.gp-northstar {
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: var(--accent-wash);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.gp-northstar--empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.gp-northstar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gp-northstar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.gp-northstar-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.3rem;
+  cursor: pointer;
+}
+
+.gp-northstar-edit:hover {
+  color: var(--text-primary);
+}
+
+.gp-northstar-vision {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.gp-northstar-identity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.gp-northstar-identity li {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  border: 1px solid var(--separator-strong);
+  background: var(--bg-elevated-2);
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+}
+
+.gp-northstar-placeholder {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.gp-northstar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.gp-northstar-field textarea {
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.65rem;
+  resize: vertical;
+  outline: none;
+}
+
+.gp-northstar-field textarea:focus {
+  border-color: var(--accent);
+}
+
+.gp-northstar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.gp-northstar-btn {
+  border: 1px solid var(--separator-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+.gp-northstar-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.gp-northstar-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ── Controls ────────────────────────────────────────────────────────────── */
 .gp-controls {
   display: flex;

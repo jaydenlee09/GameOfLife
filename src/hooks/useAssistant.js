@@ -1,0 +1,160 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { runAssistantTurn } from '../utils/assistantUtils';
+import { getTool, applySliceOp, undoBlocker } from '../utils/assistantTools';
+
+const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
+const ACTIVITY_LIMIT = 100;
+const pad = (n) => String(n).padStart(2, '0');
+const statKeys = (state) => Object.keys(state.user?.stats || {});
+
+const friendlyError = (err) => {
+  const message = err?.message || String(err);
+  if (/API key not valid|API_KEY_INVALID/i.test(message)) {
+    return 'Your Gemini API key is invalid. Get a fresh one at aistudio.google.com and put it in .env as VITE_GEMINI_API_KEY.';
+  }
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(message)) {
+    return "Gemini's free-tier rate limit was hit. Wait a minute and try again.";
+  }
+  return message;
+};
+
+// Proposal cards saved before the agent rewrite carry `type` + a normalized
+// `payload` instead of `tool` + raw `args`; map them onto today's tools.
+const proposalToolAndArgs = (action) => {
+  if (action.tool) return { tool: getTool(action.tool), args: action.args || {} };
+  const payload = action.payload || {};
+  if (action.type === 'create_calendar_event') {
+    return {
+      tool: getTool('create_calendar_event'),
+      args: { ...payload, startTime: `${pad(payload.startHour)}:${pad(payload.startMin)}`, endTime: `${pad(payload.endHour)}:${pad(payload.endMin)}` },
+    };
+  }
+  return { tool: getTool(action.type), args: payload };
+};
+
+/**
+ * Owns the assistant's side effects: running agent turns, committing the ops they
+ * produce, the activity/undo log, and approving or rejecting proposals.
+ *
+ * `state` is every slice the agent can read (plus chatHistory/assistantActivity);
+ * `setters` maps each op `collection` to its React setter. Both are read through a
+ * ref so long-running turns and click handlers always see the latest values.
+ */
+export default function useAssistant({ state, setters, setChatHistory, setActivity }) {
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const loadingRef = useRef(false);
+  const [error, setError] = useState(null);
+
+  const commitOp = useCallback((op) => {
+    const setter = setters[op.collection];
+    if (!setter) throw new Error(`No setter for ${op.collection}`);
+    setter((prev) => applySliceOp(prev, op));
+  }, [setters]);
+
+  const recordActivity = useCallback((entries) => {
+    if (!entries.length) return;
+    setActivity((prev) => [...entries.slice().reverse(), ...(prev || [])].slice(0, ACTIVITY_LIMIT));
+  }, [setActivity]);
+
+  /**
+   * Sends a message and runs the agent loop. `hidden` keeps the prompt out of the
+   * visible chat (used by check-ins); `kind` tags the reply (e.g. 'morning') and
+   * marks it unread; `silent` suppresses the error banner. Resolves true on
+   * success, false on failure, null if skipped because a turn is already running.
+   */
+  const send = useCallback(async (text, { hidden = false, kind = null, silent = false } = {}) => {
+    const trimmed = text?.trim();
+    if (!trimmed || loadingRef.current) return null;
+    loadingRef.current = true;
+    setIsLoading(true);
+    setError(null);
+
+    const snapshot = stateRef.current;
+    const userMsg = { id: makeId('msg'), role: 'user', parts: [{ text: trimmed }], ...(hidden ? { hidden: true } : {}) };
+    setChatHistory((prev) => [...prev, userMsg]);
+
+    try {
+      const result = await runAssistantTurn({
+        history: snapshot.chatHistory,
+        userMessage: trimmed,
+        state: snapshot,
+        validStats: statKeys(snapshot),
+      });
+
+      const at = Date.now();
+      const entries = result.applied.map((a) => ({
+        id: makeId('act'), at, tool: a.tool, label: a.label, inverse: a.inverse, undone: false,
+      }));
+      result.applied.forEach((a) => commitOp(a.op));
+      recordActivity(entries);
+
+      const modelMsg = {
+        id: makeId('msg'),
+        role: 'model',
+        parts: [{ text: result.text }],
+        ...(entries.length ? { actionsTaken: entries.map((e) => ({ activityId: e.id, label: e.label })) } : {}),
+        ...(result.proposed.length ? {
+          proposedActions: result.proposed.map((p) => ({ id: makeId('prop'), tool: p.tool, args: p.args, label: p.label, status: 'pending' })),
+        } : {}),
+        ...(kind ? { kind, unread: true } : {}),
+      };
+      setChatHistory((prev) => [...prev, modelMsg]);
+      return true;
+    } catch (err) {
+      if (!silent) setError(friendlyError(err));
+      setChatHistory((prev) => prev.filter((msg) => msg.id !== userMsg.id));
+      return false;
+    } finally {
+      loadingRef.current = false;
+      setIsLoading(false);
+    }
+  }, [commitOp, recordActivity, setChatHistory]);
+
+  const updateProposal = useCallback((messageId, actionId, patch) => {
+    setChatHistory((prev) => prev.map((msg) => (msg.id !== messageId ? msg : {
+      ...msg,
+      proposedActions: (msg.proposedActions || []).map((a) => (a.id === actionId ? { ...a, ...patch } : a)),
+    })));
+  }, [setChatHistory]);
+
+  // Re-validates against *current* state: the task/block may have changed since
+  // the proposal was made, and the undo must capture what's there now.
+  const approve = useCallback((messageId, actionId) => {
+    const current = stateRef.current;
+    const msg = current.chatHistory.find((m) => m.id === messageId);
+    const action = msg?.proposedActions?.find((a) => a.id === actionId);
+    if (!action || action.status !== 'pending') return;
+    try {
+      const { tool, args } = proposalToolAndArgs(action);
+      if (!tool || tool.tier === 'read') throw new Error('This proposal is no longer supported. Ask the assistant again.');
+      const prepared = tool.prepare(args, { state: current, validStats: statKeys(current) });
+      commitOp(prepared.op);
+      const entry = { id: makeId('act'), at: Date.now(), tool: tool.name, label: prepared.label, inverse: prepared.inverse, undone: false };
+      recordActivity([entry]);
+      updateProposal(messageId, actionId, { status: 'applied', activityId: entry.id, label: prepared.label, resultMessage: null });
+    } catch (err) {
+      updateProposal(messageId, actionId, { status: 'failed', resultMessage: err.message });
+    }
+  }, [commitOp, recordActivity, updateProposal]);
+
+  const reject = useCallback((messageId, actionId) => {
+    updateProposal(messageId, actionId, { status: 'rejected' });
+  }, [updateProposal]);
+
+  /** Reverts one logged action. Resolves { ok, message }. */
+  const undo = useCallback((activityId) => {
+    const current = stateRef.current;
+    const entry = (current.assistantActivity || []).find((e) => e.id === activityId);
+    if (!entry || entry.undone) return { ok: false, message: 'Already undone.' };
+    const blocker = undoBlocker(entry.inverse, current);
+    if (blocker) return { ok: false, message: blocker };
+    commitOp(entry.inverse);
+    setActivity((prev) => prev.map((e) => (e.id === activityId ? { ...e, undone: true, undoneAt: Date.now() } : e)));
+    return { ok: true, message: `Undid: ${entry.label}` };
+  }, [commitOp, setActivity]);
+
+  return { send, approve, reject, undo, isLoading, error, clearError: () => setError(null) };
+}

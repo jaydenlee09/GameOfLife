@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import './GoalsPage.css';
 import { X, Pin, Pencil, Flame } from 'lucide-react';
 import STAT_META from './statMeta';
+import NorthStarCard from './NorthStarCard';
 import {
   normalizeGoal,
   getGoalProgress,
@@ -474,7 +475,7 @@ const GoalModal = ({ mode, periodLabel, initial, onClose, onSubmit, showPeriodPi
   );
 };
 
-const GoalsPage = ({ goals = [], setGoals, setTodos, onUpdateStat, habits = [], setHabits }) => {
+const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos, onUpdateStat, habits = [], setHabits }) => {
   const [period, setPeriod] = useState('all');
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [modal, setModal] = useState(null); // { type: 'add-goal'|'edit-goal', goalId? }
@@ -850,6 +851,8 @@ const GoalsPage = ({ goals = [], setGoals, setTodos, onUpdateStat, habits = [], 
           + Add Goal
         </button>
       </div>
+
+      <NorthStarCard northStar={northStar} onSave={onSaveNorthStar} />
 
       <div className="gp-controls">
         <div className="gp-period-pills">

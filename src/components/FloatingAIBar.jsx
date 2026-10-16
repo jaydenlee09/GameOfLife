@@ -1,10 +1,18 @@
 import { useState } from 'react';
+import { Sparkles, X } from 'lucide-react';
 import './FloatingAIBar.css';
+
+const CHECKIN_LABELS = {
+  morning: 'Your morning briefing is ready',
+  evening: 'Your evening debrief is ready',
+  weekly: 'Your weekly plan is ready',
+};
 
 // The global entry point for talking to the assistant from any screen — submitting
 // here opens the Assistant drawer and sends this as the first message. Double-clicking
-// the bar opens the drawer directly, with no message sent.
-export default function FloatingAIBar({ onSubmit, onExpand }) {
+// the bar opens the drawer directly, with no message sent. Above the bar it surfaces
+// what the assistant started on its own: an unread check-in, or one rule-based nudge.
+export default function FloatingAIBar({ onSubmit, onExpand, unreadCheckin, nudge, onNudgeAction, onNudgeDismiss }) {
   const [value, setValue] = useState('');
 
   const submit = () => {
@@ -23,11 +31,26 @@ export default function FloatingAIBar({ onSubmit, onExpand }) {
 
   return (
     <div className="ai-bar-wrap">
+      {unreadCheckin ? (
+        <button className="ai-bar-checkin" onClick={onExpand}>
+          <span className="ai-bar-checkin-dot" />
+          <Sparkles size={13} />
+          {CHECKIN_LABELS[unreadCheckin.kind] || 'New message from your assistant'}
+        </button>
+      ) : nudge && (
+        <div className="ai-bar-nudge" role="status">
+          <span className="ai-bar-nudge-text">{nudge.text}</span>
+          <button className="ai-bar-nudge-cta" onClick={() => onNudgeAction(nudge)}>{nudge.cta.label}</button>
+          <button className="ai-bar-nudge-close" onClick={() => onNudgeDismiss(nudge.id)} aria-label="Dismiss for today">
+            <X size={13} />
+          </button>
+        </div>
+      )}
       <div className="ai-bar" onDoubleClick={onExpand}>
         <input
           className="ai-bar-input"
           type="text"
-          placeholder="Ask anything..."
+          placeholder="Ask anything, or tell it what to do..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

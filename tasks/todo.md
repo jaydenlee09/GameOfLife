@@ -1,5 +1,121 @@
 # Todo
 
+## Done (2026-10-16): My Assistant → a real agent (uncommitted)
+
+Goal: turn My Assistant from a reactive chatbot (one JSON reply, 3 create-only actions, forgets past
+20 messages) into an agent that looks things up, acts across the app, remembers you, starts
+conversations itself, and coaches toward a stated vision.
+
+**Locked decisions (Q&A 2026-10-16):** all four capabilities (tool loop, memory, proactive check-ins,
+north star) · safe actions auto-apply with undo, risky ones confirm · check-ins fire in-app on open
+(no backend) · "direct coach" tone · stay on Gemini 2.5 Flash (settled preference, see memory).
+
+**Blocker (user):** `VITE_GEMINI_API_KEY` is still invalid (400). I can build and unit-test against
+mocked Gemini responses, but live tool-calling can't be verified until a fresh key is in `.env`.
+
+**Guardrail: XP stays earned.** The peak-system redesign made XP behavior-derived, never
+self-assigned. So the agent gets **no tool that grants XP**: it cannot complete tasks, tick habits,
+complete calendar blocks, honor No-Phone blocks or resolve commitments. It can remind you, and you
+tap. Tasks it creates get the timeframe-default XP (`TASK_TIMEFRAME_XP`), not an AI-chosen number.
+
+### Phase 1: Tool-use loop (foundation)
+- [x] New `src/utils/assistantTools.js`: Gemini `functionDeclarations` + executors, in three tiers:
+  - **Read:** `get_today_overview`, `get_logs(from,to)`, `get_goals(id?)`, `get_score_history(days)`,
+    `get_habits`, `get_calendar(from,to)`, `search_brain_dump(query)`, `get_memory`.
+  - **Auto (apply now + undo):** `create_task`, `create_calendar_event`, `create_quick_event_template`,
+    `add_brain_dump_note`, `add_goal_milestone`, `remember`, `forget`.
+  - **Confirm (approve card):** `update_task`, `delete_task`, `move_calendar_event`,
+    `delete_calendar_event`, `update_goal`, `set_north_star`.
+  - Fold the existing normalizers from `assistantActions.js` in (reuse, don't duplicate).
+- [x] `sendToAssistant` becomes a loop: call with `tools`; while the response has `functionCalls`,
+      execute and append `functionResponse`, capped at ~6 rounds. Drop `responseMimeType: json` and
+      the ~40 lines of "payload MUST include…" prose (a real schema now enforces it).
+- [x] Read tools need *current* state mid-loop, not render-time props: App exposes a
+      `getAssistantState()` backed by a ref that's updated every render.
+- [x] Tool turns stay ephemeral. Only the final text + an `actionsTaken` list persist to
+      `chatHistory`, so the stored `{role, parts:[{text}]}` shape is unchanged and needs no migration.
+- [x] Slim `buildSystemPrompt` to a compact snapshot (today, score/rank, pinned goals, memory, north
+      star). The model pulls the rest through read tools, which keeps tokens down across rounds.
+
+### Phase 2: Undo + activity log
+- [x] New synced key `gameOfLife_assistantActivity`: `{id, at, tool, label, inverse}` per auto action
+      (inverse = delete-by-id for creates, prior-object snapshot for edits). Cap ~100.
+- [x] Undo button on each action chip in the chat + a "Recent activity" list in the drawer.
+- [x] Confirm tier reuses the existing approve/reject cards.
+
+### Phase 3: Long-term memory
+- [x] New synced key `gameOfLife_assistantMemory`: `[{id, text, kind: pattern|preference|fact|win,
+      createdAt}]`, capped ~60, injected into every prompt.
+- [x] Prompt guidance: store durable insights ("skips workouts after <6h sleep"), not one-off facts.
+- [x] Drawer panel "What I know about you": view / edit / delete entries.
+
+### Phase 4: North star
+- [x] `northStar: {vision, identity: [..], updatedAt}` on the synced user object (additive, backward
+      compatible). Editable card at the top of the Goals page.
+- [x] Injected first in the prompt; the coach measures suggestions against it. If it's empty, the first
+      morning briefing asks you to write it.
+
+### Phase 5: Proactive check-ins (in-app, on open)
+- [x] New `src/utils/assistantTriggers.js` + synced key `gameOfLife_assistantCheckins`
+      (`lastMorning`, `lastEvening`, `lastWeekly`, `dismissed`). Synced so two devices don't both fire.
+- [x] Evaluate on load + tab-visible, **only after `cloudSyncReady`** (no firing on stale local data).
+  - **Morning briefing** (first open of the day): agent run that plans today and can auto-add blocks.
+  - **Evening debrief** (after 8pm, Daily Log empty): recap + prompt to log.
+  - **Weekly plan** (Sunday / first open of the week): recap + next week's plan, tied to Weekly Review.
+  - **Rule-based nudges (no AI call):** rank streak at risk, yesterday's commitment unresolved, goal
+    untouched 7+ days, habit streak about to break.
+- [x] Delivery: briefings land as an unread assistant message + badge on FloatingAIBar (the drawer
+      doesn't auto-pop). Nudges show as a small toast that opens the drawer.
+- [x] At most 1 AI call per check-in type per day, to stay friendly with the free tier.
+
+### Phase 6: Persona
+- [x] Direct coach: honest, names slipping, supportive, cites your own data, ends with one next action.
+
+### Verification
+- [x] Baseline `npm run lint` error count first; finish with no new errors + `npm run build` passing.
+- [x] Unit tests: each executor + its undo inverse; the loop against mocked multi-round Gemini
+      responses (incl. round cap, unknown tool, bad args); trigger logic with a fake clock.
+- [x] Live (needs valid key): "plan my day" multi-step run, undo, memory surviving reload/other device,
+      morning briefing firing once.
+
+**Files:** new `assistantTools.js`, `assistantTriggers.js`; edit `assistantUtils.js`,
+`assistantActions.js`, `AssistantDrawer.jsx/.css`, `FloatingAIBar.jsx/.css`, `App.jsx`,
+`services/firestoreService.js` (`DATA_KEYS`), `GoalsPage.jsx/.css`.
+
+### Outcome + deviations from the plan
+- `assistantActions.js` was **deleted**: its normalizers moved into `assistantTools.js`, its apply logic
+  became the pure `applySliceOp` ops. New `src/hooks/useAssistant.js` owns send/approve/reject/undo so
+  `AssistantDrawer` is presentational; `NorthStarCard.jsx` is its own component.
+- Names differ from the plan sketch above. Final read tools: `get_tasks`, `get_calendar`, `get_goals`,
+  `get_habits`, `get_journal`, `get_health`, `get_score_history`, `get_focus_sessions`,
+  `get_xp_breakdown`, `get_commitments`, `get_weekly_reviews`, `search_brain_dump`, `get_wishlist`,
+  `get_achievements` (memory is always in the prompt, so no `get_memory`). The latest-state ref lives
+  in `useAssistant` (`stateRef`), not a `getAssistantState()` on App. Check-in keys are
+  `morning`/`evening`/`weekly`/`nudges`. The loop is `runAssistantTurn`; `sendToAssistant` is gone.
+- 27 tools: 14 read, 7 auto, 6 confirm. Auto ops are committed **after** the loop finishes, so a turn that
+  errors midway applies nothing. Confirm proposals are re-validated against current state at approval.
+- No-arg tools omit `parameters` entirely (Gemini rejects an OBJECT schema with empty `properties`).
+- Commitment nudge uses exactly Home's `CommitmentTile` "pending" rule (Daily Log text + archive record),
+  caught in browser testing; the first version keyed off the archive only and could point at a tile
+  with no buttons.
+- Fixed two pre-existing drawer layout bugs surfaced by testing: action cards overflowed (no
+  `box-sizing`), and on mobile the bottom nav (z 9000) covered the drawer's input (drawer was z 1120).
+
+### Verification (2026-10-16)
+- Lint: 12 errors (= baseline), 43 problems (+3 = the existing `persist` exhaustive-deps pattern for the
+  3 new keys). `npm run build` passes.
+- 27 unit tests (scratchpad, node:test via esbuild): every tool, every op + inverse, undo XP blockers,
+  loop multi-round/round-cap/unknown tool/bad args/fallback text/atomic failure, history→contents,
+  prompt, trigger windows with a fake clock, all 4 nudge kinds.
+- Real `@google/genai` browser build driven through the loop with stubbed `fetch`: request shape,
+  thought-signature echo, call-id round trip, parsing.
+- Real app in the browser pane (throwaway harness: Vite JS API + auth stub, both in scratchpad, deleted
+  after) with Gemini stubbed in-page: multi-tool turn, Undo, Approve, approve-then-Undo (restored at
+  original index), Memory/Activity tabs, North Star card + edit, unread check-in pill → drawer, the
+  commitment nudge clearing when resolved, mobile 375px. Model-supplied `xp: 500` stored as 20.
+- **Not verified live:** `VITE_GEMINI_API_KEY` is still invalid (400), so Gemini's own server-side
+  acceptance of the tool schemas and real model behavior are untested until a fresh key is in `.env`.
+
 ## Done (2026-09-09): Daily Score in the sidebar
 
 Goal: surface the Daily Score (0-10, *computed* — see `scoreUtils.js`) in the sidebar footer so it is
