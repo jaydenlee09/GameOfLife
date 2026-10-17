@@ -1,11 +1,33 @@
 // Pure, state-free helpers for the Goals feature: normalization, progress
 // calculation, and completion/milestone transitions. Period-key date math
-// (week/month/year bucketing) intentionally stays local to each consumer —
+// (week/month/year bucketing) mostly stays local to each consumer —
 // GoalsPage/TasksPage/WeeklyReviewPage already keep matching copies of that
-// logic, and this file doesn't centralize it.
+// logic. The one shared piece is "which goal is in focus right now" (Home's Why
+// tile and the Daily Log's commitment suggestions must agree on it).
 
 export const GOAL_XP_BY_PERIOD = { weekly: 50, monthly: 150, yearly: 400 };
 export const MILESTONE_XP = 15;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** The periodKey a goal of this period would have right now (weeks start Monday). */
+export const getCurrentGoalPeriodKey = (period, now) => {
+  if (period === 'weekly') {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+  if (period === 'monthly') return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+  if (period === 'yearly') return String(now.getFullYear());
+  return null;
+};
+
+/** The open goal for the current period to focus on: pinned first, else the first one. */
+export const getFocusGoal = (goals, now) => {
+  const active = (goals || []).filter((g) => !g.completed && g.periodKey === getCurrentGoalPeriodKey(g.period, now));
+  return active.find((g) => g.pinned) || active[0] || null;
+};
 
 export const normalizeGoal = (goal) => ({
   milestones: [],

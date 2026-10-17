@@ -26,17 +26,31 @@ export const entryHasContent = (entry) => !!entry && (
   || !!entry.learned?.trim()
   || !!entry.notes?.trim()
   || !!entry.commitment?.trim()
+  || entry.dayRating > 0
+  || !!entry.prompt?.answer?.trim()
 );
 
-/** Stable fingerprint of what the user wrote, to tell when an entry was edited after its review. */
-export const entryFingerprint = (entry) => JSON.stringify([
-  [...(entry?.emotions || [])].sort(),
-  clean(entry?.proud),
-  clean(entry?.improve),
-  entry?.learned?.trim() || '',
-  entry?.notes?.trim() || '',
-  entry?.commitment?.trim() || '',
-]);
+/**
+ * Stable fingerprint of what the user wrote, to tell when an entry was edited after
+ * its review. The Close the Day fields are appended only when present, so entries
+ * (and reviews) from before them keep the exact fingerprint they were saved with.
+ */
+export const entryFingerprint = (entry) => {
+  const parts = [
+    [...(entry?.emotions || [])].sort(),
+    clean(entry?.proud),
+    clean(entry?.improve),
+    entry?.learned?.trim() || '',
+    entry?.notes?.trim() || '',
+    entry?.commitment?.trim() || '',
+  ];
+  const extra = {
+    ...(entry?.dayRating ? { dayRating: entry.dayRating } : {}),
+    ...(entry?.prompt?.answer?.trim() ? { prompt: entry.prompt.answer.trim() } : {}),
+    ...(entry?.loopCheck?.result ? { loop: entry.loopCheck.result } : {}),
+  };
+  return JSON.stringify(Object.keys(extra).length ? [...parts, extra] : parts);
+};
 
 /** Everything the review looks at, as one plain object. */
 export const buildReviewContext = (state, dateKey) => {
@@ -81,6 +95,9 @@ export const buildReviewContext = (state, dateKey) => {
       learned: entry.learned?.trim() || null,
       notes: entry.notes?.trim() || null,
       commitmentForTomorrow: entry.commitment?.trim() || null,
+      dayRatingOutOf10: entry.dayRating || null,
+      nightlyQuestion: entry.prompt?.answer?.trim() ? { question: entry.prompt.text, answer: entry.prompt.answer.trim() } : null,
+      workedOnLastImprove: entry.loopCheck?.result ? { item: entry.loopCheck.text, answer: entry.loopCheck.result } : null,
     },
     dailyScore: {
       score: day.score,

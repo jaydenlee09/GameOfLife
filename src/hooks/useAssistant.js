@@ -5,6 +5,7 @@ import { getTool, applySliceOp, undoBlocker } from '../utils/assistantTools';
 import { generateDayPlan, planToEvents, fromMinutes } from '../utils/dayPlanner';
 import { generateHomeBrief } from '../utils/homeBrief';
 import { generateFocusComment } from '../utils/focusCoach';
+import { generateLogPatterns } from '../utils/logPatterns';
 
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 const ACTIVITY_LIMIT = 100;
@@ -252,8 +253,19 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     }
   }, []);
 
+  // ─── Daily Log pattern flags ────────────────────────────────────────────────
+  /** Resolves { ok, patterns } or { ok: false, error }. Writes nothing; the caller saves it. */
+  const findLogPatterns = useCallback(async (todayKey) => {
+    try {
+      const patterns = await generateLogPatterns({ state: stateRef.current, todayKey, generate: geminiGenerateJson });
+      return { ok: true, patterns };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    }
+  }, []);
+
   return {
-    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome,
+    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns,
     isLoading, error, clearError: () => setError(null),
   };
 }

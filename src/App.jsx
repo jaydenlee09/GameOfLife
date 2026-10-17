@@ -13,6 +13,7 @@ import DailyLogPage from './components/DailyLogPage'
 import { xpCapForLevel } from './utils/xpUtils'
 import RANK_TIERS from './utils/rankMeta'
 import { computeRankStatus, computeDailyScore } from './utils/scoreUtils'
+import { hasEnoughForPatterns } from './utils/logPatterns'
 import RankChangeModal from './components/RankChangeModal'
 import { calcStreakXp, getHabitAttrs } from './utils/habitUtils'
 import CalendarPage from './components/CalendarPage'
@@ -943,14 +944,37 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncSettled, clockTick, currentPage, user.homeBrief?.date]);
 
+  // Daily Log pattern flags: grouped once per night the first time the Daily Log is
+  // open, saved on the user (synced). Skipped until there are enough "improve" notes
+  // to repeat; failures retry after an hour.
+  const patternsInFlight = useRef(false);
+  const patternsFailedAt = useRef(0);
+  useEffect(() => {
+    if (!syncSettled || currentPage !== 'daily-log' || !hasAssistantApiKey()) return;
+    const todayKey = getLocalDateKey(0);
+    if (user.logPatterns?.date === todayKey || patternsInFlight.current) return;
+    if (Date.now() - patternsFailedAt.current < 60 * 60 * 1000) return;
+    if (!hasEnoughForPatterns(logs, todayKey)) return;
+    patternsInFlight.current = true;
+    assistant.findLogPatterns(todayKey).then((result) => {
+      if (result.ok) setUser(prev => ({ ...prev, logPatterns: result.patterns }));
+      else patternsFailedAt.current = Date.now();
+      patternsInFlight.current = false;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncSettled, clockTick, currentPage, user.logPatterns?.date]);
+
   const nudges = useMemo(
     () => (syncSettled
       ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals }, assistantCheckins)
       : []),
     [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, assistantCheckins]
   );
-  // A nudge that only sends you to Home is pointless while you're on Home.
-  const activeNudge = nudges.find(n => !(currentPage === 'welcome' && n.cta.type === 'navigate' && n.cta.page === 'welcome')) || null;
+  // A nudge that only sends you to the page you're already on is pointless, and the
+  // Daily Log's Look back step already asks about yesterday's commitment.
+  const nudgeIsMoot = (n) => (n.cta.type === 'navigate' && n.cta.page === currentPage)
+    || (currentPage === 'daily-log' && n.id.startsWith('commitment_'));
+  const activeNudge = nudges.find(n => !nudgeIsMoot(n)) || null;
 
   const handleNudgeDismiss = (id) => setAssistantCheckins(prev => dismissNudge(prev, id, new Date()));
   const handleNudgeAction = (nudge) => {
@@ -1031,6 +1055,12 @@ function App() {
             logs={logs}
             setLogs={setLogs}
             onCommitmentLocked={({ date, text }) => upsertCommitmentRecord(date, text)}
+            commitmentArchive={commitmentArchive}
+            onResolveCommitment={handleArchiveCommitmentResolve}
+            xpLog={xpLog}
+            goals={goals}
+            northStar={user.northStar}
+            logPatterns={user.logPatterns}
             habits={habits}
             setHabits={setHabits}
             onToggleHabitDay={handleToggleHabitDay}

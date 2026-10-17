@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import './WelcomePage.css';
 import { toDateKey, fmtRemaining } from '../utils/calendarUtils';
-import { getGoalProgress } from '../utils/goalUtils';
+import { getGoalProgress, getFocusGoal } from '../utils/goalUtils';
 import { getHabitStreak } from '../utils/habitUtils';
 import { computeDailyScore, computeStreak, scoreColor } from '../utils/scoreUtils';
 import {
@@ -357,22 +357,9 @@ function CommitmentTile({ commitment, onNavigate, onResolveCommitment }) {
   );
 }
 
-const getCurrentGoalPeriodKey = (period, now) => {
-  if (period === 'weekly') {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const day = d.getDay();
-    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-    return toDateKey(d);
-  }
-  if (period === 'monthly') return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  if (period === 'yearly') return String(now.getFullYear());
-  return null;
-};
-
 function WhyTile({ northStar, weekPriority, goals, now, onNavigate }) {
   const vision = northStar?.vision?.trim();
-  const active = (goals || []).filter((g) => !g.completed && g.periodKey === getCurrentGoalPeriodKey(g.period, now));
-  const goal = active.find((g) => g.pinned) || active[0] || null;
+  const goal = getFocusGoal(goals, now);
   const progress = goal ? getGoalProgress(goal) : null;
 
   return (

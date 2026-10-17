@@ -135,7 +135,7 @@
 
 .log-entry-pill.active {
   background: var(--accent-wash);
-  border-color: rgba(56, 189, 248, 0.5);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   color: var(--text-primary);
 }
 
@@ -224,7 +224,7 @@
 .log-today-badge {
   background: var(--accent-wash);
   color: var(--accent);
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: 20px;
   padding: 0.2rem 0.75rem;
   font-size: 0.72rem;
@@ -450,7 +450,7 @@
 
 /* ─── Commitment Section ──────────────────────────────────────────────────── */
 .commitment-section {
-  border-color: rgba(56, 189, 248, 0.25);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
   border-left: 3px solid var(--accent);
 }
 
@@ -466,7 +466,7 @@
 }
 
 .commitment-input--locked {
-  border-color: rgba(56, 189, 248, 0.6) !important;
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent) !important;
   color: var(--accent) !important;
 }
 
@@ -480,7 +480,7 @@
   width: 100%;
   height: 48px;
   border-radius: var(--radius-md);
-  border: 1.5px solid rgba(56, 189, 248, 0.4);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
   background: var(--accent-wash);
   color: var(--accent);
   font-size: 0.85rem;
@@ -517,7 +517,7 @@
   left: 0;
   top: 0;
   height: 100%;
-  background: rgba(56, 189, 248, 0.25);
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
   transition: width 0.05s linear;
   z-index: 1;
   border-radius: var(--radius-md) 0 0 var(--radius-md);
@@ -540,7 +540,7 @@
 
 /* ─── Submit + assistant review ──────────────────────────────────────────── */
 .log-review-section {
-  border-color: rgba(56, 189, 248, 0.25);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
   border-left: 3px solid var(--accent);
 }
 
@@ -679,7 +679,7 @@
   padding: 0.9rem 1rem;
   border-radius: var(--radius-md);
   background: var(--accent-wash);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .log-review-focus-label {
@@ -722,12 +722,12 @@
 .log-review-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .log-review-btn--primary {
-  border-color: rgba(56, 189, 248, 0.45);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: var(--accent-wash);
   color: var(--accent);
 }
 
-.log-review-btn--primary:hover:not(:disabled) { background: rgba(56, 189, 248, 0.2); }
+.log-review-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 
 @media (max-width: 768px) {
   .log-review-grid { grid-template-columns: minmax(0, 1fr); }
@@ -1149,7 +1149,7 @@
 }
 .health-add-btn {
   background: var(--accent-wash);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   color: var(--accent);
   padding: 0.5rem 1rem;
   border-radius: var(--radius-sm);
@@ -1609,3 +1609,127 @@
 
 .hfm-save-btn:hover { background: var(--accent-pressed); }
 .hfm-save-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ─── Sidebar tabs: Entries / Lessons ────────────────────────────────────── */
+.log-sidebar-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  margin-right: 1.9rem; /* room for the collapse toggle */
+  border-radius: 10px;
+  background: var(--bg-elevated-2);
+}
+
+.log-sidebar-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.log-sidebar-tab:hover { color: var(--text-secondary); }
+.log-sidebar-tab.active { background: var(--bg-elevated-3); color: var(--text-primary); }
+
+.log-entry-dot.closed { box-shadow: 0 0 0 3px var(--accent-wash); }
+
+.log-entry-rating {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.log-lessons {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem;
+}
+
+.log-lessons-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--separator);
+  background: var(--bg-elevated-2);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.log-lessons-search:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+
+.log-lesson {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--separator);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+.log-lesson:hover { background: var(--bg-elevated-2); border-color: var(--separator-strong); }
+.log-lesson-date { font-size: 0.68rem; color: var(--accent); }
+.log-lesson-text { font-size: 0.84rem; line-height: 1.4; color: var(--text-secondary); }
+
+/* ─── Past entries ───────────────────────────────────────────────────────── */
+.log-back-tonight {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.log-past-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.log-past-chip {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: var(--bg-elevated-2);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.log-past-chip strong { color: var(--text-primary); }
+
+@media (max-width: 768px) {
+  .log-sidebar-header { padding: 0.75rem 0.75rem 0.5rem; }
+  /* The sidebar is a 200px strip here: keep the date pills whole and drop the
+     mood chart, which only ever showed clipped beneath them. */
+  .log-entries-list { flex-shrink: 0; }
+  .emotion-trend { display: none; }
+  .log-lessons { max-height: 150px; }
+  .log-date-header { flex-wrap: wrap; gap: 0.6rem; }
+}

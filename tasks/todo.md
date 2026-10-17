@@ -1,5 +1,65 @@
 # Todo
 
+## Done, uncommitted (2026-10-16): Daily Log -> "Close the Day" routine
+
+Goal: the Daily Log stops being a 9-section form and becomes a short guided night routine whose
+answers carry forward, so each night builds on the last.
+
+**Locked decisions (Q&A 2026-10-16):** guided steps (past entries open as a full read/edit page) ·
+all four growth features: close the loop, lessons library, pattern flags, rotating prompt + 1-10
+day rating · night mode look, Daily Log only · phone and desktop equal priority · pattern flags =
+AI groups last 14 days of "improve" notes once a night (cached) + code facts (most-missed habit).
+
+**Steps (today's entry):**
+1. Look back: yesterday's commitment kept / missed (same `resolveCommitmentRecord` as Home) +
+   "Did you work on: <yesterday's improve>?" yes / partly / no.
+2. Check in: emotions (same 16, multi-select, muted chips), 1-10 day rating, energy, habits not
+   ticked yet, sleep / water / screen time (autosave), food tracker collapsed ("anything not logged").
+3. Reflect: wins (1 required, up to 3), one thing to improve (+ add up to 3), lesson learned,
+   tonight's rotating prompt, one resurfaced old lesson, pattern flag card if any.
+4. Tomorrow: commitment with suggestion chips (tonight's improve, pinned goal, last review's
+   tomorrowFocus) + optional "If/when ___, I will ___" template; Hold to Commit.
+5. Finish: one button -> health XP (same once-per-day rules) + Submit & get review; "Day closed"
+   screen with score, streak, review card. AI failure never blocks closing the day.
+
+**My defaults:** steps freely navigable (step pills), so food can be logged any time of day ·
+a closed day reopens on its summary with Edit · new entry fields are additive (`dayRating`,
+`loopCheck`, `prompt: {id, text, answer}`, `closedAt`); `proud` / `improve` / `commitment` keep
+their shapes so Daily Score, Home, Calendar viewer, review and assistant tools keep working ·
+prompt pool is static code (deterministic per date, some templated with North Star / pinned goal) ·
+Lessons = a "Lessons" tab beside the entry list (desktop) / sheet (phone) built from `learned` ·
+pattern result cached per date in a synced key, "Make it a habit" opens the prefilled habit form ·
+night theme = scoped tokens on `.daily-log-container` · install framer-motion (CLAUDE.md) for step
+transitions · fix: "committed" is local state, so a locked commitment shows "Hold to Commit" again
+after leaving the page; derive it from `commitmentArchive`.
+
+- [x] `src/utils/closeDay.js`: steps/completion, yesterday loop data, prompt pool + pick, lessons list,
+      commitment suggestions, pattern context/schema/prompt (pure, unit-tested).
+- [x] Pattern flags: generate + cache in useAssistant, synced key wired in App.
+- [x] Health inputs autosave; XP award moves to Finish.
+- [x] DailyLogPage: guided flow for today, full page for past entries, Lessons tab, day-closed screen.
+- [x] CSS, phone + desktop. (Night mode was built, then dropped on the user's call: the page uses the
+      app's normal graphite + blue, Montserrat and glass cards. No Fraunces font.)
+- [x] Verify: node checks, lint diff, build, real App harness (auth/Gemini stubbed) at 375/430/768/1440,
+      empty + heavy data, past entries still editable, Home/score/review unchanged.
+
+**Also changed on the way:** health inputs autosave and the old "Save Today's Log" button is gone (XP is
+paid per reward key at Close the day, legacy `xpAwarded` days owe nothing) · workout notes field dropped
+from the add row (old notes still stored) · moot nudges hidden (navigate-to-current-page, and the
+commitment nudge on Daily Log) · `getFocusGoal` / `getCurrentGoalPeriodKey` moved to goalUtils (Home
+uses it too) · review failure on Close the day now shows its error + retry · phone: mood chart hidden
+in the 200px sidebar strip (it squashed the date pills) · `entryFingerprint` appends new fields only
+when present, so existing reviews don't all flip to "edited since review".
+
+**Verified:** 13 node checks (carry-forward, look back, step status, lock derivation, prompt
+determinism/gating/no-repeat, lessons + anniversaries, suggestions, if-then round trip, health awards
+incl. legacy, pattern window/leak/normalize/generate). Lint: no new problems in any touched file
+(DailyLogPage 7 -> 6). Build OK. Real App harness (auth bypassed, Gemini faked) at 1440 / 768 / 430 /
+375, heavy + empty data: full walk-through of all 5 steps, commitment kept (+10 Discipline), hold to
+commit (lock survives leaving the page), health XP +60 then food-only +15 on re-close, no double pay,
+no re-review when unchanged, re-review when edited, pattern call once per night + cached, AI failure
+still closes the day and shows why, past entry editable, Lessons tab, no horizontal overflow.
+
 ## Done (2026-10-16): Statistics fills the screen on monitors
 
 At >= 1400px the 920px reading cap is dropped and the page becomes a full-width grid that fills the

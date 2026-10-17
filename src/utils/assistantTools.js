@@ -298,7 +298,7 @@ const READ_TOOLS = [
   },
   {
     name: 'get_journal',
-    description: 'Daily Log journal entries (emotions, proud of, wants to improve, learned, commitment for tomorrow) for a date range (default last 7 days).',
+    description: 'Daily Log journal entries (emotions, proud of, wants to improve, learned, commitment for tomorrow, 1-10 day rating, nightly question answer, whether they worked on the last improve item) for a date range (default last 7 days).',
     parameters: OBJ(DATE_RANGE),
     run: (args, { state }) => {
       const today = getLocalDateKey(0);
@@ -313,6 +313,9 @@ const READ_TOOLS = [
           ...(clean(e.improve).length ? { improve: clean(e.improve) } : {}),
           ...(e.learned?.trim() ? { learned: e.learned } : {}),
           ...(e.commitment?.trim() ? { commitmentForNextDay: e.commitment } : {}),
+          ...(e.dayRating ? { dayRating: e.dayRating } : {}),
+          ...(e.prompt?.answer?.trim() ? { nightlyQuestion: { question: e.prompt.text, answer: e.prompt.answer } } : {}),
+          ...(e.loopCheck?.result ? { workedOnLastImprove: { item: e.loopCheck.text, answer: e.loopCheck.result } } : {}),
         };
       });
       return { entries, daysWithoutEntry: keys.filter((key) => !state.logs?.[key]) };
