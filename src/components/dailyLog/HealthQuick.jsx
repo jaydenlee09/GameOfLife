@@ -10,7 +10,7 @@ import { calcSleepHours } from '../../utils/closeDay';
 // healthLog[todayKey] as you change it (no Save button); the health XP for it is
 // paid when you close the day (see getPendingHealthAwards).
 
-const WORKOUT_TYPES = ['Run', 'Lift', 'HIIT', 'Yoga', 'Walk', 'Swim', 'Cycle', 'Basketball', 'Other'];
+const WORKOUT_TYPES = ['Run', 'Lift', 'HIIT', 'Yoga', 'Walk', 'Swim', 'Cycle', 'Basketball', 'Muay Thai', 'Other'];
 
 const ENERGY_LABELS = ['', 'Drained', 'Low', 'Okay', 'Good', 'Great'];
 const ENERGY_COLORS = ['', '#f87171', '#fb923c', '#fbbf24', '#4ade80', '#22d3ee'];
