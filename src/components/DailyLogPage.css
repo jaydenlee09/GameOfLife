@@ -1678,19 +1678,29 @@
 .log-lesson {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.45rem;
   padding: 0.6rem 0.7rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--separator);
-  background: transparent;
+  transition: border-color var(--duration) var(--ease);
+}
+
+.log-lesson:hover { border-color: var(--separator-strong); }
+
+.log-lesson-open {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0;
+  border: none;
+  background: none;
   color: var(--text-primary);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease);
 }
 
-.log-lesson:hover { background: var(--bg-elevated-2); border-color: var(--separator-strong); }
+.log-lesson-open:hover .log-lesson-text { color: var(--text-primary); }
 .log-lesson-date { font-size: 0.68rem; color: var(--accent); }
 .log-lesson-text { font-size: 0.84rem; line-height: 1.4; color: var(--text-secondary); }
 

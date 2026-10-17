@@ -19,6 +19,7 @@ import STAT_META from '../statMeta';
 import HealthQuick from './HealthQuick';
 import HabitChecklist from './HabitChecklist';
 import LogReviewSection from './LogReview';
+import LessonInsight from './LessonInsight';
 import './CloseDay.css';
 
 const COMMIT_HOLD_DURATION = 3000;
@@ -310,7 +311,7 @@ const PatternCards = ({ flags, habitLeak, commitmentLocked, onMakeHabit, onUseFo
   );
 };
 
-const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, prompt, onShufflePrompt, patterns }) => {
+const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, prompt, onShufflePrompt, patterns, lessonHandlers }) => {
   const [notesOpen, setNotesOpen] = useState(!!entry.notes?.trim());
   const resurfaced = useMemo(() => pickResurfacedLesson(logs, todayKey), [logs, todayKey]);
   const answer = entry.prompt?.answer || '';
@@ -362,6 +363,7 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
           placeholder="A lesson, a fact, a realisation…"
           onChange={e => updateField('learned', e.target.value)}
         />
+        <LessonInsight dateKey={todayKey} entry={entry} {...lessonHandlers} />
         {resurfaced && (
           <div className="cd-resurfaced">
             <History size={14} />
@@ -579,7 +581,7 @@ const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints, onUpdateStat,
-  goals, northStar, logPatterns, xpLog, reviewingDate, onSubmitLog, onOpenAssistant,
+  goals, northStar, logPatterns, xpLog, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers,
 }) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
@@ -730,6 +732,7 @@ const CloseDayFlow = ({
                   prompt={prompt}
                   onShufflePrompt={shufflePrompt}
                   patterns={{ flags, habitLeak, commitmentLocked, onMakeHabit: habitHandlers.onAddHabit, onUseForTomorrow: applyToTomorrow }}
+                  lessonHandlers={lessonHandlers}
                 />
               )}
               {current === 'tomorrow' && (

@@ -20,6 +20,7 @@ import { scoreColor } from '../utils/scoreUtils';
 import { getLessons } from '../utils/closeDay';
 import CloseDayFlow from './dailyLog/CloseDayFlow';
 import LogReviewSection from './dailyLog/LogReview';
+import LessonInsight from './dailyLog/LessonInsight';
 
 // ─── Emotion Trend Chart ───────────────────────────────────────────────────────
 const EmotionTrend = ({ logs }) => {
@@ -291,7 +292,7 @@ const HabitFormModal = ({ habit, initialName = '', onSave, onClose }) => {
 
 // ─── Lessons ──────────────────────────────────────────────────────────────────
 
-const LessonsList = ({ logs, onOpen }) => {
+const LessonsList = ({ logs, onOpen, lessonHandlers }) => {
   const [query, setQuery] = useState('');
   const lessons = useMemo(() => getLessons(logs), [logs]);
   const q = query.trim().toLowerCase();
@@ -311,10 +312,13 @@ const LessonsList = ({ logs, onOpen }) => {
         <p className="log-empty-hint">{lessons.length ? 'No lesson matches.' : 'Every “one thing I learned” you write collects here.'}</p>
       )}
       {shown.map(l => (
-        <button key={l.date} type="button" className="log-lesson" onClick={() => onOpen(l.date)}>
-          <span className="log-lesson-date">{formatShortDate(l.date)}</span>
-          <span className="log-lesson-text">{l.text}</span>
-        </button>
+        <div key={l.date} className="log-lesson">
+          <button type="button" className="log-lesson-open" onClick={() => onOpen(l.date)}>
+            <span className="log-lesson-date">{formatShortDate(l.date)}</span>
+            <span className="log-lesson-text">{l.text}</span>
+          </button>
+          <LessonInsight dateKey={l.date} entry={logs[l.date]} compact {...lessonHandlers} />
+        </div>
       ))}
     </div>
   );
@@ -328,6 +332,7 @@ const DailyLogPage = ({
   logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], northStar, logPatterns,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
   setFoodPoints, onUpdateStat, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
+  onExpandLesson, onAskAssistant,
 }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
@@ -356,6 +361,18 @@ const DailyLogPage = ({
     onDeleteHabit: deleteHabit,
     onAddHabit: (name = '') => setNewHabitName(name),
   }), [deleteHabit]);
+
+  // "Learn more" results are saved on the entry they were asked for (by date, not
+  // the selected entry: the AI call can finish after you've moved to another day).
+  const saveLessonInsight = useCallback((dateKey, insight) => {
+    setLogs(prev => ({ ...prev, [dateKey]: { ...(prev[dateKey] || EMPTY_ENTRY()), lessonInsight: insight } }));
+  }, [setLogs]);
+
+  const lessonHandlers = useMemo(() => ({
+    onExpand: onExpandLesson,
+    onSave: saveLessonInsight,
+    onAskAssistant,
+  }), [onExpandLesson, saveLessonInsight, onAskAssistant]);
 
   // Ensure today's entry always exists
   useEffect(() => {
@@ -427,7 +444,7 @@ const DailyLogPage = ({
             </div>
 
             {sidebarTab === 'lessons' ? (
-              <LessonsList logs={logs} onOpen={openEntry} />
+              <LessonsList logs={logs} onOpen={openEntry} lessonHandlers={lessonHandlers} />
             ) : (
               <>
                 <div className="log-entries-list">
@@ -515,6 +532,7 @@ const DailyLogPage = ({
             reviewingDate={reviewingDate}
             onSubmitLog={onSubmitLog}
             onOpenAssistant={onOpenAssistant}
+            lessonHandlers={lessonHandlers}
           />
         ) : (
           <>
@@ -627,6 +645,7 @@ const DailyLogPage = ({
                   onChange={e => updateField('learned', e.target.value)}
                   rows={3}
                 />
+                <LessonInsight dateKey={selectedDate} entry={currentEntry} {...lessonHandlers} />
               </div>
 
               {/* ── Additional Notes ── */}

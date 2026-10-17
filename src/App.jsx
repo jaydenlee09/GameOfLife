@@ -797,6 +797,8 @@ function App() {
     setChatHistory(prev => (prev.some(m => m.unread) ? prev.map(m => (m.unread ? { ...m, unread: false } : m)) : prev));
   }, []);
   const openAssistant = () => { setAssistantOpen(true); markAssistantRead(); };
+  // Opens the drawer and sends `text` as your message (the drawer sends a draft on open).
+  const askAssistant = (text) => { setAssistantDraft(text); openAssistant(); };
   const closeAssistant = () => { setAssistantOpen(false); markAssistantRead(); };
   const toggleAssistant = useCallback(() => { setAssistantOpen(o => !o); markAssistantRead(); }, [markAssistantRead]);
 
@@ -1075,6 +1077,8 @@ function App() {
             onSubmitLog={assistant.reviewLog}
             reviewingDate={assistant.reviewingDate}
             onOpenAssistant={openAssistant}
+            onExpandLesson={assistant.expandLesson}
+            onAskAssistant={askAssistant}
           />
         );
       case 'timer':

@@ -935,3 +935,127 @@
   .cd-nav .cd-btn--primary { flex: 1; }
   .cd-stat-value { font-size: 1.45rem; }
 }
+
+/* ─── Lesson "Learn more" (LessonInsight) ───────────────────────── */
+.li { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.li-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 36px;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease);
+}
+
+.li-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.li-btn:disabled { opacity: 0.7; cursor: progress; }
+
+.li-card {
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--separator);
+}
+
+.li-head { display: flex; align-items: center; justify-content: space-between; }
+
+.li-kicker,
+.li-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.li-label { color: var(--text-secondary); }
+
+.li-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.li-try,
+.li-deeper { display: flex; flex-direction: column; gap: 0.3rem; padding-top: 0.55rem; border-top: 1px solid var(--separator); }
+
+.li-deeper-actions { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.li-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--separator-strong);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+
+.li-chip svg { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+.li-chip:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--bg-elevated-3); }
+
+.li-stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+.li-link,
+.li-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.li-icon-btn { color: var(--text-tertiary); padding: 2px; border-radius: 6px; }
+.li-icon-btn:hover { color: var(--text-primary); background: var(--bg-elevated-3); }
+
+.li-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
+.li-error svg { flex-shrink: 0; margin-top: 2px; }
+
+/* Narrow Lessons-tab variant */
+.li--compact { margin-top: 0; }
+.li--compact .li-btn { min-height: 28px; padding: 0.25rem 0.6rem; font-size: 0.72rem; }
+.li--compact.li-card { padding: 0.6rem 0.65rem; gap: 0.4rem; }
+.li--compact .li-text { font-size: 0.78rem; }
+.li--compact .li-chip { font-size: 0.74rem; padding: 0.4rem 0.5rem; }

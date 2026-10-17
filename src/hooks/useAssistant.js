@@ -6,6 +6,7 @@ import { generateDayPlan, planToEvents, fromMinutes } from '../utils/dayPlanner'
 import { generateHomeBrief } from '../utils/homeBrief';
 import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
+import { generateLessonInsight } from '../utils/lessonInsight';
 
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 const ACTIVITY_LIMIT = 100;
@@ -264,8 +265,19 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     }
   }, []);
 
+  // ─── Daily Log "Learn more" ─────────────────────────────────────────────────
+  /** Resolves { ok, insight } or { ok: false, error }. Writes nothing; the caller saves it on the entry. */
+  const expandLesson = useCallback(async (dateKey) => {
+    try {
+      const insight = await generateLessonInsight({ state: stateRef.current, dateKey, generate: geminiGenerateJson });
+      return { ok: true, insight };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    }
+  }, []);
+
   return {
-    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns,
+    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson,
     isLoading, error, clearError: () => setError(null),
   };
 }

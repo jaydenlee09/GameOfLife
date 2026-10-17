@@ -1,5 +1,28 @@
 # Todo
 
+## Done, uncommitted (2026-10-16): Daily Log "Learn more" on lessons
+
+Goal: after writing "one thing I learned", tap once to learn a little more about it.
+
+**Locked decisions (Q&A 2026-10-16):** tap a button (no auto-run) · content = quick explainer +
+try it tomorrow + go deeper (follow-up question to My Assistant + a search link) · saved on the
+entry (synced) · available on tonight's Reflect step, past entries and every item in the Lessons tab.
+
+**My defaults:** stored as `entry.lessonInsight {explainer, tryIt, deeperQuestion, searchFor,
+forText, generatedAt}`; editing the lesson shows "You edited this lesson since · Refresh" ·
+results are saved by date (not the selected entry), so a call that finishes after you switch days
+lands on the right entry · "go deeper" sends `About something I learned ("…"): <question>` to the
+drawer · prompt tells the model to correct a wrong/oversimplified lesson and never invent studies or
+numbers · not part of entryFingerprint (AI output, not your writing).
+
+- [x] `src/utils/lessonInsight.js` (context, schema, prompt, normalize, stale check, search URL).
+- [x] `expandLesson` in useAssistant; `askAssistant` in App.
+- [x] `dailyLog/LessonInsight.jsx` (full + compact) in Reflect, past entries, Lessons tab; styles.
+- [x] Verify: node checks, lint diff (no new), build, harness at 1440 + 375: button only once a
+      lesson exists, loading state, saved + rendered, stale + refresh, search link, go-deeper opens
+      the drawer and sends, older lesson from the Lessons tab saves to its own date, past entry
+      shows the card, no overflow.
+
 ## Done, uncommitted (2026-10-16): Daily Log -> "Close the Day" routine
 
 Goal: the Daily Log stops being a 9-section form and becomes a short guided night routine whose
