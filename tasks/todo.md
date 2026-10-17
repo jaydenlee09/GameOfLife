@@ -1,5 +1,24 @@
 # Todo
 
+## Done, uncommitted (2026-10-16): "Where your points went" on the Daily Log
+
+Goal: after the Daily Score, show where points were missed and how to win them back tonight.
+
+- [x] `explainScore` in closeDay.js: per-part points earned / possible (sums exactly to the score),
+      a fix per part (`step` in the routine or `page`), or a note when it can't be won back tonight.
+- [x] ScoreBreakdown block on Finish + Day closed: bar per part, "X to go to keep/start a streak",
+      fix buttons (tick a habit -> Check in, finish a task -> Tasks page, log sleep -> Check in,
+      add a mood/win -> Check in, mark yesterday's -> Look back, missed/no commitment -> "Lock
+      tonight's to earn this tomorrow" -> Tomorrow).
+- [x] Fixed on the way: scoreUtils labelled an *unmarked* commitment "Commitment missed"; now "Not
+      marked yet" (also corrects Home's chip and the review's context). Only "No commitment" is
+      string-matched elsewhere (statsInsights), unchanged.
+- [x] Verify: node checks (points sum to score, perfect day has no fixes, all commitment states),
+      lint diff (no new), build, harness at 1440 + 375: rows/hint/streak goal, mark-kept fix raised
+      the score 1 -> 2 and cleared that row, task fix opens To-Do, closed screen, no overflow.
+
+Not changed (flagged to user): sleep scores 0 unless > 9h, while the check-in calls 8-10h "Optimal".
+
 ## Done, uncommitted (2026-10-16): Daily Log "Learn more" on lessons
 
 Goal: after writing "one thing I learned", tap once to learn a little more about it.

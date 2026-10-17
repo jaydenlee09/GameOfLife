@@ -57,7 +57,13 @@ export const computeDailyScore = (
       tasks:      { value: Math.round(taskScore  * 10) / 10, weight: 30, label: `${tasksDone} task${tasksDone !== 1 ? 's' : ''} done` },
       sleep:      { value: sleepScore, weight: 20, label: sleepLogged ? `${Math.round(sleepHours * 10) / 10}h sleep` : 'Sleep not logged' },
       log:        { value: logScore,   weight: 10, label: logFilled ? 'Log filled' : 'Log empty' },
-      commitment: { value: commitScore, weight: 10, label: lastCommit ? (commitScore > 0 ? 'Commitment kept' : 'Commitment missed') : 'No commitment' },
+      commitment: {
+        value: commitScore,
+        weight: 10,
+        label: !lastCommit ? 'No commitment'
+          : commitScore > 0 ? 'Commitment kept'
+            : lastCommit.denied === true ? 'Commitment missed' : 'Not marked yet',
+      },
     },
   };
 };

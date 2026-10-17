@@ -3,17 +3,18 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Moon, Plus, X, Trophy, TrendingUp, Lightbulb, PenLine, Target,
   Repeat, HeartPulse, MessageCircle, Sparkles, Shuffle, History, AlertTriangle, LoaderCircle, Lock, Pencil, Flame,
+  CheckSquare, NotebookText, Handshake, PieChart,
 } from 'lucide-react';
 import EMOTIONS from '../../utils/logMeta';
 import {
   STEP_META, getLookBack, getSteps, getStepStatus, getFirstOpenStep, isCommitmentLocked,
   pickPrompt, getLastPromptId, pickResurfacedLesson, getCommitmentSuggestions,
-  parseIfThen, composeIfThen, getPendingHealthAwards,
+  parseIfThen, composeIfThen, getPendingHealthAwards, explainScore,
 } from '../../utils/closeDay';
 import { getHabitLeak } from '../../utils/logPatterns';
 import { getYesterdayCommitment } from '../../utils/homeUtils';
 import { getFocusGoal } from '../../utils/goalUtils';
-import { computeDailyScore, computeStreak, scoreColor, shiftDateKey } from '../../utils/scoreUtils';
+import { computeDailyScore, computeStreak, scoreColor, shiftDateKey, STREAK_THRESHOLD } from '../../utils/scoreUtils';
 import { entryHasContent, entryFingerprint } from '../../utils/logReview';
 import STAT_META from '../statMeta';
 import HealthQuick from './HealthQuick';
@@ -475,7 +476,53 @@ const TomorrowStep = ({ entry, updateField, todayKey, commitmentLocked, suggesti
   );
 };
 
-const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canClose, onClose }) => {
+const SCORE_PART_ICON = { habits: Repeat, tasks: CheckSquare, sleep: Moon, log: NotebookText, commitment: Handshake };
+
+/** Points earned vs possible for each part of the Daily Score, with tonight's fixes. */
+const ScoreBreakdown = ({ explained, score, streak, onFix }) => {
+  const toThreshold = Math.round((STREAK_THRESHOLD - score) * 10) / 10;
+  const goal = toThreshold > 0
+    ? `${toThreshold.toFixed(1)} to go ${streak > 0 ? 'to keep your streak' : 'to start a streak'}`
+    : null;
+  return (
+    <Block
+      Icon={PieChart}
+      title="Where your points went"
+      hint={explained.missing > 0 ? `${explained.missing.toFixed(1)} points missed` : 'Perfect day'}
+    >
+      {goal && <p className="sb-goal"><Flame size={13} /> {goal}</p>}
+      <ul className="sb-rows">
+        {explained.rows.map(row => {
+          const Icon = SCORE_PART_ICON[row.key];
+          return (
+            <li key={row.key} className={`sb-row${row.missing > 0 ? '' : ' full'}`}>
+              <div className="sb-top">
+                <span className="sb-label"><Icon size={14} /> {row.label}</span>
+                <span className="sb-detail">{row.detail}</span>
+                <span className="sb-pts"><strong>{row.points.toFixed(1)}</strong>/{row.max}</span>
+              </div>
+              <div className="sb-bar" aria-hidden="true">
+                <span style={{ width: `${(row.points / row.max) * 100}%`, background: scoreColor((row.points / row.max) * 10) }} />
+              </div>
+              {(row.fix || row.note) && (
+                <div className="sb-foot">
+                  {row.note && <span className="sb-note">{row.note}</span>}
+                  {row.fix && (
+                    <button type="button" className="sb-fix" onClick={() => onFix(row.fix)}>
+                      {row.fix.label} <ChevronRight size={13} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Block>
+  );
+};
+
+const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canClose, onClose, breakdown }) => {
   const xpTotal = pendingAwards.reduce((sum, a) => sum + a.amount, 0);
   return (
     <>
@@ -506,6 +553,8 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
         </div>
       </div>
 
+      {breakdown}
+
       {pendingAwards.length > 0 && (
         <p className="cd-awards">
           {pendingAwards.map((a, i) => (
@@ -524,7 +573,7 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
   );
 };
 
-const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, reviewError, onSubmitLog, onOpenAssistant, onEdit }) => (
+const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, reviewError, onSubmitLog, onOpenAssistant, onEdit, breakdown }) => (
   <div className="cd-closed">
     <div className="cd-closed-hero">
       <span className="cd-closed-moon"><Moon size={28} /></span>
@@ -546,6 +595,8 @@ const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, revi
         <span className="cd-stat-label">Your rating</span>
       </div>
     </div>
+
+    {breakdown}
 
     {entry.commitment?.trim() && (
       <Block Icon={Target} title="Tomorrow">
@@ -581,7 +632,7 @@ const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints, onUpdateStat,
-  goals, northStar, logPatterns, xpLog, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers,
+  goals, northStar, logPatterns, xpLog, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
 }) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
@@ -621,7 +672,7 @@ const CloseDayFlow = ({
   const habitLeak = useMemo(() => getHabitLeak(habits, todayKey), [habits, todayKey]);
   const suggestions = getCommitmentSuggestions({ entry, goals, now, flags });
 
-  const score = computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog, todayKey).score;
+  const { score, breakdown } = computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog, todayKey);
   const streak = useMemo(
     () => computeStreak(habits, xpLog, logs, commitmentArchive, healthLog),
     [habits, xpLog, logs, commitmentArchive, healthLog]
@@ -632,6 +683,19 @@ const CloseDayFlow = ({
   const [reviewError, setReviewError] = useState(null);
 
   const goTo = (key) => setStep(key);
+
+  const explained = explainScore({
+    breakdown,
+    habitsTotal: habits.length,
+    sleepLogged: healthLog[todayKey]?.sleepHours != null,
+    commitmentStatus: commitment.status,
+    tonightLocked: commitmentLocked,
+  });
+  const fixScore = (fix) => {
+    if (fix.page) onNavigate?.(fix.page);
+    else if (steps.includes(fix.step)) goTo(fix.step);
+  };
+  const scoreBreakdown = <ScoreBreakdown explained={explained} score={score} streak={streak} onFix={fixScore} />;
   const next = () => goTo(steps[Math.min(index + 1, steps.length - 1)]);
   const back = () => goTo(steps[Math.max(index - 1, 0)]);
 
@@ -703,6 +767,7 @@ const CloseDayFlow = ({
               onSubmitLog={onSubmitLog}
               onOpenAssistant={onOpenAssistant}
               onEdit={() => goTo(steps[0])}
+              breakdown={scoreBreakdown}
             />
           ) : (
             <>
@@ -755,6 +820,7 @@ const CloseDayFlow = ({
                   pendingAwards={pending.awards}
                   canClose={entryHasContent(entry)}
                   onClose={closeTheDay}
+                  breakdown={scoreBreakdown}
                 />
               )}
 

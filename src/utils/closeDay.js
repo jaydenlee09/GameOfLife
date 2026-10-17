@@ -261,3 +261,55 @@ export const calcSleepHours = (bed, wake) => {
   if (mins < 0) mins += 24 * 60;
   return Math.round((mins / 60) * 10) / 10;
 };
+
+// ─── Where your points went ───────────────────────────────────────────────────
+
+const round1 = (n) => Math.round(n * 10) / 10;
+
+export const SCORE_PARTS = [
+  { key: 'habits', label: 'Habits' },
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'sleep', label: 'Sleep' },
+  { key: 'log', label: 'Daily Log' },
+  { key: 'commitment', label: 'Commitment' },
+];
+
+/**
+ * Turns computeDailyScore's breakdown into rows of points earned / possible,
+ * each with a fix for tonight when one exists. A fix is either a routine step
+ * (`step`) or another page (`page`); `note` explains points that can't be won
+ * back tonight. The commitment's "fix" for a missed or absent one is about
+ * tomorrow (lock tonight's), and says so.
+ */
+export const explainScore = ({ breakdown, habitsTotal, sleepLogged, commitmentStatus, tonightLocked }) => {
+  const rows = SCORE_PARTS.map(({ key, label }) => {
+    const part = breakdown[key];
+    const max = part.weight / 10;
+    const points = round1((part.value * part.weight) / 100);
+    const missing = round1(max - points);
+    let fix = null;
+    let note = null;
+    if (missing > 0) {
+      if (key === 'habits') {
+        fix = habitsTotal > 0
+          ? { label: `Tick a habit (+${round1(max / habitsTotal)})`, step: 'checkIn' }
+          : { label: 'Add a habit', step: 'checkIn' };
+      } else if (key === 'tasks') {
+        fix = { label: 'Finish a task (+1)', page: 'tasks' };
+      } else if (key === 'sleep') {
+        if (sleepLogged) note = 'Only counts above 9 hours.';
+        else fix = { label: 'Log last night’s sleep', step: 'checkIn' };
+      } else if (key === 'log') {
+        fix = { label: 'Add a mood or a win (+1)', step: 'checkIn' };
+      } else if (key === 'commitment') {
+        if (commitmentStatus === 'pending') fix = { label: 'Mark yesterday’s (+1 if kept)', step: 'lookBack' };
+        else {
+          note = commitmentStatus === 'missed' ? 'Yesterday’s was missed.' : 'No commitment yesterday.';
+          if (!tonightLocked) fix = { label: 'Lock tonight’s to earn this tomorrow', step: 'tomorrow' };
+        }
+      }
+    }
+    return { key, label, detail: part.label, points, max, missing, fix, note };
+  });
+  return { rows, missing: round1(rows.reduce((sum, r) => sum + r.missing, 0)) };
+};

@@ -1079,6 +1079,7 @@ function App() {
             onOpenAssistant={openAssistant}
             onExpandLesson={assistant.expandLesson}
             onAskAssistant={askAssistant}
+            onNavigate={handleNavigate}
           />
         );
       case 'timer':
