@@ -640,3 +640,7 @@
     justify-content: center;
   }
 }
+
+/* Focus debrief (shared FocusCoach component) */
+.timer-debrief-modal { max-width: 460px; max-height: 90vh; overflow-y: auto; align-items: center; padding: 1.75rem 1.25rem; }
+.timer-main-card .fc-intent, .timer-main-card .fc-park { width: 100%; max-width: 420px; }

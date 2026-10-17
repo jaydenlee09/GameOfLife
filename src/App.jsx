@@ -28,6 +28,9 @@ import WeeklyReviewPage from './components/WeeklyReviewPage'
 import ShopPage from './components/ShopPage'
 import BrainDumpPage from './components/BrainDumpPage'
 import FocusMode from './components/FocusMode'
+import DayPlanner from './components/DayPlanner'
+import { getTool, applySliceOp } from './utils/assistantTools'
+import { completeBlock, completeTask, findBlockInstance } from './utils/completionUtils'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
 import { normalizeGoal } from './utils/goalUtils'
 
@@ -329,6 +332,10 @@ function App() {
   const [rankChangeModal, setRankChangeModal] = useState(null);
   const [dataModalOpen, setDataModalOpen] = useState(false);
   const [focusModeOpen, setFocusModeOpen] = useState(false);
+  // Set when Focus Mode is opened from a calendar block's "Start focus".
+  const [focusLaunch, setFocusLaunch] = useState(null);
+  // Date being planned in the Plan My Day modal (null = closed).
+  const [plannerDate, setPlannerDate] = useState(null);
   const [achievementToast, setAchievementToast] = useState(null);
   const [commitmentToast, setCommitmentToast] = useState(false);
 
@@ -832,6 +839,51 @@ function App() {
     setLogReviews,
   });
 
+  // ─── Plan My Day + focus coach ────────────────────────────────────────────────
+  const openPlanner = useCallback((dateKey) => setPlannerDate(dateKey || getLocalDateKey(0)), []);
+
+  const startFocusFromBlock = useCallback((ev) => {
+    const minutes = (ev.endHour * 60 + ev.endMin) - (ev.startHour * 60 + ev.startMin);
+    setFocusLaunch({
+      blockId: ev.id,
+      blockDate: ev._instanceDate || ev.date,
+      blockTitle: ev.title,
+      taskId: ev.plan?.taskId ?? null,
+      intent: ev.plan?.intent || '',
+      durationSecs: Math.max(5, minutes) * 60,
+    });
+    setFocusModeOpen(true);
+  }, []);
+
+  const closeFocusMode = useCallback(() => { setFocusModeOpen(false); setFocusLaunch(null); }, []);
+
+  // Parked thoughts become Brain Dump notes, laid out like the agent's own notes.
+  const parkThought = useCallback((text) => {
+    setBrainDumpNotes(prev => {
+      const { op } = getTool('add_brain_dump_note').prepare({ text }, { state: { brainDumpNotes: prev } });
+      return applySliceOp(prev, op);
+    });
+  }, []);
+
+  // One-tap completes from the focus debrief: same XP rules as the Calendar/Tasks pages.
+  const completeBlockById = (blockId, dateKey) => {
+    const done = completeBlock(findBlockInstance(calendarEvents, blockId, dateKey));
+    if (!done) return null;
+    done.awards.forEach(a => updateStat(a.stat, a.amount, { source: a.source, label: a.label }));
+    setCalendarEvents(done.update);
+    return done.xp;
+  };
+  const completeTaskById = (taskId) => {
+    const done = completeTask(todos.find(t => String(t.id) === String(taskId)));
+    if (!done) return null;
+    done.awards.forEach(a => updateStat(a.stat, a.amount, { source: a.source, label: a.label }));
+    setTodos(done.update);
+    return done.xp;
+  };
+  const saveFocusComment = useCallback((sessionId, coachNote) => {
+    setPomodoroSessions(prev => prev.map(s => (s.id === sessionId ? { ...s, coachNote } : s)));
+  }, []);
+
   const unreadCheckin = assistantOpen ? null : [...chatHistory].reverse().find(m => m.unread) || null;
 
   // Proactive behaviour re-evaluates on load, whenever the tab becomes visible, and
@@ -968,6 +1020,9 @@ function App() {
             onUpdateStat={updateStat}
             pomodoroSessions={pomodoroSessions}
             onSessionComplete={handleSessionComplete}
+            onPark={parkThought}
+            onComment={assistant.commentOnFocus}
+            onCommentSaved={saveFocusComment}
           />
         );
       case 'calendar':
@@ -984,6 +1039,8 @@ function App() {
             onUpdateStat={updateStat}
             todos={todos}
             logs={logs}
+            onPlanDay={openPlanner}
+            onStartFocus={startFocusFromBlock}
           />
         );
       case 'goals':
@@ -1069,6 +1126,7 @@ function App() {
         hasNorthStar={!!user.northStar?.vision}
         draftMessage={assistantDraft}
         onDraftConsumed={() => setAssistantDraft(null)}
+        onPlanDay={() => { closeAssistant(); openPlanner(); }}
         uid={firebaseUser?.uid}
       />
 
@@ -1083,11 +1141,29 @@ function App() {
       )}
       {focusModeOpen && (
         <FocusMode
+          key={focusLaunch ? `${focusLaunch.blockId}_${focusLaunch.blockDate}` : 'free'}
           todos={todos}
           onUpdateStat={updateStat}
           pomodoroSessions={pomodoroSessions}
           onSessionComplete={handleSessionComplete}
-          onClose={() => setFocusModeOpen(false)}
+          onClose={closeFocusMode}
+          launch={focusLaunch}
+          linkedBlock={focusLaunch ? findBlockInstance(calendarEvents, focusLaunch.blockId, focusLaunch.blockDate) : null}
+          onPark={parkThought}
+          onComment={assistant.commentOnFocus}
+          onCommentSaved={saveFocusComment}
+          onCompleteBlock={completeBlockById}
+          onCompleteTask={completeTaskById}
+        />
+      )}
+      {plannerDate && (
+        <DayPlanner
+          initialDateKey={plannerDate}
+          settings={user.planner}
+          onSaveSettings={(planner) => setUser(prev => ({ ...prev, planner }))}
+          calendarEvents={calendarEvents}
+          assistant={assistant}
+          onClose={() => setPlannerDate(null)}
         />
       )}
       {achievementToast && (

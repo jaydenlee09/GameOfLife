@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { runAssistantTurn, geminiGenerateJson } from '../utils/assistantUtils';
 import { generateLogReview, upsertReview, reviewToChatText } from '../utils/logReview';
 import { getTool, applySliceOp, undoBlocker } from '../utils/assistantTools';
+import { generateDayPlan, planToEvents, fromMinutes } from '../utils/dayPlanner';
+import { generateFocusComment } from '../utils/focusCoach';
 
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 const ACTIVITY_LIMIT = 100;
@@ -193,5 +195,53 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     }
   }, [setChatHistory, setLogReviews]);
 
-  return { send, approve, reject, undo, reviewLog, reviewingDate, isLoading, error, clearError: () => setError(null) };
+  // ─── Plan My Day ────────────────────────────────────────────────────────────
+  /** Builds a plan proposal; writes nothing. Resolves { ok, plan } or { ok: false, error }. */
+  const planDay = useCallback(async ({ dateKey, settings, endTime }) => {
+    try {
+      const plan = await generateDayPlan({ state: stateRef.current, dateKey, settings, endTime, generate: geminiGenerateJson });
+      return { ok: true, plan };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    }
+  }, []);
+
+  /**
+   * Adds the reviewed plan's blocks to the Calendar as one action with one undo,
+   * and notes it in the chat so follow-ups ("move my 3pm block") have context.
+   */
+  const applyPlan = useCallback((plan, blocks) => {
+    const items = planToEvents(blocks, { dateKey: plan.dateKey, planId: plan.id });
+    if (!items.length) return { ok: false, error: 'Nothing to add.' };
+    const label = `Planned ${dateLabel(plan.dateKey)}: ${items.length} block${items.length === 1 ? '' : 's'}`;
+    commitOp({ collection: 'calendarEvents', kind: 'insertMany', items });
+    const entry = {
+      id: makeId('act'), at: Date.now(), tool: 'plan_day', label,
+      inverse: { collection: 'calendarEvents', kind: 'removeMany', ids: items.map((e) => e.id) }, undone: false,
+    };
+    recordActivity([entry]);
+    const lines = blocks.map((b) => `- ${fromMinutes(b.start)}-${fromMinutes(b.end)} ${b.title}${b.intent ? `: ${b.intent}` : ''}`).join('\n');
+    setChatHistory((prev) => [
+      ...prev,
+      { id: makeId('msg'), role: 'user', parts: [{ text: `[I used Plan My Day for ${plan.dateKey} and added the plan to my calendar.]` }], hidden: true },
+      { id: makeId('msg'), role: 'model', parts: [{ text: `**Plan for ${dateLabel(plan.dateKey)}**\n${plan.summary ? `${plan.summary}\n` : ''}${lines}` }], kind: 'plan', actionsTaken: [{ activityId: entry.id, label }] },
+    ]);
+    return { ok: true, count: items.length, activityId: entry.id };
+  }, [commitOp, recordActivity, setChatHistory]);
+
+  // ─── Focus debrief comment ──────────────────────────────────────────────────
+  /** Resolves { ok, comment } or { ok: false, error }. Writes nothing. */
+  const commentOnFocus = useCallback(async (session) => {
+    try {
+      const comment = await generateFocusComment({ state: stateRef.current, session, generate: geminiGenerateJson });
+      return { ok: true, comment };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    }
+  }, []);
+
+  return {
+    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus,
+    isLoading, error, clearError: () => setError(null),
+  };
 }

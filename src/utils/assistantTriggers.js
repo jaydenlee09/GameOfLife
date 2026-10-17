@@ -58,7 +58,7 @@ const AUTO = (what) => `[Automatic ${what}: I just opened the app — I didn't t
 
 export const checkinPrompt = (type, now) => {
   if (type === 'morning') {
-    return `${AUTO('morning check-in')} Give me my start-of-day briefing. Look at yesterday (score, journal, commitment) and today (calendar, tasks, habits, goals). Then give me a concrete plan for today: the 1-3 things that matter most and when to do them. If there's clearly free time and something important has no slot, you may schedule up to 2 time blocks. If my North Star isn't set, end by asking me who I want to become. Under 150 words.`;
+    return `${AUTO('morning check-in')} Give me my start-of-day briefing. Look at yesterday (score, journal, commitment) and today (calendar, tasks, habits, goals). Then name the 1-3 things that matter most today. Don't create time blocks yourself: the app's Plan My Day button (shown under your message) builds the schedule, so if today isn't planned yet, end by telling me to tap it. If my North Star isn't set, end by asking me who I want to become. Under 150 words.`;
   }
   if (type === 'evening') {
     return `${AUTO('evening check-in')} Give me a short evening debrief: how today went against the plan and my Daily Score, one thing I did well, one thing to fix tomorrow. Remind me to fill in today's Daily Log and set a commitment for tomorrow. Don't create anything unless it's clearly needed. Under 120 words.`;
@@ -112,7 +112,7 @@ export const computeNudges = (now, state, checkins) => {
       if (!history[today] && streak >= 3) {
         nudges.push({
           id: `habit_${h.id}`,
-          text: `"${h.text}": your ${streak}-day streak ends tonight if you skip it.`,
+          text: `"${h.name || h.text}": your ${streak}-day streak ends tonight if you skip it.`,
           cta: { type: 'navigate', label: 'Check in', page: 'daily-log' },
         });
       }

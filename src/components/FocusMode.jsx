@@ -1,39 +1,77 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './FocusMode.css';
-import { X, ChevronDown, Play, Pause, RotateCcw, Timer, PartyPopper } from 'lucide-react';
+import { X, ChevronDown, Play, Pause, RotateCcw, Timer, CalendarClock } from 'lucide-react';
 import STAT_META from './statMeta';
 import { xpForFocusMinutes } from '../utils/xpUtils';
 import { useCountdownTimer } from '../hooks/useCountdownTimer';
+import { makeFocusSession } from '../utils/focusInsights';
+import { IntentField, ParkThought, FocusDebrief } from './FocusCoach';
 
 const getLocalDateKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
-const PRESETS = [5 * 60, 10 * 60, 25 * 60, 45 * 60];
+const PRESETS = [5 * 60, 10 * 60, 25 * 60, 45 * 60, 60 * 60, 90 * 60];
 const STAT_ATTRS = Object.keys(STAT_META);
 
-const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionComplete, onClose }) => {
+/**
+ * Fullscreen focus session. `launch` (from a calendar block's "Start focus")
+ * prefills the task, intent and length and links the session to that block:
+ * a linked session pays no focus XP, because completing the block pays for it.
+ * `linkedBlock` is that block's current instance (null once deleted).
+ */
+const FocusMode = ({
+  todos = [], onUpdateStat, pomodoroSessions = [], onSessionComplete, onClose,
+  launch = null, linkedBlock = null, onPark, onComment, onCommentSaved, onCompleteBlock, onCompleteTask,
+}) => {
+  const launchedTask = launch?.taskId != null ? todos.find(t => String(t.id) === String(launch.taskId) && !t.completed) : null;
   const todayTasks = todos.filter(t => (t.timeFrame === 'today' || t.timeFrame === 'tomorrow') && !t.completed);
+  const taskOptions = launchedTask && !todayTasks.includes(launchedTask) ? [launchedTask, ...todayTasks] : todayTasks;
+  const isLinked = launch?.blockId != null;
 
-  const [pinnedId, setPinnedId]   = useState(todayTasks[0]?.id || null);
+  const [pinnedId, setPinnedId]   = useState(launchedTask?.id ?? (isLinked ? null : todayTasks[0]?.id ?? null));
   const [xpStat, setXpStat]       = useState('focus');
   const [showDone, setShowDone]   = useState(false);
   const [startedAt, setStartedAt] = useState(null);
   const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [intent, setIntent]       = useState(launch?.intent || '');
+  const [parked, setParked]       = useState(0);
+  // Set once the finished session is stored, so closing mid-debrief can't lose it.
+  const savedRef = useRef(false);
 
   const { totalSecs, timeLeft, isRunning, hasStarted, start, pause, reset, setDuration } =
-    useCountdownTimer(25 * 60, () => setTimeout(() => setShowDone(true), 600));
+    useCountdownTimer(launch?.durationSecs || 25 * 60, () => setTimeout(() => { savedRef.current = false; setShowDone(true); }, 600));
 
   // Reward is EARNED from session length, not chosen — 1 XP per focused minute.
   const xpAmount = xpForFocusMinutes(totalSecs / 60);
-  const pinnedTask  = todayTasks.find(t => t.id === pinnedId) || todayTasks[0];
+  const pinnedTask = taskOptions.find(t => t.id === pinnedId) || null;
 
+  const saveSession = (debrief) => {
+    if (savedRef.current) return null;
+    savedRef.current = true;
+    const session = makeFocusSession({
+      startedAt, durationSecs: totalSecs, stat: xpStat, xpAmount, intent,
+      taskId: pinnedTask?.id, blockId: launch?.blockId, blockDate: launch?.blockDate, parked, debrief,
+    });
+    if (!isLinked) onUpdateStat(xpStat, xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
+    onSessionComplete?.(session);
+    return session;
+  };
+
+  // Closing during the debrief still records the session (as skipped).
+  const handleClose = () => {
+    if (showDone) saveSession(null);
+    onClose();
+  };
+
+  const handleCloseRef = useRef(handleClose);
+  useEffect(() => { handleCloseRef.current = handleClose; });
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') handleCloseRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   const handleStart = () => {
     if (timeLeft === 0) return;
@@ -45,22 +83,16 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
   const handleReset = () => { reset(); setStartedAt(null); };
   const setPreset = (s) => { setDuration(s); setStartedAt(null); };
 
-  const handleClaimXp = () => {
-    onUpdateStat(xpStat, xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
-    onSessionComplete?.({
-      id: `${Date.now()}-fm`,
-      date: getLocalDateKey(),
-      startedAt: startedAt || Date.now() - totalSecs * 1000,
-      completedAt: Date.now(),
-      durationSecs: totalSecs,
-      xpAmount,
-      stat: xpStat,
-      completed: true,
-    });
+  const handleDebriefDone = () => {
     setShowDone(false);
     setStartedAt(null);
+    setParked(0);
     reset();
+    // A block-linked session is one sitting; afterwards Focus Mode closes.
+    if (isLinked) onClose();
   };
+
+  const park = (text) => { onPark?.(text); setParked(n => n + 1); };
 
   const todayFocusMins = pomodoroSessions.filter(s => s.date === getLocalDateKey() && s.completed)
     .reduce((sum, s) => sum + Math.floor(s.durationSecs / 60), 0);
@@ -69,10 +101,17 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
   const displaySecs = String(timeLeft % 60).padStart(2, '0');
   const progress = totalSecs > 0 ? (totalSecs - timeLeft) / totalSecs : 0;
   const R = 100, C = 2 * Math.PI * R;
+  const xpLine = isLinked
+    ? 'XP for these minutes comes from completing the block.'
+    : `+${xpAmount} XP → ${STAT_META[xpStat]?.label}`;
 
   return (
     <div className="focus-overlay">
-      <button className="focus-close" onClick={onClose} title="Exit (Esc)"><X size={16} /></button>
+      <button className="focus-close" onClick={handleClose} title="Exit (Esc)"><X size={16} /></button>
+
+      {isLinked && (
+        <div className="focus-block-tag"><CalendarClock size={13} /> {linkedBlock?.title || launch.blockTitle}</div>
+      )}
 
       {/* Current task */}
       <div className="focus-task-section">
@@ -81,12 +120,16 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
           <button className="focus-task-name" onClick={() => setShowTaskPicker(o => !o)}>
             {pinnedTask.text} <ChevronDown size={14} />
           </button>
+        ) : taskOptions.length > 0 ? (
+          <button className="focus-task-name muted" onClick={() => setShowTaskPicker(o => !o)}>
+            Pick a task (optional) <ChevronDown size={14} />
+          </button>
         ) : (
           <span className="focus-task-name muted">No tasks for today</span>
         )}
-        {showTaskPicker && todayTasks.length > 0 && (
+        {showTaskPicker && taskOptions.length > 0 && (
           <div className="focus-task-picker">
-            {todayTasks.map(t => (
+            {taskOptions.map(t => (
               <button key={t.id} className={`focus-task-option ${t.id === pinnedId ? 'active' : ''}`} onClick={() => { setPinnedId(t.id); setShowTaskPicker(false); }}>
                 {t.text}
               </button>
@@ -94,6 +137,8 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
           </div>
         )}
       </div>
+
+      <IntentField value={intent} onChange={setIntent} locked={hasStarted || isRunning} />
 
       {/* Timer ring */}
       <div className="focus-ring-wrap">
@@ -126,34 +171,45 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
         <button className="focus-btn reset" onClick={handleReset}><RotateCcw size={16} /></button>
       </div>
 
-      {/* Presets */}
-      <div className="focus-presets">
-        {PRESETS.map(s => (
-          <button key={s} className={`focus-preset ${totalSecs === s ? 'active' : ''}`} onClick={() => setPreset(s)}>
-            {Math.floor(s / 60)}m
-          </button>
-        ))}
-      </div>
+      {hasStarted ? (
+        <ParkThought onPark={park} count={parked} />
+      ) : (
+        <div className="focus-presets">
+          {PRESETS.map(s => (
+            <button key={s} className={`focus-preset ${totalSecs === s ? 'active' : ''}`} onClick={() => setPreset(s)}>
+              {Math.floor(s / 60)}m
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Stat + XP */}
-      <div className="focus-config">
-        <div className="focus-config-row focus-xp-earned-row">
-          <span className="focus-xp-earned">+{xpAmount} XP</span>
-          <span className="focus-xp-earned-note">earned · 1 XP / focused min</span>
+      {isLinked ? (
+        <div className="focus-config">
+          <div className="focus-config-row focus-xp-earned-row">
+            <span className="focus-xp-earned-note">XP comes from completing the block</span>
+          </div>
         </div>
-        <div className="focus-config-row focus-stat-row">
-          {STAT_ATTRS.map(attr => {
-            const meta = STAT_META[attr];
-            const { Icon } = meta;
-            const active = xpStat === attr;
-            return (
-              <button key={attr} className={`focus-stat-pill ${active ? 'active' : ''}`} style={active ? { borderColor: meta.color, color: meta.color, background: `${meta.color}18` } : {}} onClick={() => setXpStat(attr)}>
-                <Icon size={10} strokeWidth={2.5} /> {meta.label.slice(0, 4)}
-              </button>
-            );
-          })}
+      ) : (
+        <div className="focus-config">
+          <div className="focus-config-row focus-xp-earned-row">
+            <span className="focus-xp-earned">+{xpAmount} XP</span>
+            <span className="focus-xp-earned-note">earned · 1 XP / focused min</span>
+          </div>
+          <div className="focus-config-row focus-stat-row">
+            {STAT_ATTRS.map(attr => {
+              const meta = STAT_META[attr];
+              const { Icon } = meta;
+              const active = xpStat === attr;
+              return (
+                <button key={attr} className={`focus-stat-pill ${active ? 'active' : ''}`} style={active ? { borderColor: meta.color, color: meta.color, background: `${meta.color}18` } : {}} onClick={() => setXpStat(attr)}>
+                  <Icon size={10} strokeWidth={2.5} /> {meta.label.slice(0, 4)}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {todayFocusMins > 0 && (
         <div className="focus-today-stats">
@@ -161,13 +217,21 @@ const FocusMode = ({ todos = [], onUpdateStat, pomodoroSessions = [], onSessionC
         </div>
       )}
 
-      {/* Done overlay */}
+      {/* Debrief */}
       {showDone && (
         <div className="focus-done-overlay">
-          <span className="focus-done-emoji"><PartyPopper size={64} /></span>
-          <h2 className="focus-done-title">Session Complete!</h2>
-          <p className="focus-done-xp">+{xpAmount} XP → {STAT_META[xpStat]?.label}</p>
-          <button className="focus-done-btn" onClick={handleClaimXp}>Claim XP</button>
+          <FocusDebrief
+            intent={intent.trim()}
+            xpLine={xpLine}
+            linkedBlock={linkedBlock}
+            linkedTask={pinnedTask}
+            onSave={saveSession}
+            onComment={onComment}
+            onCommentSaved={onCommentSaved}
+            onCompleteBlock={() => onCompleteBlock?.(launch.blockId, launch.blockDate)}
+            onCompleteTask={() => (pinnedTask ? onCompleteTask?.(pinnedTask.id) : null)}
+            onClose={handleDebriefDone}
+          />
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, X, AlertTriangle, Loader2, Send, Check, Undo2, Trash2, Pencil } from 'lucide-react';
+import { Sparkles, X, AlertTriangle, Loader2, Send, Check, Undo2, Trash2, Pencil, CalendarClock } from 'lucide-react';
 import { MEMORY_KINDS, MEMORY_LIMIT } from '../utils/assistantTools';
 import NotificationSettings from './NotificationSettings';
 import './AssistantDrawer.css';
@@ -9,6 +9,7 @@ const CHECKIN_LABELS = {
   evening: 'Evening debrief',
   weekly: 'Weekly plan',
   'log-review': 'Daily Log review',
+  plan: 'Day plan',
 };
 
 const TABS = [
@@ -56,6 +57,7 @@ export default function AssistantDrawer({
   hasNorthStar,
   draftMessage,
   onDraftConsumed,
+  onPlanDay,
   uid,
 }) {
   const { send, approve, reject, undo, isLoading, error } = assistant;
@@ -202,6 +204,12 @@ export default function AssistantDrawer({
                       <span className="assistant-checkin-tag"><Sparkles size={11} /> {CHECKIN_LABELS[msg.kind]}</span>
                     )}
                     <div className="assistant-chat-bubble">{renderText(text)}</div>
+
+                    {!isUser && msg.kind === 'morning' && onPlanDay && (
+                      <button className="assistant-plan-btn" onClick={onPlanDay}>
+                        <CalendarClock size={14} /> Plan my day
+                      </button>
+                    )}
 
                     {!isUser && Array.isArray(msg.actionErrors) && msg.actionErrors.length > 0 && (
                       <div className="assistant-action-errors">

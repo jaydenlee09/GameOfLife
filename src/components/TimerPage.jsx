@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './TimerPage.css';
-import { Sparkles, Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, RotateCcw } from 'lucide-react';
 import STAT_META from './statMeta';
 import { xpForFocusMinutes } from '../utils/xpUtils';
 import { useCountdownTimer } from '../hooks/useCountdownTimer';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { makeFocusSession } from '../utils/focusInsights';
+import { IntentField, ParkThought, FocusDebrief } from './FocusCoach';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PRESETS = [
@@ -12,6 +14,8 @@ const PRESETS = [
   { label: '10 min', seconds: 10 * 60 },
   { label: '25 min', seconds: 25 * 60 },
   { label: '45 min', seconds: 45 * 60 },
+  { label: '60 min', seconds: 60 * 60 },
+  { label: '90 min', seconds: 90 * 60 },
 ];
 
 const STAT_ATTRIBUTES = Object.keys(STAT_META);
@@ -40,35 +44,21 @@ const relativeTime = (ts) => {
 };
 
 
-// ─── XP Modal ─────────────────────────────────────────────────────────────────
-const XpModal = ({ xp, stat, onClose }) => (
-  <div className="modal-overlay" onClick={onClose}>
-    <div className="modal-content xp-modal" onClick={(e) => e.stopPropagation()}>
-      <span className="xp-badge-big"><Sparkles size={48} /></span>
-      <h3 className="modal-title xp-title">+{xp} XP</h3>
-      <p className="modal-body">
-        Focus session complete!{' '}
-        <span style={{ color: 'var(--accent)', fontWeight: 600, textTransform: 'capitalize' }}>
-          {STAT_LABELS[stat] || stat}
-        </span>{' '}
-        increased.
-      </p>
-      <button onClick={onClose} className="modal-btn primary">Awesome!</button>
-    </div>
-  </div>
-);
-
 // ─── Timer Page ───────────────────────────────────────────────────────────────
-const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) => {
+const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete, onPark, onComment, onCommentSaved }) => {
   const [sessionStartedAt, setSessionStartedAt] = useState(null);
   const [customMinutes, setCustomMinutes] = useState('');
   const [customSeconds, setCustomSeconds] = useState('');
   const [xpStat, setXpStat]   = useState('focus');
-  const [showXpModal, setShowXpModal] = useState(false);
+  const [showDebrief, setShowDebrief] = useState(false);
+  const [intent, setIntent] = useState('');
+  const [parked, setParked] = useState(0);
+  // Set once the finished session is stored, so it's never recorded twice.
+  const savedRef = useRef(false);
   const [activePreset, setActivePreset] = useState(25 * 60);
 
   const { totalSecs: totalSeconds, timeLeft, isRunning, hasStarted, start, pause, reset, setDuration } =
-    useCountdownTimer(25 * 60, () => setTimeout(() => setShowXpModal(true), 600));
+    useCountdownTimer(25 * 60, () => setTimeout(() => { savedRef.current = false; setShowDebrief(true); }, 600));
 
   // Reward is EARNED from the session length, not chosen — 1 XP per focused minute.
   const xpAmount = xpForFocusMinutes(totalSeconds / 60);
@@ -119,23 +109,26 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
 
   const handleCustomKeyDown = (e) => { if (e.key === 'Enter') handleCustomApply(); };
 
-  // ── XP grant + session record ─────────────────────────────────────────────
-  const handleXpClose = () => {
-    setShowXpModal(false);
+  // ── XP grant + session record (on debrief save or skip) ───────────────────
+  const saveSession = (debrief) => {
+    if (savedRef.current) return null;
+    savedRef.current = true;
+    const session = makeFocusSession({ startedAt: sessionStartedAt, durationSecs: totalSeconds, stat: xpStat, xpAmount, intent, parked, debrief });
     onUpdateStat(xpStat, xpAmount, { source: 'pomodoro', label: `${Math.floor(totalSeconds / 60)}m focus session` });
-    if (onSessionComplete) {
-      onSessionComplete({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        date: todayKey,
-        startedAt: sessionStartedAt || (Date.now() - totalSeconds * 1000),
-        completedAt: Date.now(),
-        durationSecs: totalSeconds,
-        xpAmount,
-        stat: xpStat,
-        completed: true,
-      });
-    }
+    onSessionComplete?.(session);
+    return session;
+  };
+
+  // Leaving the page mid-debrief still records the session (as skipped).
+  const pendingSaveRef = useRef(null);
+  useEffect(() => { pendingSaveRef.current = showDebrief ? () => saveSession(null) : null; });
+  useEffect(() => () => pendingSaveRef.current?.(), []);
+
+  const handleDebriefDone = () => {
+    setShowDebrief(false);
     setSessionStartedAt(null);
+    setIntent('');
+    setParked(0);
     reset();
   };
 
@@ -178,6 +171,8 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
             </div>
           </div>
 
+          <IntentField value={intent} onChange={setIntent} locked={hasStarted || isRunning} />
+
           <div className="timer-controls">
             {!isRunning ? (
               <button className="timer-btn play" onClick={handleStart} disabled={timeLeft === 0}>
@@ -188,6 +183,8 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
             )}
             <button className="timer-btn reset" onClick={handleReset}><RotateCcw size={16} /> Reset</button>
           </div>
+
+          {hasStarted && <ParkThought onPark={(text) => { onPark?.(text); setParked((n) => n + 1); }} count={parked} />}
 
           {/* Today's focus summary */}
           <div className="timer-today-summary">
@@ -301,7 +298,20 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete }) =
         )}
       </div>
 
-      {showXpModal && <XpModal xp={xpAmount} stat={xpStat} onClose={handleXpClose} />}
+      {showDebrief && (
+        <div className="modal-overlay">
+          <div className="modal-content timer-debrief-modal" onClick={(e) => e.stopPropagation()}>
+            <FocusDebrief
+              intent={intent.trim()}
+              xpLine={`+${xpAmount} XP → ${STAT_LABELS[xpStat] || xpStat}`}
+              onSave={saveSession}
+              onComment={onComment}
+              onCommentSaved={onCommentSaved}
+              onClose={handleDebriefDone}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

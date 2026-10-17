@@ -59,6 +59,13 @@
   background: var(--bg-elevated-2); color: var(--text-secondary); font-size: 0.72rem; font-weight: 500; letter-spacing: 0;
   cursor: pointer; transition: all var(--duration) var(--ease); font-family: inherit;
 }
+.cal-plan-btn {
+  display: flex; align-items: center; gap: 5px;
+  height: 34px; padding: 0 12px; border-radius: var(--radius-sm); border: 1px solid rgba(56,189,248,0.4);
+  background: var(--accent-wash); color: var(--accent); font-size: 0.72rem; font-weight: 600;
+  cursor: pointer; transition: all var(--duration) var(--ease); font-family: inherit; white-space: nowrap;
+}
+.cal-plan-btn:hover { background: rgba(56,189,248,0.2); }
 .cal-nophone-toggle:hover { background: var(--bg-elevated-3); color: var(--text-primary); }
 .cal-nophone-toggle--active { background: var(--danger-wash); border-color: var(--danger); color: var(--danger); }
 
@@ -606,6 +613,8 @@
 .cal-event-btn { width: 18px; height: 18px; border-radius: 3px; border: none; background: transparent; color: var(--text-secondary); font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.1s; }
 .cal-event-btn svg { display: block; }
 .cal-event-complete:hover, .cal-event-complete--done { color: var(--success); background: var(--success-wash); }
+.cal-event-focus:hover { color: var(--accent); background: var(--accent-wash); }
+.cal-event-planned { color: var(--accent); margin-right: 3px; vertical-align: -1px; flex-shrink: 0; }
 .cal-event-duplicate:hover { color: var(--accent); background: var(--accent-wash); }
 .cal-event-delete:hover { color: var(--danger); background: var(--danger-wash); }
 

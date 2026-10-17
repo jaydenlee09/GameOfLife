@@ -1,5 +1,68 @@
 # Todo
 
+## Done, uncommitted (2026-10-16): Plan My Day + Focus session coach
+
+Goal: the AI turns "what matters today" into a real schedule, and every focus session runs
+plan → intent → work → debrief, so the planner learns when you actually focus well.
+
+**Locked decisions (Q&A 2026-10-16):** entry = Calendar day-view button + morning check-in offer ·
+preview card (remove / ±15 min per block) then "Add to calendar", one undo · hours set once
+(wake/bed + fixed busy times) and end time adjustable per plan · contents = open tasks, goal work,
+habits, breaks & buffer · AI picks 25–90 min blocks, break after 50+ min, new 60/90 presets · coach =
+intent before, park-it during, debrief after, AI comment on the debrief · planned blocks get
+"Start focus" · **block-linked sessions pay no focus XP** (the block's Complete pays, once).
+
+**My defaults (stated to user):** replanning only fills free gaps (never moves/deletes) · breaks show
+in the preview but aren't added to the Calendar · No-Phone blocks count as free · Timer page gets the
+same intent/park/debrief · debrief offers "Complete block" / "Mark task done" buttons (user taps;
+existing XP rules) · habit slots carry no stat attributes (0 block XP; tick the habit itself).
+
+**Design rules:**
+- AI proposes, code validates: free gaps are computed deterministically; any AI block outside a
+  gap, overlapping another, off the 15-min grid or referencing an unknown task/goal is fixed or dropped.
+- One JSON-schema Gemini call (same pattern as logReview), no tools, so it can't write anything.
+- Applying = one `insertMany` op on calendarEvents logged as ONE activity entry; undo = `removeMany`
+  that keeps blocks already completed (XP earned stays).
+- Best focus hours are computed from session history in code, never guessed by the model.
+
+- [x] `src/utils/focusInsights.js`: pure stats from pomodoroSessions (by start hour: minutes,
+      done-rate from debriefs; top windows; common blockers).
+- [x] `src/utils/dayPlanner.js`: settings defaults/normalize, `computeFreeGaps`, `buildPlanContext`,
+      PLAN_SCHEMA + prompt, `normalizePlan` (validation), `planToEvents`, `generateDayPlan`.
+- [x] `assistantTools.js`: `insertMany` / `removeMany` ops + undoBlocker; extract block completion
+      into a shared helper so Calendar and the focus debrief complete blocks the same way.
+- [x] `DayPlanner.jsx` modal (App-level): settings step (first run / gear), generating, preview list
+      with remove/shift, insights line, Add to calendar → activity + undo.
+- [x] Entry points: Calendar header button (day view), "Plan my day" button on morning check-in
+      messages in the drawer; morning prompt stops creating blocks itself.
+- [x] Calendar: planned blocks marked (`plan` field), "Start focus" action → opens Focus Mode
+      prefilled (task, intent, length, blockId).
+- [x] Focus coach: shared intent field, Park-it → Brain Dump, debrief screen (outcome + blocker +
+      note), session fields saved, AI comment (one tool-free call), block-linked XP rule, 60/90 presets.
+      Same coach on Timer page.
+- [x] Fix habit `text`→`name` reads in assistant code (found earlier; the planner needs habit names).
+- [x] Verify: node unit runs (gaps, normalizePlan, insights, ops/undo), lint diff, build, real UI
+      with stubbed Gemini (desktop + 375px).
+
+**Also fixed on the way:** Focus Mode close X was invisible (global button padding squashed the svg;
+`padding:0`) · Focus Mode and the planner now sit above the mobile bottom nav (both were z 9000) ·
+every block (not only planned ones) gets Start focus · Tasks/Calendar completion now go through
+`completionUtils` (same payout, one source).
+
+**Verified:** 19 node tests (gaps incl. busy/recurring/end override, normalizePlan clipping/sliding/
+dropping, shift, planToEvents, insertMany/removeMany + undo keeps completed, completeBlock/Task,
+insights, session record, context, generateDayPlan + focus comment with stubbed model); lint diff
+empty (44 pre-existing before/after); build. Real UI in a scratchpad harness (real App, auth stubbed,
+Gemini faked at fetch): first-run settings → build → shift/remove → add (3 events with `plan`, one
+activity, chat note) → undo → re-add → Start focus prefill (task, intent, 60m, linked tag) → park
+thought (1 Brain Dump note) → debrief Partly+Phone → 0 focus XP, comment saved as `coachNote` →
+Complete block (+60) / Mark task done (+20) → undo keeps the completed block; morning drawer
+button; Timer page Skip (+25 XP, no AI call); AI error path; 375px planner sheet + Focus + debrief.
+Two bugs found and fixed by the UI test: sliding a block past a break shortened it; drawer covered
+the planner. **Not verified:** a real Gemini call (local key invalid) — first live run should check
+PLAN_SCHEMA is accepted and plan quality.
+
+
 ## Done (2026-10-16): Run push notifications from GitHub Actions instead of Cloud Functions
 
 Why: user wants the least setup and no card on file (repo is public → Actions minutes are free).

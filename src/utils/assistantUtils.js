@@ -83,7 +83,7 @@ const summarizeHabits = (habits) => {
   const today = getLocalDateKey(0);
   return habits.map((h) => {
     const history = h.history || {};
-    return `- ${h.text}: ${history[today] ? 'done today' : 'not yet today'}, streak ${getHabitStreak({ ...h, history })}`;
+    return `- ${h.name || h.text}: ${history[today] ? 'done today' : 'not yet today'}, streak ${getHabitStreak({ ...h, history })}`;
   }).join('\n');
 };
 

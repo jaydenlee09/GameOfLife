@@ -525,6 +525,24 @@
   margin-bottom: 0.1rem;
 }
 
+.assistant-plan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease);
+}
+.assistant-plan-btn:hover { background: rgba(56, 189, 248, 0.2); }
+
 .assistant-taken-list {
   width: 100%;
   display: flex;

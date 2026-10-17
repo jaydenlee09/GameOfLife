@@ -1,8 +1,9 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import STAT_META from './statMeta';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
+import { completeBlock } from '../utils/completionUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
   toDateKey, buildDayEventTargetMs, fmtRemaining,
@@ -189,6 +190,8 @@ export default function CalendarPage({
   onUpdateStat,
   todos = [],
   logs = {},
+  onPlanDay,
+  onStartFocus,
 }) {
   const [view, setView] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_calendarView');
@@ -581,17 +584,12 @@ export default function CalendarPage({
   // ─── Complete ────────────────────────────────────────────────────────────────
   const completeEvent = (ev, e) => {
     e.stopPropagation();
-    if (isInstanceCompleted(ev)) return;
     // XP is EARNED from the block's scheduled length and split across its attributes,
     // so it can't be inflated by typing a big number or piling on attributes.
-    const attrs = ev.attributes || [];
-    if (attrs.length > 0) {
-      const total = xpForBlockMinutes(minsEndFromEvent(ev) - minsFromEvent(ev));
-      const each = Math.max(1, Math.floor(total / attrs.length));
-      attrs.forEach(attr => onUpdateStat(attr, each, { source: 'calendar', label: ev.title }));
-    }
-    if (ev.recurrence==='none'||!ev.recurrence) setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completed:true}:e));
-    else setCalendarEvents(prev=>prev.map(e=>e.id===ev.id?{...e,completedDates:[...(e.completedDates||[]),ev._instanceDate]}:e));
+    const done = completeBlock(ev);
+    if (!done) return;
+    done.awards.forEach(a => onUpdateStat(a.stat, a.amount, { source: a.source, label: a.label }));
+    setCalendarEvents(done.update);
   };
 
   const setBonusTaskCompletion = (ev, task, shouldBeCompleted) => {
@@ -1207,7 +1205,7 @@ export default function CalendarPage({
                         onClick={(e)=>e.stopPropagation()}
                       />
                       <div className="cal-event-inner">
-                        <div className="cal-event-title">{ev.title}</div>
+                        <div className="cal-event-title">{ev.plan && <Sparkles size={9} className="cal-event-planned" aria-label="Planned by My Assistant" />}{ev.title}</div>
                         {height>30&&<div className="cal-event-time">{fmtTime(dispStartH,dispStartM)} – {fmtTime(dispEndH,dispEndM)}</div>}
                         {height>48&&ev.attributes.length>0&&(
                           <div className="cal-event-attrs">
@@ -1243,6 +1241,7 @@ export default function CalendarPage({
                         )}
                       </div>
                       <div className="cal-event-actions">
+                        {!done && onStartFocus && <button className="cal-event-btn cal-event-focus" onClick={(e)=>{e.stopPropagation();cancelHoverCard();onStartFocus(ev);}} title="Start focus"><Play size={11} strokeWidth={3} /></button>}
                         <button className={`cal-event-btn cal-event-complete ${done?'cal-event-complete--done':''}`} onClick={(e)=>completeEvent(ev,e)} title={done?'Completed':'Mark complete'}>{done ? <Check size={11} strokeWidth={3} /> : <Circle size={11} strokeWidth={3} />}</button>
                         <button className="cal-event-btn cal-event-duplicate" onClick={(e)=>duplicateEvent(ev,e)} title="Duplicate"><Copy size={11} strokeWidth={3} /></button>
                         <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete"><X size={11} strokeWidth={3} /></button>
@@ -1685,6 +1684,15 @@ export default function CalendarPage({
           ))}
         </div>
         <div className="cal-header-right">
+          {onPlanDay && (
+            <button
+              className="cal-plan-btn"
+              onClick={()=>{ const key = toDateKey(anchor); onPlanDay(view==='day' && key>=todayKey ? key : todayKey); }}
+              title="Let My Assistant build a time-blocked plan"
+            >
+              <Sparkles size={13} strokeWidth={2.5} /> Plan my day
+            </button>
+          )}
           {view!=='month' && (
             <button
               className={`cal-nophone-toggle ${noPhoneMode?'cal-nophone-toggle--active':''}`}

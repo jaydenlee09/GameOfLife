@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './TasksPage.css';
 import { Sparkles, Zap, Circle } from 'lucide-react';
 import STAT_META from './statMeta';
+import { completeTask } from '../utils/completionUtils';
 
 // ─── Date Helpers (used by AddTaskModal and TodoList) ─────────────────────────
 const toLocalDateStr = (d = new Date()) =>
@@ -478,20 +479,13 @@ const TodoList = ({ onUpdateStat, todos, setTodos, selectedTask, setSelectedTask
 
   const handleConfirmTask = () => {
     const task = todos.find(t => t.id === pendingTaskId);
-    if (!task) return;
+    const done = completeTask(task);
+    if (!done) return;
     setGainedXp(task.xp);
-    const cats = task.categories || (task.category ? [task.category] : []);
-    setGainedCategories(cats);
-    if (task.goalId) {
-      setTodos(prev => prev.map(t => t.id === pendingTaskId ? { ...t, completed: true } : t));
-    } else {
-      setTodos(prev => prev.filter(t => t.id !== pendingTaskId));
-    }
+    setGainedCategories(done.categories);
+    setTodos(done.update);
     // Split XP evenly across all selected attributes
-    if (cats.length > 0) {
-      const xpEach = Math.floor(task.xp / cats.length);
-      cats.forEach(cat => onUpdateStat(cat, xpEach, { source: 'task', label: task.text }));
-    }
+    done.awards.forEach(a => onUpdateStat(a.stat, a.amount, { source: a.source, label: a.label }));
     if (!task.goalId && selectedTask?.id === pendingTaskId) setSelectedTask(null);
     setShowConfirmModal(false);
     setPendingTaskId(null);

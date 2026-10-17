@@ -120,6 +120,14 @@ export const applySliceOp = (slice, op) => {
       return [...list, op.item];
     case 'remove':
       return list.filter((item) => !sameId(item.id, op.id));
+    case 'insertMany':
+      return [...list, ...op.items];
+    // Removes a batch (e.g. a day plan) but keeps anything already completed:
+    // XP earned on it stays earned.
+    case 'removeMany': {
+      const ids = new Set(op.ids.map(String));
+      return list.filter((item) => !ids.has(String(item.id)) || item.completed || item.completedDates?.length);
+    }
     case 'restore': {
       if (list.some((item) => sameId(item.id, op.item.id))) return list;
       const next = [...list];
@@ -158,6 +166,13 @@ export const undoBlocker = (inverse, state) => {
     const event = (state.calendarEvents || []).find((e) => sameId(e.id, inverse.id));
     if (event?.completed || event?.completedDates?.length) {
       return 'That block was already completed — the XP was earned, so it stays.';
+    }
+  }
+  if (inverse.kind === 'removeMany') {
+    const ids = new Set(inverse.ids.map(String));
+    const left = (state[inverse.collection] || []).filter((item) => ids.has(String(item.id)));
+    if (left.length && left.every((item) => item.completed || item.completedDates?.length)) {
+      return 'Every one of those is already completed — the XP was earned, so they stay.';
     }
   }
   if (inverse.kind === 'removeMilestone') {
@@ -272,7 +287,7 @@ const READ_TOOLS = [
           const history = h.history || {};
           return {
             id: String(h.id),
-            text: h.text,
+            name: h.name || h.text,
             streak: getHabitStreak({ ...h, history }),
             doneToday: !!history[today],
             last14: last14.map((key) => (history[key] ? 'x' : '.')).join(''),
