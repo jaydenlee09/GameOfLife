@@ -115,7 +115,10 @@ const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog }) => {
           <span className="trend-legend-item trend-legend-ref">- - - clears {STREAK_THRESHOLD}</span>
         </div>
       )}
-      <ResponsiveContainer width="100%" height={180}>
+      {/* Absolute inner box so the plot can grow with the card (monitor layout). */}
+      <div className="trend-chart-plot">
+      <div className="trend-chart-plot-inner">
+      <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
           <XAxis
             dataKey="label"
@@ -160,6 +163,8 @@ const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog }) => {
           <ReferenceLine y={cfg.referenceY} stroke="#8e8e93" strokeDasharray="3 3" ifOverflow="extendDomain" />
         </BarChart>
       </ResponsiveContainer>
+      </div>
+      </div>
     </div>
   );
 };

@@ -327,20 +327,23 @@ const PlayerDashboard = ({
 
   return (
     <div className="player-dashboard">
-      <header className="stats-header">
-        <h1 className="stats-title">Statistics</h1>
-      </header>
+      {/* Single column on phones/laptops; a screen-filling grid on monitors (see CSS). */}
+      <div className="stats-main">
+        <header className="stats-header">
+          <h1 className="stats-title">Statistics</h1>
+        </header>
 
-      <WeekVerdict verdict={verdict} rankStatus={rankStatus} />
+        <WeekVerdict verdict={verdict} rankStatus={rankStatus} />
 
-      <div className="stats-insight-row">
-        <LeakCard leaks={leaks} onNavigate={onNavigate} />
-        <StrengthCard leaks={leaks} />
+        <div className="stats-insight-row">
+          <LeakCard leaks={leaks} onNavigate={onNavigate} />
+          <StrengthCard leaks={leaks} />
+        </div>
+
+        <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} />
+
+        <WeekDeltas deltas={deltas} />
       </div>
-
-      <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} />
-
-      <WeekDeltas deltas={deltas} />
 
       {/* ── MORE (collapsed) ──────────────────────────────────────────────── */}
       <button

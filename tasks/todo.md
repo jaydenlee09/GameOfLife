@@ -1,6 +1,19 @@
 # Todo
 
-## Done, uncommitted (2026-10-16): Statistics page: minimal "leaks + fix"
+## Done (2026-10-16): Statistics fills the screen on monitors
+
+At >= 1400px the 920px reading cap is dropped and the page becomes a full-width grid that fills the
+viewport height: verdict | leak | strength on top, trend chart (grows to fill) | deltas below, More
+toggle pinned at the bottom. `.stats-main` keeps `min-height: calc(100% - 70px)` so opening More
+doesn't collapse the chart. Below 1400px nothing changes.
+
+- [x] Wrap main sections in `.stats-main`; monitor grid + `display: contents` on the insight row.
+- [x] TrendChart plot in an absolute inner box so it can grow with its card (180px minimum).
+- [x] Verify: 2560x1440, 1920x1080, 1440x900 fill with no page scroll, More bar clear of the AI
+      bar, chart height stable when More opens; 1366x768 and 375 unchanged; no clipped cards,
+      no horizontal overflow, no console errors.
+
+## Done (2026-10-16, 729496a): Statistics page: minimal "leaks + fix"
 
 Goal: Statistics stops being a wall of ~30 numbers and answers one question: what's working,
 what's costing me, what's the one thing to fix. Home already covers "what do I do now".

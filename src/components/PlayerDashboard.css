@@ -23,8 +23,15 @@ body {
    automatic min-height resolve to 0 instead of content size — inside this
    scrolling flex column that lets cards get shrunk toward 0 instead of the
    column just scrolling. Every direct child keeps its natural height instead. */
-.player-dashboard > * {
+.player-dashboard > *,
+.stats-main > * {
   flex-shrink: 0;
+}
+
+.stats-main {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 1.5vw, 1.5rem);
 }
 
 /* Cards — liquid glass surface, matching the Shop page's card treatment */
@@ -556,6 +563,10 @@ body {
 .stats-more { display: flex; flex-direction: column; gap: clamp(1rem, 1.5vw, 1.5rem); }
 .stats-more > * { flex-shrink: 0; }
 
+/* Plot area: 180px by default, grows with the card when the monitor grid stretches it. */
+.trend-chart-plot { position: relative; flex: 1 1 auto; min-height: 180px; }
+.trend-chart-plot-inner { position: absolute; inset: 0; }
+
 /* ─── Trend legend + tooltip ─────────────────────────────────────────────── */
 .trend-legend {
   display: flex;
@@ -579,6 +590,36 @@ body {
 .trend-tooltip-val { margin-left: auto; color: #fff; font-variant-numeric: tabular-nums; }
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
+/* Monitors: drop the reading-width cap and fill the screen. The main grid grows to
+   the viewport height (minus the More toggle) and the trend chart takes the slack. */
+@media (min-width: 1400px) {
+  .player-dashboard { max-width: none; }
+  .stats-main {
+    flex: 1 0 auto;
+    /* Keep the screen-filling size when More opens (More then sits below the fold),
+       instead of the chart collapsing. 70px ~ the More toggle plus one gap. */
+    min-height: calc(100% - 70px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(320px, 1fr);
+    grid-template-areas:
+      "head    head  head"
+      "verdict leak  strength"
+      "trend   trend deltas";
+  }
+  .stats-header { grid-area: head; }
+  .stats-verdict { grid-area: verdict; justify-content: space-between; }
+  .stats-insight-row { display: contents; }
+  .stats-leak { grid-area: leak; }
+  .stats-strength { grid-area: strength; }
+  .trend-chart-card { grid-area: trend; }
+  .stats-deltas { grid-area: deltas; }
+  /* Rows share the card's height evenly instead of bunching at the top. */
+  .stats-delta-list { flex: 1; }
+  .stats-delta-row { flex: 1; max-height: 72px; }
+  .stats-delta-row:first-child { padding-top: 0.55rem; }
+}
+
 @media (max-width: 900px) {
   .dashboard-secondary-row { grid-template-columns: 1fr; }
 }
