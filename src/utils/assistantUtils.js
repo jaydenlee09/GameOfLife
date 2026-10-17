@@ -3,6 +3,7 @@ import { computeDailyScore, computeRankStatus, getLocalDateKey, shiftDateKey, ST
 import { toDateKey, expandEventsForDates, isInstanceCompleted } from './calendarUtils';
 import { getHabitStreak } from './habitUtils';
 import { getGoalProgress } from './goalUtils';
+import { carriedDays, isTop, todayQueue } from './taskUtils';
 import { TOOL_DECLARATIONS, getTool, applyOpToState } from './assistantTools';
 
 const STAT_LABELS = {
@@ -72,9 +73,22 @@ const summarizeToday = (state) => {
 };
 
 const summarizeTasks = (todos) => {
+  const today = getLocalDateKey(0);
   const open = (todos || []).filter((t) => !t.completed);
   if (!open.length) return 'No open tasks.';
-  return open.slice(0, 25).map((t) => `- [${t.id}] ${t.text} (${t.timeFrame})`).join('\n')
+  // Today's queue first (Top 3, then stale, then the rest), so the model sees priorities.
+  const queue = todayQueue(open, today);
+  const ordered = [...queue, ...open.filter((t) => !queue.includes(t))];
+  const describe = (t) => {
+    const tags = [
+      isTop(t, today) && 'TOP 3 today',
+      carriedDays(t, today) > 0 && `carried over ${carriedDays(t, today)}d`,
+      t.scheduledDate > today && `scheduled ${t.scheduledDate}`,
+      t.dueDate && `due ${t.dueDate}`,
+    ].filter(Boolean);
+    return `- [${t.id}] ${t.text} (${t.timeFrame}${tags.length ? `; ${tags.join('; ')}` : ''})`;
+  };
+  return ordered.slice(0, 25).map(describe).join('\n')
     + (open.length > 25 ? `\n…and ${open.length - 25} more (get_tasks)` : '');
 };
 

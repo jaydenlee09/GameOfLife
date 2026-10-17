@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
-  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Pin,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Pin, Star,
 } from 'lucide-react';
 import './WelcomePage.css';
 import { toDateKey, fmtRemaining } from '../utils/calendarUtils';
@@ -11,6 +11,7 @@ import { computeDailyScore, computeStreak, scoreColor } from '../utils/scoreUtil
 import {
   getDayMode, getNextUp, getYesterdayCommitment, getNextMove, getCloseDaySteps,
 } from '../utils/homeUtils';
+import { todayQueue } from '../utils/taskUtils';
 
 const getGreeting = (hour) => {
   if (hour < 5) return 'Good night';
@@ -284,8 +285,8 @@ function HabitStrip({ habits, todayKey, onToggleHabitDay, onNavigate }) {
 
 // ── Tiles ────────────────────────────────────────────────────────────────────
 function TasksTile({ todos, todayKey, onNavigate, onCompleteTask }) {
-  const todayTasks = (todos || []).filter((t) =>
-    !t.completed && (t.timeFrame === 'today' || !t.timeFrame) && (!t.scheduledDate || t.scheduledDate <= todayKey));
+  // Same list and order as the Tasks page: Top 3, then carried over, then the rest.
+  const todayTasks = todayQueue(todos || [], todayKey);
 
   return (
     <section className="wp-tile wp-tile--tasks" aria-label="Today's tasks">
@@ -303,6 +304,7 @@ function TasksTile({ todos, todayKey, onNavigate, onCompleteTask }) {
               <li key={t.id} className="wp-task-row">
                 <button type="button" className="wp-task-checkbox" aria-label={`Complete ${t.text}`} onClick={() => onCompleteTask(t.id)} />
                 <span className="wp-task-text">{t.text}</span>
+                {t.topDate === todayKey && <Star size={12} className="wp-task-star" fill="currentColor" aria-label="Top 3" />}
               </li>
             ))}
           </ul>

@@ -31,20 +31,20 @@ export const completeBlock = (ev) => {
 
 /**
  * One task. XP is the task's own (timeframe-based) amount split across its
- * categories. Goal-linked tasks stay as completed (goal progress counts them);
- * others are removed. Returns null if already done.
+ * categories. The task stays in the list as completed (Tasks shows "Done today",
+ * goal progress counts goal-linked ones); taskUtils.pruneDoneTasks clears old
+ * ones. Awards share `ref` (the task id) so the completion counts once, not once
+ * per stat; only the first is the counted one. Returns null if already done.
  */
-export const completeTask = (task) => {
+export const completeTask = (task, now = Date.now()) => {
   if (!task || task.completed) return null;
   const cats = task.categories || (task.category ? [task.category] : []);
   const each = cats.length ? Math.floor(task.xp / cats.length) : 0;
   return {
-    awards: cats.map((stat) => ({ stat, amount: each, source: 'task', label: task.text })),
+    awards: cats.map((stat, i) => ({ stat, amount: each, source: 'task', label: task.text, ref: task.id, repeat: i > 0 })),
     xp: each * cats.length,
     categories: cats,
-    update: (todos) => (task.goalId
-      ? todos.map((t) => (t.id === task.id ? { ...t, completed: true } : t))
-      : todos.filter((t) => t.id !== task.id)),
+    update: (todos) => todos.map((t) => (t.id === task.id ? { ...t, completed: true, completedAt: now } : t)),
   };
 };
 

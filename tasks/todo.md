@@ -1066,3 +1066,20 @@ The 4 fixes above weren't actually why mobile was stuck on level 64 — Firestor
 - [x] Cleared the stale `data` subcollection under the real user's doc in Firestore Console, reloaded laptop (re-seeded cloud via existing `migrateLocalStorageToFirestore` path), reloaded phone — confirmed correct data + live bidirectional sync both work.
 
 **Closed.** No firestore.rules file exists in this repo (rules are managed manually via Firebase Console) — worth remembering if sync ever silently breaks again, check Rules tab first.
+
+---
+
+## 2026-10-17: Tasks page rebuild (use it daily, phone-first)
+
+User pain points (all four + "mobile version is hard to use and unpleasant"): adding is slow, forgets to open it, list goes stale, no clear next move. Decisions: one-tap complete + Undo (no popups), Top 3 must-dos, fix Daily Score per-attribute double count.
+
+- [x] `src/utils/taskUtils.js`: pure helpers (buckets: top/today/carried/upcoming/later/doneToday, carried-days, prune old done, count completions per task)
+- [x] `completeTask` keeps finished tasks (`completed`, `completedAt`) so "Done today" exists; prune non-goal done tasks after 7 days at rollover
+- [x] xpLog task events carry `ref` (task id); Daily Score / Home / week stats / log review / lifetime counter count one per task, not per attribute
+- [x] Rebuild TasksPage: quick-add bar (Enter adds, chips Today/Tomorrow/This week/Later), Today view (Top 3 + progress, carried-over triage, rest, Done today), Upcoming, Later tabs; one-tap complete with Undo toast; detail = side panel on desktop, bottom sheet on phone (rename, notes, when, due, stats, subtasks, Start focus, delete)
+- [x] Start focus from a task (FocusMode launch with taskId)
+- [x] Home Tasks tile + morning push fallback + home brief list Top 3 first
+- [x] Keep shared modal/section-title CSS other pages rely on; new styles `tk-` prefixed, app tokens only
+- [x] Verify: lint, build, unit checks of taskUtils, harness screenshots at 375/390/768/1280/1600, interaction tests
+
+**Verified:** eslint clean (App warnings pre-existing), `npm run build` ok, 11 node unit groups for taskUtils/completeTask/Daily Score/morning push pass, harness checks: one-tap complete + Undo + payout after 5s, flush on leaving page, 2-stat task counts once on Daily Score and lifetime counter, Top 3 cap, carried triage, quick add → Tomorrow toast, legacy 'tomorrow' migration, Start focus pins the task, Home tile Top 3 first. No horizontal overflow at 320/390/768/1024/1100/1920 in all three views + sheet. Found and fixed during testing: overdue task moved to Tomorrow stayed on Today (explicit reschedule now beats the deadline pull). Uncommitted.

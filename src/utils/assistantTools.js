@@ -23,6 +23,7 @@ import {
 import { getHabitStreak } from './habitUtils';
 import { getGoalProgress } from './goalUtils';
 import { ACHIEVEMENTS } from './achievementsMeta';
+import { carriedDays, isTop } from './taskUtils';
 
 export const TASK_TIMEFRAME_XP = {
   today: 20,
@@ -215,6 +216,10 @@ const READ_TOOLS = [
           timeFrame: t.timeFrame,
           categories: t.categories || (t.category ? [t.category] : []),
           completed: !!t.completed,
+          ...(t.scheduledDate ? { scheduledDate: t.scheduledDate } : {}),
+          ...(t.dueDate ? { dueDate: t.dueDate } : {}),
+          ...(isTop(t) ? { topThreeToday: true } : {}),
+          ...(carriedDays(t) > 0 ? { carriedOverDays: carriedDays(t) } : {}),
           ...(t.notes ? { notes: t.notes } : {}),
           ...(t.goalId != null ? { goalId: String(t.goalId) } : {}),
           ...(t.subtasks?.length ? { subtasks: `${t.subtasks.filter((s) => s.completed).length}/${t.subtasks.length} done` } : {}),
@@ -479,7 +484,9 @@ const AUTO_TOOLS = [
     prepare: (args, { state, validStats }) => {
       const text = toTrimmedString(args?.text);
       if (!text) throw new Error('Task text is required.');
-      const timeFrame = VALID_TIMEFRAMES.includes(args?.timeFrame) ? args.timeFrame : 'today';
+      const asked = VALID_TIMEFRAMES.includes(args?.timeFrame) ? args.timeFrame : 'today';
+      // "Tomorrow" is a today-task scheduled for tomorrow (how the Tasks page stores it).
+      const timeFrame = asked === 'tomorrow' ? 'today' : asked;
       const categories = filterStats(args?.categories, validStats);
       const finalCategories = categories.length ? categories : ['discipline'];
       const goal = has(args, 'goalId') && toTrimmedString(String(args.goalId)) ? findGoal(state, args.goalId) : null;
@@ -493,12 +500,14 @@ const AUTO_TOOLS = [
         completed: false,
         notes: toTrimmedString(args?.notes),
         subtasks: [],
+        createdAt: Date.now(),
+        ...(asked === 'tomorrow' ? { scheduledDate: getLocalDateKey(1) } : {}),
         ...(goal ? { goalId: goal.id } : {}),
       };
       return {
         op: { collection: 'todos', kind: 'insert', item },
         inverse: { collection: 'todos', kind: 'remove', id: item.id },
-        label: `Added task "${text}" (${timeFrame})`,
+        label: `Added task "${text}" (${asked})`,
         result: { taskId: String(item.id) },
       };
     },
@@ -679,7 +688,13 @@ const CONFIRM_TOOLS = [
         fields.text = args.text.trim();
         changes.push(`rename to "${fields.text}"`);
       }
-      if (VALID_TIMEFRAMES.includes(args?.timeFrame) && args.timeFrame !== task.timeFrame) {
+      if (args?.timeFrame === 'tomorrow') {
+        const tomorrow = getLocalDateKey(1);
+        if (task.timeFrame !== 'today' || task.scheduledDate !== tomorrow) {
+          Object.assign(fields, { timeFrame: 'today', xp: TASK_TIMEFRAME_XP.today, scheduledDate: tomorrow });
+          changes.push(`${task.timeFrame} → tomorrow`);
+        }
+      } else if (VALID_TIMEFRAMES.includes(args?.timeFrame) && args.timeFrame !== task.timeFrame) {
         fields.timeFrame = args.timeFrame;
         fields.xp = TASK_TIMEFRAME_XP[args.timeFrame];
         changes.push(`${task.timeFrame} → ${args.timeFrame}`);

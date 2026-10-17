@@ -11,6 +11,7 @@
 import { computeNudges } from './assistantTriggers';
 import { expandEventsForDates, isInstanceCompleted } from './calendarUtils';
 import { shiftDateKey } from './scoreUtils';
+import { isTop, todayQueue } from './taskUtils';
 
 export const PUSH_TYPES = ['morning', 'evening', 'streak', 'blocks', 'commitment'];
 
@@ -56,12 +57,15 @@ const inWindow = (type, settings, nowMin) => {
 
 /** Template used when Gemini can't write the morning brief. */
 export const morningFallbackBody = (state, today) => {
-  const tasks = (state.todos || []).filter((t) => !t.completed && t.timeFrame === 'today').length;
+  const queue = todayQueue(state.todos || [], today);
+  const tops = queue.filter((t) => isTop(t, today));
   const first = expandEventsForDates(state.calendarEvents || [], [today])
     .sort((a, b) => (a.startHour * 60 + a.startMin) - (b.startHour * 60 + b.startMin))[0];
   const commitment = state.logs?.[shiftDateKey(today, -1)]?.commitment?.trim();
   const parts = [
-    tasks ? `${tasks} task${tasks === 1 ? '' : 's'} due today` : 'No tasks due today',
+    tops.length
+      ? `Top 3: ${tops.map((t) => t.text).join(', ')}`
+      : queue.length ? `${queue.length} task${queue.length === 1 ? '' : 's'} today, pick your Top 3` : 'No tasks today',
     first ? `first block ${fmt(first.startHour, first.startMin)} ${first.title}` : null,
     commitment ? `commitment: "${commitment}"` : null,
   ].filter(Boolean);

@@ -1,35 +1,7 @@
-/* ─── Page Layout ─────────────────────────────────────────────────────────── */
-.tasks-page-container {
-  width: 100%;
-  height: 100%;
-  padding: 2rem;
-  box-sizing: border-box;
-  color: var(--text-primary);
-  overflow-y: auto;
-}
+/* ─── Shared ──────────────────────────────────────────────────────────────────
+   This sheet loads app-wide, and other pages (Timer, Goals, Calendar, Data,
+   Review, Shop) use these generic classes. Keep them until they move out. */
 
-/* Grid (not flex) so the detail column's row starts exactly where the todo
-   card's row starts — column 2 has no content in rows 1–2, so those rows
-   size to column 1's header/day-strip height and row 3 begins level for both. */
-.tasks-layout {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  column-gap: 2rem;
-  row-gap: 0;
-  align-items: start;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.tasks-detail-column {
-  grid-column: 2;
-  grid-row: 3;
-  min-width: 280px;
-  position: sticky;
-  top: 0;
-}
-
-/* ─── Section Titles ─────────────────────────────────────────────────────── */
 .section-page-title {
   font-size: 1.7rem;
   font-weight: 600;
@@ -38,602 +10,6 @@
   margin: 0 0 1rem 0;
 }
 
-/* ─── Header Row (title + timeframe toggle) ─────────────────────────────── */
-.todo-header-row {
-  grid-column: 1;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.todo-header-row .section-page-title {
-  margin-bottom: 0;
-}
-
-/* Matches the calendar page's view-tab toggle (cal-view-tabs / cal-view-tab) */
-.tasks-view-tabs {
-  display: flex;
-  gap: 4px;
-  background: var(--bg-elevated-2);
-  border-radius: var(--radius-md);
-  padding: 3px;
-}
-
-.tasks-view-tab {
-  padding: 5px 16px;
-  border-radius: 7px;
-  border: none;
-  background: transparent;
-  color: var(--text-tertiary);
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  cursor: pointer;
-  transition: all var(--duration) var(--ease);
-  font-family: inherit;
-}
-
-.tasks-view-tab:hover {
-  color: var(--text-secondary);
-}
-
-.tasks-view-tab--active {
-  background: var(--accent);
-  color: #fff;
-}
-
-/* ─── Liquid glass cards — matches the Shop page's card treatment ────────── */
-.todo-card,
-.detail-panel,
-.detail-empty {
-  position: relative;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-  overflow: hidden;
-  isolation: isolate;
-  transition: transform 0.3s var(--ease), border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
-}
-
-.todo-card::before,
-.detail-panel::before,
-.detail-empty::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--glass-sheen);
-  pointer-events: none;
-}
-
-.todo-card:hover,
-.detail-panel:hover {
-  transform: translateY(-3px);
-  border-color: var(--glass-border-hover);
-  box-shadow: var(--glass-shadow-hover);
-}
-
-/* ─── To-Do Card ─────────────────────────────────────────────────────────── */
-.todo-card {
-  grid-column: 1;
-  grid-row: 3;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-/* ─── Task Groups ─────────────────────────────────────────────────────────── */
-.task-group {
-  margin-bottom: 0.5rem;
-}
-
-.task-group-header {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0 0.6rem 0;
-}
-
-.task-group-title {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: 0;
-}
-
-.task-group-title.tomorrow {
-  color: var(--text-secondary);
-}
-
-.task-group-count {
-  background: var(--bg-elevated-2);
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--separator);
-}
-
-/* ─── 7-Day Strip ────────────────────────────────────────────────────────── */
-.day-strip {
-  grid-column: 1;
-  grid-row: 2;
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-
-.day-strip::-webkit-scrollbar {
-  display: none;
-}
-
-.day-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  background: var(--bg-elevated-1);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-md);
-  padding: 0.6rem 0.85rem 0.5rem;
-  cursor: pointer;
-  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease);
-  flex-shrink: 0;
-  position: relative;
-  min-width: 56px;
-}
-
-.day-pill:hover:not(.active) {
-  background: var(--bg-elevated-2);
-  border-color: var(--separator-strong);
-}
-
-.day-pill.active {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.day-pill.is-today:not(.active) {
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-.day-pill-abbrev {
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-tertiary);
-  transition: color var(--duration) var(--ease);
-}
-
-.day-pill.is-today:not(.active) .day-pill-abbrev {
-  color: var(--accent);
-}
-
-.day-pill.active .day-pill-abbrev {
-  color: rgba(0, 0, 0, 0.55);
-}
-
-.day-pill-num {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1;
-  transition: color var(--duration) var(--ease);
-}
-
-.day-pill.active .day-pill-num {
-  color: #000;
-}
-
-.day-pill.is-today:not(.active) .day-pill-num {
-  color: var(--text-primary);
-}
-
-.day-pill-count {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 600;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--bg-base);
-  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
-}
-
-.day-pill.active .day-pill-count {
-  background: #000;
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-/* ─── Day Empty State ────────────────────────────────────────────────────── */
-.day-empty-state {
-  text-align: center;
-  padding: 1.5rem 1rem;
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-  font-weight: 400;
-}
-
-/* ─── Schedule Quick Buttons (in AddTaskModal) ──────────────────────────── */
-.schedule-quick-btns {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.schedule-quick-btn {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: 20px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 500;
-  padding: 0.3rem 0.85rem;
-  cursor: pointer;
-  transition: all var(--duration) var(--ease);
-}
-
-.schedule-quick-btn:hover:not(.active) {
-  background: var(--bg-elevated-3);
-  color: var(--text-primary);
-}
-
-.schedule-quick-btn.active {
-  background: var(--accent-wash);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-/* ─── Upcoming Section ───────────────────────────────────────────────────── */
-.upcoming-section {
-  margin: 0.25rem 0;
-}
-
-.upcoming-divider {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 0 0.5rem 0;
-}
-
-.upcoming-divider-line {
-  flex: 1;
-  height: 1px;
-  background: var(--separator);
-}
-
-.upcoming-divider-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.upcoming-date-title {
-  color: var(--text-secondary) !important;
-  font-size: 0.9rem !important;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.upcoming-dot {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-tertiary);
-}
-
-.upcoming-task-item {
-  opacity: 0.65;
-  border-style: dashed !important;
-}
-
-.upcoming-task-item:hover {
-  opacity: 0.85;
-}
-
-.upcoming-checkbox {
-  border-color: var(--separator-strong) !important;
-  border-style: dashed !important;
-  border-radius: 50% !important;
-}
-
-.upcoming-task-text {
-  color: var(--text-secondary) !important;
-  font-style: italic;
-}
-
-.upcoming-xp {
-  opacity: 0.45;
-}
-
-/* ─── Task Items ─────────────────────────────────────────────────────────── */
-.task-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: var(--bg-elevated-2);
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1rem;
-  margin-bottom: 0.5rem;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease);
-}
-
-.task-item:hover {
-  background: var(--bg-elevated-3);
-}
-
-.task-item.selected {
-  border-color: rgba(56, 189, 248, 0.4);
-  background: var(--accent-wash);
-}
-
-.task-checkbox {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--text-tertiary);
-  border-radius: 6px;
-  flex-shrink: 0;
-  transition: border-color var(--duration) var(--ease);
-  cursor: pointer;
-}
-
-.task-checkbox:hover {
-  border-color: var(--text-secondary);
-}
-
-.task-checkbox.checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.task-text {
-  flex: 1;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.task-text.completed-text {
-  text-decoration: line-through;
-  color: var(--text-tertiary);
-}
-
-.task-text-edit {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--separator-strong);
-  outline: none;
-  color: var(--text-primary);
-  font-family: inherit;
-  padding: 0;
-  width: 100%;
-  caret-color: var(--accent);
-}
-
-.task-due-badge {
-  flex-shrink: 0;
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--text-secondary);
-  background: var(--bg-elevated-1);
-  border: 1px solid var(--separator);
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-}
-
-.task-due-badge.overdue {
-  color: var(--danger);
-  border-color: rgba(255, 69, 58, 0.4);
-  background: var(--danger-wash);
-}
-
-.task-due-badge.soon {
-  color: var(--danger);
-  border-color: rgba(255, 69, 58, 0.25);
-  background: rgba(255, 69, 58, 0.06);
-}
-
-.task-xp-badge {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-
-.task-delete {
-  color: var(--text-tertiary);
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0 4px;
-  transition: color var(--duration) var(--ease);
-  flex-shrink: 0;
-}
-
-.task-delete:hover {
-  color: var(--danger);
-}
-
-/* ─── Add Task Button ─────────────────────────────────────────────────────── */
-.add-task-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--bg-elevated-2);
-  border: 1px dashed var(--separator-strong);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  margin-top: 0.5rem;
-  transition: background var(--duration) var(--ease), color var(--duration) var(--ease), border-color var(--duration) var(--ease);
-}
-
-.add-task-btn span {
-  font-size: 1.2rem;
-  line-height: 1;
-  color: var(--accent);
-}
-
-.add-task-btn:hover {
-  background: var(--bg-elevated-3);
-  color: var(--text-primary);
-  border-color: rgba(56, 189, 248, 0.35);
-}
-
-/* ─── Add Task Modal ─────────────────────────────────────────────────────── */
-.add-task-modal {
-  max-width: 480px !important;
-  text-align: left !important;
-  background: var(--bg-elevated-1) !important;
-  border: 1px solid var(--separator) !important;
-}
-
-.add-task-form-modal {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.modal-text-input {
-  width: 100%;
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 1rem;
-  font-weight: 500;
-  padding: 0.75rem 1rem;
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color var(--duration) var(--ease);
-}
-
-.modal-text-input:focus {
-  border-color: var(--accent);
-}
-
-.modal-text-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.modal-field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.modal-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-secondary);
-}
-
-.timeframe-pills {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.timeframe-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  font-weight: 500;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  transition: all var(--duration) var(--ease);
-  flex: 1;
-}
-
-.timeframe-pill.active {
-  background: var(--accent-wash);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.timeframe-pill:hover:not(.active) {
-  background: var(--bg-elevated-3);
-  border-color: var(--separator-strong);
-}
-
-.pill-xp {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--accent);
-  margin-top: 2px;
-}
-
-.timeframe-pill.active .pill-xp {
-  color: var(--accent);
-}
-
-.category-pills {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.category-pill {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: 20px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 500;
-  padding: 0.3rem 0.8rem;
-  cursor: pointer;
-  transition: all var(--duration) var(--ease);
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.category-pill.active {
-  font-weight: 600;
-}
-
-.category-pill:hover:not(.active) {
-  background: var(--bg-elevated-3);
-  color: var(--text-primary);
-}
-
-/* ─── General Modals ─────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -781,281 +157,6 @@
   100% { transform: scale(1); }
 }
 
-/* ─── Detail Panel ───────────────────────────────────────────────────────── */
-.detail-panel {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.detail-empty {
-  padding: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  text-align: center;
-}
-
-.detail-empty p {
-  color: var(--text-tertiary);
-  font-size: 0.95rem;
-  font-weight: 400;
-  line-height: 1.6;
-}
-
-.detail-top {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.detail-category-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.detail-category-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border-radius: 20px;
-  border: 1px solid;
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 3px 12px;
-  width: fit-content;
-}
-
-.detail-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.3;
-}
-
-.detail-notes {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  padding: 0.75rem 1rem;
-  resize: vertical;
-  min-height: 80px;
-  outline: none;
-  font-family: inherit;
-  transition: border-color var(--duration) var(--ease);
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.detail-notes:focus {
-  border-color: rgba(56, 189, 248, 0.4);
-  color: var(--text-primary);
-}
-
-.detail-notes::placeholder {
-  color: var(--text-tertiary);
-}
-
-.detail-field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.detail-field-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-secondary);
-}
-
-.detail-due-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.detail-date-input {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 0.55rem 0.75rem;
-  outline: none;
-}
-
-.detail-date-input:focus {
-  border-color: rgba(56, 189, 248, 0.4);
-}
-
-.detail-clear-btn {
-  background: transparent;
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 500;
-  padding: 0.55rem 0.75rem;
-  cursor: pointer;
-  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), color var(--duration) var(--ease);
-}
-
-.detail-clear-btn:hover {
-  background: var(--bg-elevated-3);
-  border-color: var(--separator-strong);
-  color: var(--text-primary);
-}
-
-/* Sub-tasks */
-.detail-subtasks {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.subtask-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.25rem;
-}
-
-.subtask-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-secondary);
-}
-
-.subtask-progress {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.subtask-item {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-elevated-2);
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-}
-
-.subtask-checkbox {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--text-tertiary);
-  border-radius: 4px;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: border-color var(--duration) var(--ease);
-}
-
-.subtask-checkbox:hover {
-  border-color: var(--text-secondary);
-}
-
-.subtask-checkbox.checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.subtask-text {
-  flex: 1;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.subtask-text.done {
-  text-decoration: line-through;
-  color: var(--text-tertiary);
-}
-
-.subtask-delete {
-  color: var(--text-tertiary);
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 0 2px;
-  transition: color var(--duration) var(--ease);
-}
-
-.subtask-delete:hover {
-  color: var(--danger);
-}
-
-.add-subtask-form {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--bg-elevated-2);
-  border-radius: var(--radius-sm);
-  border: 1px dashed var(--separator-strong);
-  padding: 0.4rem 0.75rem;
-  margin-top: 0.25rem;
-}
-
-.plus-icon-small {
-  color: var(--accent);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.subtask-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  outline: none;
-}
-
-.subtask-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-/* Detail Footer */
-.detail-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-top: auto;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--separator);
-}
-
-.detail-xp-badge {
-  background: var(--accent-wash);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: var(--radius-sm);
-  color: var(--accent);
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 4px 12px;
-}
-
-.detail-timeframe-badge {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 4px 12px;
-}
-
 .empty-state {
   text-align: center;
   color: var(--text-tertiary);
@@ -1063,37 +164,1251 @@
   font-size: 0.85rem;
 }
 
-/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+/* ═══ Tasks page ═════════════════════════════════════════════════════════════
+   Phone-first. One column up to 1099px (details open as a bottom sheet), then a
+   list + side panel. Inside the desktop shell's fixed 100vh content area the
+   page scrolls itself; on phones the document scrolls. */
+
+.tk-page {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 2rem 2rem 7rem;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.tk-layout {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.tk-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ─── Glass surfaces (same treatment as the rest of the app) ─────────────── */
+.tk-hero,
+.tk-add,
+.tk-aside,
+.tk-sheet {
+  position: relative;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-lg);
+  isolation: isolate;
+}
+
+.tk-hero::before,
+.tk-add::before,
+.tk-aside::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--glass-sheen);
+  pointer-events: none;
+}
+
+/* ─── Header + tabs ──────────────────────────────────────────────────────── */
+.tk-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tk-title {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tk-date {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.tk-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--separator);
+  border-radius: 12px;
+}
+
+.tk-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.tk-tab:hover { color: var(--text-primary); }
+
+.tk-tab--on {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.tk-tab-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 0.7rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ─── Quick add ──────────────────────────────────────────────────────────── */
+.tk-add {
+  padding: 0.5rem 0.5rem 0.6rem;
+}
+
+.tk-add-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem 0 0.6rem;
+}
+
+.tk-add-plus {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.tk-add-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+
+.tk-add-input::placeholder { color: var(--text-tertiary); }
+
+.tk-add-submit {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #001018;
+  cursor: pointer;
+  transition: opacity var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+
+.tk-add-submit:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.tk-add-submit:not(:disabled):active { transform: scale(0.94); }
+
+.tk-add-opts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.35rem 0.25rem 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tk-add-opts::-webkit-scrollbar { display: none; }
+
+.tk-add-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 18px;
+  background: var(--separator-strong);
+  margin: 0 2px;
+}
+
+/* Chips: "when", Top 3, stat */
+.tk-when {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 32px;
+  padding: 0 0.7rem;
+  box-sizing: border-box;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+.tk-when:hover:not(:disabled):not(.tk-when--on) {
+  color: var(--text-primary);
+  border-color: var(--separator-strong);
+}
+
+.tk-when--on {
+  background: var(--accent-wash);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: var(--accent);
+}
+
+.tk-when:disabled,
+.tk-when--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tk-when--star.tk-when--on {
+  background: var(--warning-wash);
+  border-color: rgba(255, 159, 10, 0.45);
+  color: var(--warning);
+}
+
+.tk-when-xp {
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+/* A transparent native date input over the chip: tapping opens the OS picker. */
+.tk-when-date {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  color-scheme: dark;
+}
+
+.tk-when--stat select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+}
+
+.tk-when--stat select option {
+  background: var(--bg-elevated-2);
+  color: var(--text-primary);
+}
+
+/* ─── Today hero: progress + next up ─────────────────────────────────────── */
+.tk-hero {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem 1.15rem;
+}
+
+.tk-hero-count {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+}
+
+.tk-hero-count strong {
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-hero-count span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.tk-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin: 0.6rem 0 0.5rem;
+}
+
+.tk-bar-seg {
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.4s var(--ease);
+}
+
+.tk-bar-seg--on {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+}
+
+.tk-hero-caption {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.tk-next {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "label label" "text go";
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.3rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--separator);
+}
+
+.tk-next-label {
+  grid-area: label;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.tk-next-text {
+  grid-area: text;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.tk-next-go { grid-area: go; }
+
+.tk-next-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.tk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0 1rem;
+  border: 1px solid var(--separator-strong);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+
+.tk-btn:hover { background: rgba(255, 255, 255, 0.09); }
+.tk-btn:active { transform: scale(0.97); }
+
+.tk-btn--primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: #001018;
+}
+
+.tk-btn--primary:hover { background: var(--accent-pressed); }
+
+.tk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 30px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--separator-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tk-pill:hover { background: rgba(255, 255, 255, 0.1); }
+
+.tk-pill--accent {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.tk-pill--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.tk-icon-btn {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tk-icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+}
+
+.tk-icon-btn:disabled { opacity: 0.35; cursor: default; }
+.tk-icon-btn--star { color: var(--warning); }
+.tk-icon-btn--danger:hover:not(:disabled) { color: var(--danger); background: var(--danger-wash); }
+.tk-icon-btn--sm { width: 30px; height: 30px; }
+
+/* ─── Sections ───────────────────────────────────────────────────────────── */
+.tk-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.tk-section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem 0.15rem;
+}
+
+.tk-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.tk-section--top .tk-section-title { color: var(--warning); }
+.tk-section--carried .tk-section-title { color: var(--text-primary); }
+
+.tk-section-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-section-hint {
+  margin: -0.25rem 0 0.6rem 0.15rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.tk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tk-slot {
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border: 1px dashed rgba(255, 159, 10, 0.3);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.tk-empty {
+  margin: 0;
+  padding: 1.5rem 1.25rem;
+  border: 1px dashed var(--separator-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.tk-empty strong { color: var(--text-primary); font-weight: 600; }
+
+.tk-done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  padding: 0.35rem 0.15rem;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tk-done-chev { transition: transform var(--duration) var(--ease); }
+.tk-done-chev--open { transform: rotate(180deg); }
+
+/* ─── Task row ───────────────────────────────────────────────────────────── */
+.tk-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.25rem 0.5rem;
+  padding: 0.55rem 0.35rem 0.55rem 0.4rem;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+  outline: none;
+  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), opacity 0.3s var(--ease);
+}
+
+.tk-row:hover { background: rgba(255, 255, 255, 0.06); }
+.tk-row:focus-visible { border-color: var(--glass-border-hover); }
+.tk-row--top { border-color: rgba(255, 159, 10, 0.22); }
+
+.tk-row--selected {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: var(--accent-wash);
+}
+
+.tk-row--done { opacity: 0.55; }
+
+.tk-row--done .tk-row-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-tertiary);
+  color: var(--text-secondary);
+}
+
+/* 44px tap target around a 22px circle. */
+.tk-check {
+  width: 44px;
+  height: 44px;
+  margin: -0.15rem 0;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #001018;
+  cursor: pointer;
+}
+
+.tk-check::before {
+  content: '';
+  grid-area: 1 / 1;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 2px solid var(--text-tertiary);
+  border-radius: 50%;
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), transform 0.2s var(--ease);
+}
+
+.tk-check > svg {
+  grid-area: 1 / 1;
+  position: relative;
+  animation: tk-pop 0.25s var(--ease);
+}
+
+.tk-check:hover:not(:disabled)::before { border-color: var(--accent); }
+.tk-check:active:not(:disabled)::before { transform: scale(0.88); }
+
+.tk-check:disabled { cursor: default; }
+
+.tk-check:disabled::before,
+.tk-sub--done .tk-check::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.tk-check--sm { width: 34px; height: 34px; margin: 0; }
+.tk-check--sm::before { width: 18px; height: 18px; }
+
+@keyframes tk-pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.tk-row-body {
+  min-width: 0;
+  padding: 0.55rem 0 0.15rem;
+}
+
+.tk-row-text {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.tk-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.45rem;
+  margin-top: 0.35rem;
+}
+
+.tk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  min-width: 0;
+  height: 20px;
+  padding: 0 0.45rem;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tk-chip--danger { background: var(--danger-wash); color: var(--danger); }
+.tk-chip--warning { background: var(--warning-wash); color: var(--warning); }
+.tk-chip--goal { color: var(--accent); background: var(--accent-wash); }
+
+.tk-chip-clip {
+  min-width: 0;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-stat {
+  display: inline-flex;
+  opacity: 0.9;
+}
+
+.tk-xp {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.tk-triage {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0 0.25rem;
+}
+
+.tk-row-side {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding-top: 0.2rem;
+}
+
+.tk-star {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color var(--duration) var(--ease), transform 0.2s var(--ease);
+}
+
+.tk-star:hover { color: var(--text-secondary); }
+.tk-star:active { transform: scale(0.9); }
+.tk-star--on, .tk-star--on:hover { color: var(--warning); }
+
+/* ─── Details (side panel or sheet) ──────────────────────────────────────── */
+.tk-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.tk-detail-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: -0.25rem -0.25rem -0.5rem;
+}
+
+.tk-detail-bar-label {
+  flex: 1;
+  padding-left: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.tk-detail-title {
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  margin: 0 -0.5rem;
+  width: calc(100% + 1rem);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.35;
+  resize: none;
+  field-sizing: content;
+  min-height: 2.2em;
+  outline: none;
+}
+
+.tk-detail-title:hover { border-color: var(--separator); }
+.tk-detail-title:focus { border-color: rgba(56, 189, 248, 0.45); background: rgba(255, 255, 255, 0.03); }
+
+.tk-detail-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.tk-field-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.tk-field-count {
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.tk-field-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.tk-field-note strong { color: var(--text-primary); font-weight: 600; }
+
+.tk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tk-stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 30px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tk-stat-chip:hover:not(.tk-stat-chip--on) { color: var(--text-primary); border-color: var(--separator-strong); }
+
+.tk-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+  color-scheme: dark;
+  outline: none;
+}
+
+.tk-input:focus { border-color: rgba(56, 189, 248, 0.5); }
+.tk-input::placeholder { color: var(--text-tertiary); }
+
+.tk-due {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tk-due .tk-input { width: auto; flex: 0 1 220px; min-height: 40px; }
+
+.tk-notes {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.45;
+}
+
+.tk-subs {
+  list-style: none;
+  margin: 0 0 0.25rem;
+  padding: 0;
+}
+
+.tk-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 36px;
+}
+
+.tk-sub-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.tk-sub--done .tk-sub-text {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.tk-sub-add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.6rem;
+  border: 1px dashed var(--separator-strong);
+  border-radius: 10px;
+  color: var(--text-tertiary);
+}
+
+.tk-sub-input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.tk-sub-input::placeholder { color: var(--text-tertiary); }
+
+.tk-detail-foot {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+/* ─── Desktop side column ────────────────────────────────────────────────── */
+.tk-aside {
+  padding: 1.25rem;
+}
+
+.tk-glance {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tk-glance-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.tk-glance-empty {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+}
+
+.tk-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 36px;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tk-mini:hover { background: rgba(255, 255, 255, 0.06); }
+
+.tk-mini-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
+.tk-mini-dot--top { background: var(--warning); opacity: 1; }
+
+.tk-mini-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-mini-hint {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.tk-glance-link {
+  align-self: flex-start;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tk-glance-tip {
+  margin: 1rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--separator);
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.tk-glance-tip kbd {
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--separator-strong);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Bottom sheet (below 1100px) ────────────────────────────────────────── */
+.tk-sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 9100; /* above the phone bottom nav (9000) and the AI bar */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.tk-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+}
+
+.tk-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  max-height: 88svh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 0.5rem 1rem calc(1.25rem + env(safe-area-inset-bottom));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-bottom: none;
+  background: var(--bg-elevated-1);
+  animation: tk-sheet-in 0.28s var(--ease);
+}
+
+.tk-sheet-grip {
+  width: 38px;
+  height: 5px;
+  margin: 0 auto 0.75rem;
+  border-radius: 3px;
+  background: var(--separator-strong);
+}
+
+@keyframes tk-sheet-in {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ─── Toast (Undo) ───────────────────────────────────────────────────────── */
+.tk-toast-wrap {
+  position: fixed;
+  left: var(--sidebar-w);
+  right: 0;
+  bottom: calc(1.5rem + 66px); /* just above the floating AI bar */
+  z-index: 9200;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem;
+  pointer-events: none;
+}
+
+.tk-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 420px;
+  padding: 0.6rem 0.6rem 0.6rem 1rem;
+  box-sizing: border-box;
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated-2);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+  animation: tk-toast-in 0.25s var(--ease);
+}
+
+.tk-toast-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tk-toast-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.tk-toast-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-toast-undo {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes tk-toast-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ─── Wide: list + side panel ────────────────────────────────────────────── */
+@media (min-width: 1100px) {
+  .tk-layout {
+    max-width: 1180px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .tk-tabs {
+    display: inline-grid;
+    grid-template-columns: repeat(3, auto);
+    justify-self: start;
+    align-self: flex-start;
+  }
+
+  .tk-tab { padding: 0 1rem; }
+
+  .tk-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: 1.5rem;
+  }
+
+  .tk-next {
+    padding-top: 0;
+    padding-left: 1.5rem;
+    border-top: none;
+    border-left: 1px solid var(--separator);
+    align-content: center;
+  }
+
+  .tk-aside {
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+  }
+
+  .tk-add-opts { flex-wrap: wrap; overflow: visible; }
+}
+
+/* ─── Phone ──────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .tasks-page-container {
-    padding: 1rem;
+  .tk-page {
     height: auto;
     overflow-y: visible;
+    padding: 1rem 1rem calc(6rem + env(safe-area-inset-bottom));
   }
 
-  /* Drop the grid — grid-column/grid-row on children become no-ops outside
-     a grid container, so everything just stacks in DOM order instead. */
-  .tasks-layout {
-    display: block;
+  .tk-title { font-size: 1.5rem; }
+
+  /* Compact hero so the list starts above the fold. */
+  .tk-hero { padding: 0.85rem 0.95rem; gap: 0.75rem; }
+  .tk-hero-progress {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 0.85rem;
+  }
+  .tk-hero-count strong { font-size: 1.45rem; }
+  .tk-hero-count span { font-size: 0.78rem; }
+  .tk-bar { margin: 0; }
+  .tk-hero-caption { grid-column: 1 / -1; margin-top: 0.4rem; font-size: 0.75rem; }
+  .tk-next { padding-top: 0.7rem; }
+  .tk-next-text {
+    font-size: 0.92rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .tk-next-go { min-height: 36px; padding: 0 0.8rem; font-size: 0.8rem; }
+
+  .tk-tab { padding: 0 0.4rem; font-size: 0.8rem; }
+
+  /* 16px+ inputs stop iOS Safari zooming the page on focus. */
+  .tk-add-input,
+  .tk-input,
+  .tk-sub-input,
+  .tk-detail-title { font-size: 16px; }
+
+  .tk-detail-title { font-size: 1.15rem; }
+
+  .tk-when { height: 34px; }
+
+  /* The chip row scrolls sideways; fade the edge so that's visible. */
+  .tk-add-opts {
+    -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+    mask-image: linear-gradient(to right, #000 85%, transparent);
+    padding-right: 1.5rem;
   }
 
-  .tasks-detail-column {
-    min-width: 0;
-    width: 100%;
-    position: static;
-    margin-top: 1rem;
+  .tk-toast-wrap {
+    left: 0;
+    bottom: calc(60px + 0.75rem + 62px + env(safe-area-inset-bottom));
   }
+}
 
-  /* Enlarge the tap target to ~36px without growing the visible checkbox —
-     an invisible ::before extends the hit area (clicks on it bubble to the
-     checkbox's own onClick since it's a child of that element). */
-  .task-checkbox {
-    position: relative;
-  }
+/* Small phones: tabs drop their icons so all three fit. */
+@media (max-width: 400px) {
+  .tk-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tk-tab { gap: 0.3rem; padding: 0 0.25rem; }
+  .tk-tab > svg { display: none; }
+}
 
-  .task-checkbox::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
-  }
+/* No hover on touch: don't leave a hover tint stuck on a tapped row. */
+@media (hover: none) {
+  .tk-row:hover { background: rgba(255, 255, 255, 0.035); }
+  .tk-row--selected:hover { background: var(--accent-wash); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-sheet, .tk-toast, .tk-check > svg, .tk-sheet-backdrop { animation: none; }
 }

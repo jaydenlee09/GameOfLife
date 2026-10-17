@@ -6,6 +6,7 @@
 // which is what makes the streak possible.
 
 import RANK_TIERS from './rankMeta';
+import { countTaskCompletions } from './taskUtils';
 
 export const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -31,8 +32,8 @@ export const computeDailyScore = (
   const habitsDone  = habits.filter(h => h.history?.[dateKey]).length;
   const habitScore  = habitsTotal > 0 ? (habitsDone / habitsTotal) * 10 : 0;
 
-  // Tasks: task xp events logged on this day (3 tasks = full score)
-  const tasksDone   = xpLog.filter(e => e.source === 'task' && e.date === dateKey).length;
+  // Tasks: tasks completed on this day, once each however many stats they train (3 = full score)
+  const tasksDone   = countTaskCompletions(xpLog, dateKey);
   const taskScore   = Math.min(tasksDone / 3, 1) * 10;
 
   // Sleep: logged and over 9h = full score

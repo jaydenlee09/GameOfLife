@@ -6,6 +6,7 @@ import {
   toDateKey, parseDateKey, buildDayEventTargetMs, expandEventsForDates, isInstanceCompleted,
 } from './calendarUtils';
 import { computeDailyScore, STREAK_THRESHOLD } from './scoreUtils';
+import { countTaskCompletions } from './taskUtils';
 
 const EVENING_FROM = 20;
 const MORNING_WINDOW = [4, 12];
@@ -109,7 +110,7 @@ export const getNextMove = ({ habits, xpLog, logs, commitmentArchive, healthLog 
   const { score } = computeDailyScore(habits || [], xpLog || [], logs || {}, commitmentArchive || [], healthLog || {}, todayKey);
   const habitsTotal = (habits || []).length;
   const habitsDone = (habits || []).filter((h) => h.history?.[todayKey]).length;
-  const tasksDone = (xpLog || []).filter((e) => e.source === 'task' && e.date === todayKey).length;
+  const tasksDone = countTaskCompletions(xpLog, todayKey);
   const sleepLogged = healthLog?.[todayKey]?.sleepHours != null;
   const entry = logs?.[todayKey];
   const logFilled = !!entry && ((entry.emotions?.length > 0) || entry.proud?.some((p) => p?.trim()));

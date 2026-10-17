@@ -9,6 +9,7 @@ import { getHabitStreak } from './habitUtils';
 import { getGoalProgress } from './goalUtils';
 import { getTool } from './assistantTools';
 import { toDateKey } from './calendarUtils';
+import { isTop, todayQueue } from './taskUtils';
 
 export const BRIEF_MAX_CHARS = 180;
 
@@ -42,10 +43,10 @@ export const buildBriefContext = (state, now, { weekPriority, logReviews } = {})
   const scoreInputs = [state.habits || [], state.xpLog || [], state.logs || {}, state.commitmentArchive || [], state.healthLog || {}];
   const calendar = getTool('get_calendar').run({ from: todayKey, to: todayKey }, { state });
 
-  const openTasks = (state.todos || [])
-    .filter((t) => !t.completed && (t.timeFrame === 'today' || !t.timeFrame) && (!t.scheduledDate || t.scheduledDate <= todayKey))
+  // Top 3 first (marked), then what else is on today.
+  const openTasks = todayQueue(state.todos || [], todayKey)
     .slice(0, 10)
-    .map((t) => t.text);
+    .map((t) => (isTop(t, todayKey) ? `[Top 3] ${t.text}` : t.text));
 
   const goals = (state.goals || [])
     .filter((g) => !g.completed)

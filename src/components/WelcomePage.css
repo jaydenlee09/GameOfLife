@@ -753,6 +753,11 @@ button.wp-move:hover {
   border-color: var(--accent);
 }
 
+.wp-task-star {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+
 .wp-task-text {
   flex: 1;
   min-width: 0;

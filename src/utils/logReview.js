@@ -9,6 +9,7 @@ import { getHabitStreak } from './habitUtils';
 import { getGoalProgress } from './goalUtils';
 import { getTool } from './assistantTools';
 import EMOTIONS from './logMeta';
+import { taskLabelsCompletedOn } from './taskUtils';
 
 // Reviews kept in the synced `gameOfLife_logReviews` key (one Firestore doc).
 export const LOG_REVIEW_LIMIT = 120;
@@ -109,7 +110,7 @@ export const buildReviewContext = (state, dateKey) => {
       doneThatDay: !!h.history?.[dateKey],
       currentStreak: getHabitStreak({ ...h, history: h.history || {} }),
     })),
-    tasksCompletedThatDay: (state.xpLog || []).filter((e) => e.source === 'task' && e.date === dateKey).map((e) => e.label).filter(Boolean),
+    tasksCompletedThatDay: taskLabelsCompletedOn(state.xpLog, dateKey),
     healthLast7DaysAndThatDay: health,
     calendarThatDay: { blocks: calendar.blocks.map(({ time, title, done }) => ({ time, title, done })), noPhone: calendar.noPhone },
     commitmentDueThatDay: prevCommitmentText

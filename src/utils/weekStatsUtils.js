@@ -1,4 +1,5 @@
 import { Zap, CheckSquare, Flame, Timer, Target, Flag, Moon, Dumbbell } from 'lucide-react';
+import { countTaskCompletions } from './taskUtils';
 
 export const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -37,7 +38,7 @@ export const computeWeekStats = (mondayKey, ...rest) => computeStatsForDays(getW
 export const computeStatsForDays = (days, xpLog, pomodoroSessions, habits, todos, logs, goals = [], healthLog = {}) => {
 
   const xpEarned     = xpLog.filter(e => days.includes(e.date) && e.amount > 0).reduce((s, e) => s + e.amount, 0);
-  const tasksCompleted = xpLog.filter(e => days.includes(e.date) && e.source === 'task').length;
+  const tasksCompleted = countTaskCompletions(xpLog, days);
   const habitsCompleted = xpLog.filter(e => days.includes(e.date) && e.source === 'habit' && e.amount > 0).length;
   const focusMinutes  = pomodoroSessions.filter(s => days.includes(s.date) && s.completed).reduce((s, p) => s + Math.floor(p.durationSecs / 60), 0);
   const goalsCompleted = goals.filter(g => g.completed && g.completedAt && days.some(d => (

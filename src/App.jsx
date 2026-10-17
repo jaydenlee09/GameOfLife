@@ -32,6 +32,7 @@ import FocusMode from './components/FocusMode'
 import DayPlanner from './components/DayPlanner'
 import { getTool, applySliceOp } from './utils/assistantTools'
 import { completeBlock, completeTask, findBlockInstance } from './utils/completionUtils'
+import { pruneDoneTasks } from './utils/taskUtils'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
 import { normalizeGoal } from './utils/goalUtils'
 
@@ -596,7 +597,9 @@ function App() {
   }, [firebaseUser, cloudSyncReady]);
 
   // ─── XP Logging ───────────────────────────────────────────────────────────────
-  const logXpEvent = useCallback((stat, amount, source = 'manual', label = '') => {
+  // `ref` ties the per-stat events of one completion together (a task logs one per
+  // stat it trains); `repeat` marks the extra ones so counters tally it once.
+  const logXpEvent = useCallback((stat, amount, source = 'manual', label = '', { ref, repeat } = {}) => {
     const today = getLocalDateKey(0);
     const event = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -606,6 +609,7 @@ function App() {
       amount,
       source,
       label,
+      ...(ref != null ? { ref } : {}),
     };
     setXpLog(prev => {
       const next = [event, ...prev];
@@ -617,7 +621,7 @@ function App() {
       setUser(prev => ({
         ...prev,
         lifetimeXp: (prev.lifetimeXp || 0) + amount,
-        lifetimeTaskCount: (prev.lifetimeTaskCount || 0) + (source === 'task' ? 1 : 0),
+        lifetimeTaskCount: (prev.lifetimeTaskCount || 0) + (source === 'task' && !repeat ? 1 : 0),
       }));
     }
   }, []);
@@ -629,7 +633,7 @@ function App() {
   // handles level up/down, and logs the event. (A second global-only `addXp` used to
   // exist for commitments — it was removed so every reward flows through one path.)
   const updateStat = useCallback((statName, amount, meta = {}) => {
-    logXpEvent(statName, amount, meta.source || 'manual', meta.label || '');
+    logXpEvent(statName, amount, meta.source || 'manual', meta.label || '', meta);
     setUser(prev => {
       let currentXp = prev.xp + amount;
       let currentLevel = prev.level;
@@ -683,8 +687,10 @@ function App() {
   // ─── Midnight Rollover ─────────────────────────────────────────────────────────
   const todayStr = () => new Date().toISOString().slice(0, 10);
 
+  // New day: legacy 'tomorrow' tasks become today's, and finished tasks older than
+  // a week are cleared out (Tasks keeps them around for "Done today").
   const promoteTomorrowTasks = (currentTodos) =>
-    currentTodos.map(t => t.timeFrame === 'tomorrow' ? { ...t, timeFrame: 'today', xp: 20 } : t);
+    pruneDoneTasks(currentTodos.map(t => t.timeFrame === 'tomorrow' ? { ...t, timeFrame: 'today', xp: 20 } : t));
 
   useEffect(() => {
     const lastDate = localStorage.getItem('gameOfLife_lastDate');
@@ -858,6 +864,11 @@ function App() {
     setFocusModeOpen(true);
   }, []);
 
+  const startFocusOnTask = useCallback((task) => {
+    setFocusLaunch({ taskId: task.id, intent: '' });
+    setFocusModeOpen(true);
+  }, []);
+
   const closeFocusMode = useCallback(() => { setFocusModeOpen(false); setFocusLaunch(null); }, []);
 
   // Parked thoughts become Brain Dump notes, laid out like the agent's own notes.
@@ -879,7 +890,7 @@ function App() {
   const completeTaskById = (taskId) => {
     const done = completeTask(todos.find(t => String(t.id) === String(taskId)));
     if (!done) return null;
-    done.awards.forEach(a => updateStat(a.stat, a.amount, { source: a.source, label: a.label }));
+    done.awards.forEach(a => updateStat(a.stat, a.amount, a));
     setTodos(done.update);
     return done.xp;
   };
@@ -1049,6 +1060,9 @@ function App() {
             onUpdateStat={updateStat}
             todos={todos}
             setTodos={setTodos}
+            xpLog={xpLog}
+            goals={goals}
+            onStartFocus={startFocusOnTask}
           />
         );
       case 'daily-log':
@@ -1209,7 +1223,7 @@ function App() {
       )}
       {focusModeOpen && (
         <FocusMode
-          key={focusLaunch ? `${focusLaunch.blockId}_${focusLaunch.blockDate}` : 'free'}
+          key={focusLaunch ? `${focusLaunch.blockId ?? `task${focusLaunch.taskId}`}_${focusLaunch.blockDate}` : 'free'}
           todos={todos}
           onUpdateStat={updateStat}
           pomodoroSessions={pomodoroSessions}
