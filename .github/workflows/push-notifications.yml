@@ -1,31 +1,43 @@
 # Sends APEX push notifications (functions/src/cli.js).
-# GitHub runs scheduled workflows late (often 5–20 min) and occasionally skips
-# one; the push logic tolerates that (time windows + dedupe by id). GitHub also
-# pauses schedules after 60 days without commits to the repo — re-enable it from
-# the Actions tab if that email arrives.
+# GitHub runs scheduled workflows late and often skips them for hours, which is
+# too sparse for time-block heads-ups. So each successful run waits until ~5 min
+# after it started and then dispatches the next run itself (the "chain" step).
+# The cron below only revives the chain if it ever breaks (a failed run doesn't
+# chain, so a broken setup can't email a failure every 5 minutes).
+# STOPGAP: once an external timer (cron-job.org) dispatches this workflow, delete
+# the chain step, the actions: write permission and the start-time step.
+# GitHub pauses schedules after 60 days without commits to the repo; re-enable it
+# from the Actions tab if that email arrives.
 name: Push notifications
 
 on:
   schedule:
     - cron: '*/5 * * * *'
-  workflow_dispatch: # "Run workflow" button, for testing
+  workflow_dispatch: # "Run workflow" button, for testing; also how the chain continues
+  push: # starts the chain right away whenever this file changes
+    branches: [main]
+    paths: [.github/workflows/push-notifications.yml]
 
 # Never run two ticks at once: they'd both see a push as unsent and send it twice.
+# A run triggered meanwhile waits here, and the chain step sees it and stands down.
 concurrency:
   group: push-notifications
   cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: write # lets the chain step dispatch the next run
 
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: functions
     steps:
+      - run: echo "TICK_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+        working-directory: . # functions/ doesn't exist until checkout
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -38,3 +50,20 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Chain the next run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Next tick ~5 min after this one started (dispatch + queueing add ~30s).
+          wait=$(( 270 - ($(date +%s) - TICK_STARTED) ))
+          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+          # Another run already waiting (cron or a manual run) takes over the chain;
+          # dispatching too would grow a second chain.
+          waiting=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow push-notifications.yml \
+            --limit 20 --json databaseId,status \
+            --jq "[.[] | select(.status != \"completed\" and .databaseId != $GITHUB_RUN_ID)] | length")
+          if [ "$waiting" -gt 0 ]; then
+            echo "Another run is already queued; it continues the chain."
+          else
+            gh workflow run push-notifications.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+          fi
