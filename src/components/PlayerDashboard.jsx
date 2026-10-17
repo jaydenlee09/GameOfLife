@@ -4,17 +4,15 @@ import STAT_META from './statMeta';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip as RechartTooltip
 } from 'recharts';
-import { computeDailyScore, computeStreak, REQUIRED_STREAK_DAYS, scoreColor } from '../utils/scoreUtils';
-import { computeWeekStats, STAT_ITEMS, getMondayKey } from '../utils/weekStatsUtils';
+import { REQUIRED_STREAK_DAYS } from '../utils/scoreUtils';
+import { getWeekVerdict, getScoreLeaks, getWeekDeltas } from '../utils/statsInsights';
 import RANK_TIERS, { TIER_ICONS } from '../utils/rankMeta';
 import TrendChart from './stats/TrendChart';
 import ConnectedFeatureTiles from './stats/ConnectedFeatureTiles';
 import {
-  CheckSquare, Flame, Swords, Handshake, Timer, Moon, Pin, HeartCrack, Zap, Sparkles, Target, Flag,
-  Smile, Repeat, NotebookText,
+  CheckSquare, Flame, Swords, Handshake, Timer, Pin, HeartCrack, Zap, Sparkles, Target, Flag,
+  ArrowRight, ArrowUp, ArrowDown, Minus, ChevronDown, Check, X, ThumbsUp,
 } from 'lucide-react';
-
-const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, sleep: Moon, log: NotebookText, commitment: Handshake };
 
 const relativeTime = (ts) => {
   const mins = Math.floor((Date.now() - ts) / 60000);
@@ -125,55 +123,6 @@ const AttributeRadar = ({ stats }) => {
   );
 };
 
-// ─── Daily Score Badge ────────────────────────────────────────────────────────
-const DailyScoreBadge = ({ score, breakdown, streak }) => {
-  const color = scoreColor(score);
-  const R = 46;
-  const circumference = 2 * Math.PI * R;
-  const pct = score / 10;
-
-  return (
-    <div className="daily-score-wrapper">
-      <div className="daily-score-card">
-        <div className="daily-score-head">
-          <div className="daily-score-ring-wrap">
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="8" />
-              <circle
-                cx="60" cy="60" r={R} fill="none"
-                stroke={color} strokeWidth="8" strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference * (1 - pct)}
-                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.6s ease' }}
-              />
-            </svg>
-            <div className="daily-score-ring-center">
-              <span className="daily-score-number" style={{ color }}>{score.toFixed(1)}</span>
-              <span className="daily-score-outof">/ 10</span>
-            </div>
-          </div>
-          <div className="daily-score-body">
-            <span className="daily-score-title">Today's Score</span>
-            <span className="daily-score-streak">
-              {streak > 0 ? <><Flame size={13} /> {streak}-day streak</> : 'No streak yet — clear 6+ to start'}
-            </span>
-          </div>
-        </div>
-        <div className="daily-score-chips">
-          {Object.entries(breakdown).map(([key, { value, label }]) => {
-            const ChipIcon = SCORE_CHIP_ICON[key];
-            return (
-              <span key={key} className="daily-score-chip" data-tier={value >= 7 ? 'good' : value >= 4 ? 'mid' : 'low'}>
-                <span className="daily-score-chip-icon"><ChipIcon size={12} /></span>{label}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ─── Activity Feed ────────────────────────────────────────────────────────────
 const ActivityFeed = ({ xpLog }) => {
   const recent = xpLog.slice(0, 25);
@@ -204,176 +153,272 @@ const ActivityFeed = ({ xpLog }) => {
   );
 };
 
-// ─── This Week ────────────────────────────────────────────────────────────────
-const ThisWeek = ({ xpLog, pomodoroSessions, habits, todos, logs, goals, healthLog }) => {
-  const stats = useMemo(
-    () => computeWeekStats(getMondayKey(0), xpLog, pomodoroSessions, habits, todos, logs, goals, healthLog),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [xpLog.length, pomodoroSessions.length, habits.length, todos.length, Object.keys(logs).length, goals, healthLog]
-  );
 
+// ─── Week Verdict ─────────────────────────────────────────────────────────────
+// Counted days, never an average: "5 of 7 days cleared 6", one dot per weekday.
+const DOT_ICON = { cleared: Check, missed: X };
+const WeekVerdict = ({ verdict, rankStatus }) => {
+  const rank = rankStatus.tier;
+  const RankIcon = TIER_ICONS[rank.icon];
+  const diff = verdict.cleared - verdict.lastWeekCleared;
   return (
-    <div className="dashboard-card this-week-card">
-      <h3 className="section-title">This Week</h3>
-      <div className="week-stats-grid">
-        {STAT_ITEMS.map((item) => {
-          const Icon = item.Icon;
+    <section className="dashboard-card stats-verdict">
+      <div className="stats-verdict-top">
+        <div>
+          <p className="stats-verdict-line">
+            <strong>{verdict.cleared} of 7</strong> days cleared {verdict.threshold} this week
+          </p>
+          <p className="stats-verdict-sub">
+            Last week: {verdict.lastWeekCleared} of 7
+            {diff !== 0 && <span className={diff > 0 ? 'is-up' : 'is-down'}> ({diff > 0 ? '+' : ''}{diff} so far)</span>}
+          </p>
+        </div>
+        <div className="stats-rank" style={{ '--tier-color': rank.color }}>
+          {RankIcon && <RankIcon size={16} color={rank.color} />}
+          <span className="stats-rank-name">{rank.name}</span>
+          <span className="stats-rank-sub">
+            {rankStatus.nextTier
+              ? <>{rankStatus.nextTierStreak}/{REQUIRED_STREAK_DAYS} days toward <span style={{ color: rankStatus.nextTier.color }}>{rankStatus.nextTier.name}</span></>
+              : <>Top rank, held {rankStatus.streakDays} days</>}
+          </span>
+        </div>
+      </div>
+      <div className="stats-week-dots">
+        {verdict.days.map((d) => {
+          const Icon = DOT_ICON[d.status];
           return (
-            <div key={item.key} className="week-stat-card">
-              <div className="week-stat-top">
-                <span className="week-stat-icon"><Icon size={14} /></span>
-                <span className="week-stat-value">{item.fmt(stats[item.key])}</span>
-              </div>
-              <span className="week-stat-label">{item.label}</span>
+            <div key={d.dateKey} className="stats-week-day" data-status={d.status} title={d.score != null ? `${d.dateKey}: ${d.score.toFixed(1)}` : d.dateKey}>
+              <span className="stats-week-dot">
+                {Icon ? <Icon size={14} strokeWidth={3} /> : d.status === 'today' ? d.score.toFixed(1) : ''}
+              </span>
+              <span className="stats-week-letter">{d.letter}</span>
             </div>
           );
         })}
-        {stats.topEmotion && (
-          <div className="week-stat-card">
-            <div className="week-stat-top">
-              <span className="week-stat-icon"><Smile size={14} /></span>
-              <span className="week-stat-value">{stats.topEmotion}</span>
-            </div>
-            <span className="week-stat-label">Top Mood</span>
-          </div>
-        )}
       </div>
-    </div>
+    </section>
   );
 };
 
+// ─── Leak + Strength ──────────────────────────────────────────────────────────
+const LeakCard = ({ leaks, onNavigate }) => {
+  if (leaks.empty) {
+    return (
+      <section className="dashboard-card stats-leak">
+        <span className="stats-eyebrow">Biggest leak</span>
+        <p className="stats-leak-head">Not enough data yet</p>
+        <p className="stats-leak-evidence">Log a few days (habits, tasks, sleep) and this shows where your score slips.</p>
+      </section>
+    );
+  }
+  const { biggest } = leaks;
+  if (!biggest) {
+    return (
+      <section className="dashboard-card stats-leak is-clean">
+        <span className="stats-eyebrow">Biggest leak</span>
+        <p className="stats-leak-head">No points lost {leaks.windowLabel}</p>
+        <p className="stats-leak-evidence">Every finished day was a perfect 10.</p>
+      </section>
+    );
+  }
+  const others = leaks.leaks.slice(1, 3);
+  return (
+    <section className="dashboard-card stats-leak">
+      <span className="stats-eyebrow">Biggest leak</span>
+      <p className="stats-leak-head">
+        <span className="stats-swatch" style={{ background: biggest.color }} />
+        {biggest.label} cost you <strong>{biggest.lost.toFixed(1)} points</strong> {leaks.windowLabel}
+      </p>
+      <p className="stats-leak-evidence">{biggest.evidence}</p>
+      <div className="stats-leak-foot">
+        <button type="button" className="stats-fix-btn" onClick={() => onNavigate?.(biggest.page)}>
+          {biggest.fix} <ArrowRight size={14} />
+        </button>
+        {others.length > 0 && (
+          <span className="stats-leak-others">
+            Then: {others.map((o) => `${o.label} −${o.lost.toFixed(1)}`).join(' · ')}
+          </span>
+        )}
+      </div>
+    </section>
+  );
+};
+
+const StrengthCard = ({ leaks }) => (
+  <section className="dashboard-card stats-strength">
+    <span className="stats-eyebrow">What's working</span>
+    {leaks.empty ? (
+      <p className="stats-leak-evidence">Nothing yet. This fills in after a few logged days.</p>
+    ) : leaks.strength ? (
+      <>
+        <p className="stats-strength-head">
+          <ThumbsUp size={16} /> {leaks.strength.label}
+        </p>
+        <p className="stats-leak-evidence">
+          Full marks on {leaks.strength.full} of {leaks.days} days {leaks.windowLabel}. Keep it.
+        </p>
+      </>
+    ) : (
+      <p className="stats-leak-evidence">
+        Nothing at full marks on half the days yet. Pick the leak and win that first.
+      </p>
+    )}
+  </section>
+);
+
+// ─── This week vs last ────────────────────────────────────────────────────────
+const WeekDeltas = ({ deltas }) => (
+  <section className="dashboard-card stats-deltas">
+    <h3 className="section-title">This week vs the same days last week</h3>
+    <div className="stats-delta-list">
+      {deltas.map((row) => {
+        const { key, label, Icon, fmt, value, delta } = row;
+        const dir = delta == null || delta === 0 ? 'flat' : delta > 0 ? 'up' : 'down';
+        const DirIcon = dir === 'up' ? ArrowUp : dir === 'down' ? ArrowDown : Minus;
+        const deltaText = delta == null ? '' : delta === 0 ? 'same' : key === 'focusMinutes'
+          ? `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${fmt(Math.abs(delta))}`
+          : key === 'avgSleep'
+            ? `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${Math.abs(delta).toFixed(1)}h`
+            : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${Math.abs(delta)}`;
+        return (
+          <div key={key} className="stats-delta-row">
+            <span className="stats-delta-icon"><Icon size={14} /></span>
+            <span className="stats-delta-label">{label}</span>
+            <span className="stats-delta-value">{fmt(value)}</span>
+            <span className={`stats-delta-change is-${dir}`}>
+              <DirIcon size={12} strokeWidth={2.5} />{deltaText}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+);
+
 // ─── Main Component ───────────────────────────────────────────────────────────
+// One question: what's working, what's costing me, what's the one thing to fix.
+// Home covers "what do I do now"; everything archival lives in the closed "More".
 const PlayerDashboard = ({
   user, onUpdateName,
   xpCap = 100,
   commitmentArchive = [],
   xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {},
   goals = [], healthLog = {}, noPhoneBlocks = [],
-  onOpenFocusMode, onNavigate,
+  onNavigate,
   rankStatus = { tier: RANK_TIERS[0], streakDays: 0, nextTier: null, nextTierStreak: 0 },
 }) => {
-  const [isEditing, setIsEditing]           = useState(false);
-  const [nameInput, setNameInput]           = useState(user.name);
+  const [isEditing, setIsEditing] = useState(false);
+  const [nameInput, setNameInput] = useState(user.name);
+  const [moreOpen, setMoreOpen]   = useState(false);
 
-  const rank = rankStatus.tier;
-  const RankIcon = TIER_ICONS[rank.icon];
-
-  const handleEditClick  = () => { setIsEditing(true); setNameInput(user.name); };
-  const handleSaveClick  = () => { onUpdateName(nameInput); setIsEditing(false); };
-  const handleKeyDown    = (e) => { if (e.key === 'Enter') handleSaveClick(); };
+  const handleEditClick = () => { setIsEditing(true); setNameInput(user.name); };
+  const handleSaveClick = () => { onUpdateName(nameInput); setIsEditing(false); };
+  const handleKeyDown   = (e) => { if (e.key === 'Enter') handleSaveClick(); };
 
   const attributes = user.stats ? Object.entries(user.stats) : [];
 
-  const dailyScore = useMemo(() =>
-    computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]
-  );
-
-  const dailyScoreStreak = useMemo(() =>
-    computeStreak(habits, xpLog, logs, commitmentArchive, healthLog),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]
-  );
+  const data = { habits, xpLog, logs, commitmentArchive, healthLog, pomodoroSessions, todos, goals };
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const deps = [habits, xpLog.length, logs, commitmentArchive, healthLog, pomodoroSessions.length, todos.length, goals];
+  const verdict = useMemo(() => getWeekVerdict(data), deps);
+  const leaks   = useMemo(() => getScoreLeaks(data), deps);
+  const deltas  = useMemo(() => getWeekDeltas(data), deps);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   return (
     <div className="player-dashboard">
-      {/* ── HERO BAND ─────────────────────────────────────────────────────── */}
-      <div className="dashboard-hero">
-        <div className="hero-identity">
-          <div className="character-sheet-eyebrow">Character Sheet</div>
-          {isEditing ? (
-            <input className="profile-name-input" value={nameInput} onChange={(e) => setNameInput(e.target.value)} onBlur={handleSaveClick} onKeyDown={handleKeyDown} autoFocus />
-          ) : (
-            <h1 className="profile-name" onClick={handleEditClick} title="Edit Name">{user.name}</h1>
-          )}
-          <div className="level-bar-container">
-            <div className="level-bar-top">
-              <span className="level-text-left">Level {user.level}</span>
-              <span className="level-text-right">{user.xp}/{xpCap} XP</span>
-            </div>
-            <div className="level-progress-bar">
-              <div className="level-progress-fill" style={{ width: `${Math.min((user.xp / xpCap) * 100, 100)}%` }} />
-            </div>
-          </div>
-        </div>
+      <header className="stats-header">
+        <h1 className="stats-title">Statistics</h1>
+      </header>
 
-        <div className="hero-rank">
-          <div className="rank-badge-icon-ring" style={{ '--tier-color': rank.color }}>
-            {RankIcon && <RankIcon size={28} color={rank.color} />}
-          </div>
-          <span className="rank-name-label" style={{ color: rank.color }}>{rank.name}</span>
-          <span className="rank-streak-label">{rankStatus.streakDays}-day streak</span>
-          {rankStatus.nextTier && (
-            <p className="next-rank-hint">
-              {rankStatus.nextTierStreak}/{REQUIRED_STREAK_DAYS} days toward{' '}
-              <span style={{ color: rankStatus.nextTier.color }}>{rankStatus.nextTier.name}</span>
-            </p>
-          )}
-          {onOpenFocusMode && (
-            <button className="focus-mode-btn" onClick={onOpenFocusMode} title="Alt+F">
-              <Target size={16} /> Focus Mode
-            </button>
-          )}
-        </div>
+      <WeekVerdict verdict={verdict} rankStatus={rankStatus} />
 
-        <DailyScoreBadge score={dailyScore.score} breakdown={dailyScore.breakdown} streak={dailyScoreStreak} />
+      <div className="stats-insight-row">
+        <LeakCard leaks={leaks} onNavigate={onNavigate} />
+        <StrengthCard leaks={leaks} />
       </div>
 
-      {/* ── TREND CHART + THIS WEEK ──────────────────────────────────────── */}
-      <div className="dashboard-trend-row">
-        <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} />
-        <ThisWeek xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} goals={goals} healthLog={healthLog} />
-      </div>
+      <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} />
 
-      {/* ── CONNECTED FEATURES ────────────────────────────────────────────── */}
-      <div className="dashboard-section-label">Connected Features</div>
-      <ConnectedFeatureTiles
-        habits={habits} goals={goals} healthLog={healthLog} pomodoroSessions={pomodoroSessions}
-        todos={todos} noPhoneBlocks={noPhoneBlocks} commitmentArchive={commitmentArchive}
-        onNavigate={onNavigate}
-      />
+      <WeekDeltas deltas={deltas} />
 
-      {/* ── ATTRIBUTES + ACTIVITY ─────────────────────────────────────────── */}
-      <div className="dashboard-secondary-row">
-        {user.stats && (
-          <div className="dashboard-card attributes-card">
-            <h3 className="section-title">Attributes</h3>
-            <AttributeRadar stats={user.stats} />
-            <div className="attributes-list">
-              {attributes.map(([key, value]) => {
-                const meta = STAT_META[key] || { label: key, Icon: null, color: '#a3a3a3' };
-                const { Icon } = meta;
-                return (
-                  <div key={key} className="attribute-item">
-                    <div className="attribute-header">
-                      <span className="attribute-name">
-                        {Icon && <Icon size={14} color={meta.color} className="attribute-icon" strokeWidth={2.5} />}
-                        {meta.label}
-                      </span>
-                      <span className="attribute-level" style={{ color: meta.color }}>LVL {Math.floor(value / 100) + 1}</span>
-                    </div>
-                    <div className="attribute-bar-container">
-                      <div className="attribute-bar-fill" style={{ width: `${Math.max(5, value % 100)}%`, background: meta.color }} />
-                    </div>
-                  </div>
-                );
-              })}
+      {/* ── MORE (collapsed) ──────────────────────────────────────────────── */}
+      <button
+        type="button"
+        className={`stats-more-toggle${moreOpen ? ' is-open' : ''}`}
+        onClick={() => setMoreOpen((o) => !o)}
+        aria-expanded={moreOpen}
+      >
+        More <span className="stats-more-hint">character, features, attributes, activity, heatmap</span>
+        <ChevronDown size={16} />
+      </button>
+
+      {moreOpen && (
+        <div className="stats-more">
+          <div className="dashboard-card stats-character">
+            <div className="character-sheet-eyebrow">Character</div>
+            {isEditing ? (
+              <input className="profile-name-input" value={nameInput} onChange={(e) => setNameInput(e.target.value)} onBlur={handleSaveClick} onKeyDown={handleKeyDown} autoFocus />
+            ) : (
+              <h2 className="profile-name" onClick={handleEditClick} title="Edit Name">{user.name}</h2>
+            )}
+            <div className="level-bar-container">
+              <div className="level-bar-top">
+                <span className="level-text-left">Level {user.level}</span>
+                <span className="level-text-right">{user.xp}/{xpCap} XP</span>
+              </div>
+              <div className="level-progress-bar">
+                <div className="level-progress-fill" style={{ width: `${Math.min((user.xp / xpCap) * 100, 100)}%` }} />
+              </div>
             </div>
           </div>
-        )}
 
-        <div className="dashboard-card feed-card">
-          <h3 className="section-title">Activity</h3>
-          <ActivityFeed xpLog={xpLog} />
+          <ConnectedFeatureTiles
+            habits={habits} goals={goals} healthLog={healthLog} pomodoroSessions={pomodoroSessions}
+            todos={todos} noPhoneBlocks={noPhoneBlocks} commitmentArchive={commitmentArchive}
+            onNavigate={onNavigate}
+          />
+
+          <div className="dashboard-secondary-row">
+            {user.stats && (
+              <div className="dashboard-card attributes-card">
+                <h3 className="section-title">Attributes</h3>
+                <AttributeRadar stats={user.stats} />
+                <div className="attributes-list">
+                  {attributes.map(([key, value]) => {
+                    const meta = STAT_META[key] || { label: key, Icon: null, color: '#a3a3a3' };
+                    const { Icon } = meta;
+                    return (
+                      <div key={key} className="attribute-item">
+                        <div className="attribute-header">
+                          <span className="attribute-name">
+                            {Icon && <Icon size={14} color={meta.color} className="attribute-icon" strokeWidth={2.5} />}
+                            {meta.label}
+                          </span>
+                          <span className="attribute-level" style={{ color: meta.color }}>LVL {Math.floor(value / 100) + 1}</span>
+                        </div>
+                        <div className="attribute-bar-container">
+                          <div className="attribute-bar-fill" style={{ width: `${Math.max(5, value % 100)}%`, background: meta.color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="dashboard-card feed-card">
+              <h3 className="section-title">Activity</h3>
+              <ActivityFeed xpLog={xpLog} />
+            </div>
+          </div>
+
+          <div className="dashboard-card heatmap-card">
+            <h3 className="section-title">Productivity Heatmap: last 12 months</h3>
+            <ProductivityHeatmap xpLog={xpLog} />
+          </div>
         </div>
-      </div>
-
-      {/* ── HEATMAP ────────────────────────────────────────────────────────── */}
-      <div className="dashboard-card heatmap-card">
-        <h3 className="section-title">Productivity Heatmap — {new Date().getFullYear()}</h3>
-        <ProductivityHeatmap xpLog={xpLog} />
-      </div>
+      )}
     </div>
   );
 };

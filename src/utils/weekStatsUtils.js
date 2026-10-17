@@ -31,8 +31,10 @@ export const getWeekDays = (mondayKey) => {
   });
 };
 
-export const computeWeekStats = (mondayKey, xpLog, pomodoroSessions, habits, todos, logs, goals = [], healthLog = {}) => {
-  const days = getWeekDays(mondayKey);
+export const computeWeekStats = (mondayKey, ...rest) => computeStatsForDays(getWeekDays(mondayKey), ...rest);
+
+// Same stats over any list of day keys (e.g. a partial week, for like-for-like deltas).
+export const computeStatsForDays = (days, xpLog, pomodoroSessions, habits, todos, logs, goals = [], healthLog = {}) => {
 
   const xpEarned     = xpLog.filter(e => days.includes(e.date) && e.amount > 0).reduce((s, e) => s + e.amount, 0);
   const tasksCompleted = xpLog.filter(e => days.includes(e.date) && e.source === 'task').length;

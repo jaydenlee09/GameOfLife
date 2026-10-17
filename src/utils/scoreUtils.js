@@ -93,7 +93,7 @@ const daysBetweenKeys = (laterKey, earlierKey) => {
 // Daily Score reads from. Used to cap how many consecutive days are REQUIRED to
 // hold a rank, so a brand-new or returning user isn't stranded at the bottom tier
 // just for lacking history yet (see computeRankStatus below).
-const getEarliestActivityKey = (habits, xpLog, logs, commitmentArchive, healthLog) => {
+export const getEarliestActivityKey = (habits, xpLog, logs, commitmentArchive, healthLog) => {
   let earliest = null;
   const consider = (key) => { if (key && (!earliest || key < earliest)) earliest = key; };
   habits.forEach(h => Object.keys(h.history || {}).forEach(consider));

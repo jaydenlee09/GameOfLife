@@ -1,5 +1,39 @@
 # Todo
 
+## Done, uncommitted (2026-10-16): Statistics page: minimal "leaks + fix"
+
+Goal: Statistics stops being a wall of ~30 numbers and answers one question: what's working,
+what's costing me, what's the one thing to fix. Home already covers "what do I do now".
+
+**Locked decisions (Q&A 2026-10-16):** layout = verdict line, biggest leak + fix button, one
+strength, 30-day score trend stacked by component, this-week-vs-last deltas · radar / activity
+feed / heatmap / feature tiles go into one collapsed "More" section · insights are code only
+(Daily Score math, no AI) · window = Mon-Sun week.
+
+**My defaults:** only finished days count toward the leak (today is in progress, same rule as the
+streak) · fewer than 3 finished days this week -> leak uses the last 14 finished days, labeled ·
+deltas compare this week so far to the same weekdays last week (fair) · Today's Score ring and
+Focus Mode button removed (Home + sidebar have them) · name edit + level move into "More".
+
+- [x] `src/utils/statsInsights.js`: week verdict (day dots), component leaks, strength, week deltas.
+- [x] `weekStatsUtils`: day-list stats helper shared with computeWeekStats.
+- [x] TrendChart score mode -> stacked by the 5 score components + legend.
+- [x] PlayerDashboard rebuild + CSS (desktop / tablet / phone).
+- [x] Verify: node unit checks, lint diff, build, real App harness at phone + desktop, empty + heavy data.
+
+**Also changed on the way:** TrendChart had `margin.left: -20` with a hidden YAxis, which pushed the
+first bar off the left edge (x = -17px); now 4px · days before any tracked activity show as neutral
+dots, not red misses · page leaves 72px at the bottom so the last card scrolls clear of the AI bar ·
+`getEarliestActivityKey` exported from scoreUtils.
+
+**Verified:** 12 node checks (Monday math, verdict statuses incl. today/before, exact leak points,
+today excluded, 14-day fallback, most-missed habit, no habits, like-for-like deltas, sleep not
+comparable, computeWeekStats unchanged). Lint clean on all touched files (0 before, 0 after). Build OK.
+Real App in a scratchpad harness (auth + Firestore + push stubbed) at 1440 / 768 / 375, heavy and
+empty data: no horizontal overflow, no clipped cards, tooltip, fix button -> Daily Log, More section,
+last row clears the AI bar, no console errors.
+
+
 ## Done, uncommitted (2026-10-16): Home screen redesign: "locked in" Home
 
 Goal: Home goes from a status board to a "what do I do now" screen. Minimal, one screen,
