@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import {
   ChevronLeft, ChevronRight, ChevronDown, X, Check, MoreHorizontal, Plus,
-  Video, Hourglass, Clapperboard, Trophy, CheckSquare, NotebookText, MessageCircle, Repeat,
+  Trophy, CheckSquare, NotebookText, MessageCircle, Repeat,
   HeartPulse, Moon, Zap, GlassWater, Dumbbell, Utensils, ArrowRight, TrendingUp, Lightbulb, PenLine, Target,
   Apple, AlertTriangle, Droplet, Smartphone, Sparkles, Send, RefreshCw, Compass, LoaderCircle,
 } from 'lucide-react';
 import './DailyLogPage.css';
 import EMOTIONS from '../utils/logMeta';
-import { saveVideo, getVideo, deleteVideo } from '../utils/videoDB';
 import flameIcon from '../assets/flame_icon.png';
 import STAT_META from './statMeta';
 import {
@@ -104,7 +103,6 @@ const EMPTY_ENTRY = () => ({
   improve: ['', '', ''],
   learned: '',
   notes: '',
-  videoName: null,
   commitment: '',
 });
 
@@ -218,121 +216,6 @@ const LogReviewSection = ({ dateKey, entry, isToday, review, reviewingDate, onSu
         </button>
       </div>
       {status}
-    </div>
-  );
-};
-
-// ─── Video Upload Section ─────────────────────────────────────────────────────
-
-const VideoSection = ({ date, videoName, onVideoChange }) => {
-  const fileInputRef = useRef(null);
-  // objectUrl is a fresh blob URL created from the IndexedDB blob — lives only
-  // in this component's lifetime and is revoked on cleanup.
-  const [objectUrl, setObjectUrl] = useState(null);
-  const objectUrlRef = useRef(null);
-
-  // Load blob from IndexedDB whenever the date or videoName changes
-  useEffect(() => {
-    let cancelled = false;
-
-    // Revoke any previous object URL
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
-      setObjectUrl(null);
-    }
-
-    if (!videoName) return;
-
-    getVideo(date)
-      .then((blob) => {
-        if (cancelled || !blob) return;
-        const url = URL.createObjectURL(blob);
-        objectUrlRef.current = url;
-        setObjectUrl(url);
-      })
-      .catch(() => {
-        // silently ignore — user will see upload UI
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-    };
-  }, [date, videoName]);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Persist raw blob to IndexedDB so it survives page reloads
-    saveVideo(date, file).catch(console.error);
-
-    // Create a temporary object URL for immediate playback in this session
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(file);
-    objectUrlRef.current = url;
-    setObjectUrl(url);
-
-    onVideoChange({ name: file.name });
-  };
-
-  const handleRemove = () => {
-    deleteVideo(date).catch(console.error);
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
-    }
-    setObjectUrl(null);
-    onVideoChange(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  return (
-    <div className="log-section">
-      <h3 className="log-section-title"><Video size={18} /> Day in Review</h3>
-      <p className="log-section-subtitle">Upload a short video from your camera roll</p>
-
-      {objectUrl ? (
-        <div className="video-preview-wrapper">
-          <video
-            className="video-preview"
-            src={objectUrl}
-            controls
-            playsInline
-          />
-          <div className="video-meta">
-            <span className="video-name">{videoName}</span>
-            <button className="video-remove-btn" onClick={handleRemove}><X size={14} /> Remove</button>
-          </div>
-        </div>
-      ) : videoName ? (
-        // Blob is still loading from IndexedDB (or failed)
-        <div className="video-preview-wrapper">
-          <div className="video-loading"><Hourglass size={14} /> Loading video…</div>
-          <div className="video-meta">
-            <span className="video-name">{videoName}</span>
-            <button className="video-remove-btn" onClick={handleRemove}><X size={14} /> Remove</button>
-          </div>
-        </div>
-      ) : (
-        <label className="video-upload-area" htmlFor="video-upload-input">
-          <div className="video-upload-icon"><Clapperboard size={28} /></div>
-          <div className="video-upload-text">Tap to upload a video</div>
-          <div className="video-upload-hint">Under 1 minute · MP4, MOV, etc.</div>
-          <input
-            ref={fileInputRef}
-            id="video-upload-input"
-            type="file"
-            accept="video/*"
-            className="video-file-input"
-            onChange={handleFileChange}
-          />
-        </label>
-      )}
     </div>
   );
 };
@@ -1022,11 +905,6 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked, habits = [], setHabit
     updateField(field, arr);
   };
 
-  // ── Video ──
-  const handleVideoChange = (videoData) => {
-    updateField('videoName', videoData ? videoData.name : null);
-  };
-
   const isToday = selectedDate === todayKey;
 
   return (
@@ -1053,8 +931,7 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked, habits = [], setHabit
                   entry.proud?.some(v => v.trim()) ||
                   entry.improve?.some(v => v.trim()) ||
                   entry.learned?.trim() ||
-                  entry.notes?.trim() ||
-                  entry.videoName;
+                  entry.notes?.trim();
 
                 return (
                   <button
@@ -1308,13 +1185,6 @@ const DailyLogPage = ({ logs, setLogs, onCommitmentLocked, habits = [], setHabit
               rows={5}
             />
           </div>
-
-          {/* ── Video Upload ── */}
-          <VideoSection
-            date={selectedDate}
-            videoName={currentEntry.videoName || null}
-            onVideoChange={handleVideoChange}
-          />
 
           {/* ── Commitment for Tomorrow ── */}
           <div className="log-section commitment-section">
