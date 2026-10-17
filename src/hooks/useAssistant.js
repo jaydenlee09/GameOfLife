@@ -3,6 +3,7 @@ import { runAssistantTurn, geminiGenerateJson } from '../utils/assistantUtils';
 import { generateLogReview, upsertReview, reviewToChatText } from '../utils/logReview';
 import { getTool, applySliceOp, undoBlocker } from '../utils/assistantTools';
 import { generateDayPlan, planToEvents, fromMinutes } from '../utils/dayPlanner';
+import { generateHomeBrief } from '../utils/homeBrief';
 import { generateFocusComment } from '../utils/focusCoach';
 
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
@@ -240,8 +241,19 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     }
   }, []);
 
+  // ─── Home one-liner ─────────────────────────────────────────────────────────
+  /** Resolves { ok, brief } or { ok: false, error }. Writes nothing; the caller saves it. */
+  const briefHome = useCallback(async ({ weekPriority, logReviews } = {}) => {
+    try {
+      const brief = await generateHomeBrief({ state: stateRef.current, weekPriority, logReviews, generate: geminiGenerateJson });
+      return { ok: true, brief };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    }
+  }, []);
+
   return {
-    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus,
+    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome,
     isLoading, error, clearError: () => setError(null),
   };
 }

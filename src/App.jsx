@@ -665,11 +665,11 @@ function App() {
     if (history[dateStr]) {
       const xp = calcStreakXp(history, dateStr); // streak still includes this day
       delete history[dateStr];
-      attrs.forEach(attr => updateStat(attr, -xp, { source: 'habit', label: habit.text }));
+      attrs.forEach(attr => updateStat(attr, -xp, { source: 'habit', label: habit.name || habit.text }));
     } else {
       history[dateStr] = true;
       const xp = calcStreakXp(history, dateStr);
-      attrs.forEach(attr => updateStat(attr, xp, { source: 'habit', label: habit.text }));
+      attrs.forEach(attr => updateStat(attr, xp, { source: 'habit', label: habit.name || habit.text }));
     }
     setHabits(prev => prev.map(h => h.id === habitId ? { ...h, history } : h));
   }, [habits, updateStat]);
@@ -918,13 +918,39 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncSettled, clockTick]);
 
+  // Home's one-line brief: made once per day (after 4am) the first time Home is open,
+  // saved on the user so every device shows the same line. Failures retry after an hour.
+  const [briefLoading, setBriefLoading] = useState(false);
+  const briefInFlight = useRef(false);
+  const briefFailedAt = useRef(0);
+  const runHomeBrief = useCallback(async (manual = false) => {
+    if (briefInFlight.current) return;
+    briefInFlight.current = true;
+    setBriefLoading(true);
+    const result = await assistant.briefHome({ weekPriority: currentWeekPriority, logReviews });
+    if (result.ok) setUser(prev => ({ ...prev, homeBrief: result.brief }));
+    else if (!manual) briefFailedAt.current = Date.now();
+    briefInFlight.current = false;
+    setBriefLoading(false);
+  }, [assistant, currentWeekPriority, logReviews]);
+
+  useEffect(() => {
+    if (!syncSettled || currentPage !== 'welcome' || !hasAssistantApiKey()) return;
+    const now = new Date(clockTick);
+    if (now.getHours() < 4 || user.homeBrief?.date === getLocalDateKey(0)) return;
+    if (Date.now() - briefFailedAt.current < 60 * 60 * 1000) return;
+    runHomeBrief();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncSettled, clockTick, currentPage, user.homeBrief?.date]);
+
   const nudges = useMemo(
     () => (syncSettled
       ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals }, assistantCheckins)
       : []),
     [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, assistantCheckins]
   );
-  const activeNudge = nudges[0] || null;
+  // A nudge that only sends you to Home is pointless while you're on Home.
+  const activeNudge = nudges.find(n => !(currentPage === 'welcome' && n.cta.type === 'navigate' && n.cta.page === 'welcome')) || null;
 
   const handleNudgeDismiss = (id) => setAssistantCheckins(prev => dismissNudge(prev, id, new Date()));
   const handleNudgeAction = (nudge) => {
@@ -945,20 +971,27 @@ function App() {
           <WelcomePage
             user={user}
             todos={todos}
-            setTodos={setTodos}
-            onUpdateStat={updateStat}
             calendarEvents={calendarEvents}
             noPhoneBlocks={noPhoneBlocks}
             calendarDayEvents={calendarDayEvents}
             currentWeekPriority={currentWeekPriority}
             logs={logs}
+            logReviews={logReviews}
             commitmentArchive={commitmentArchive}
             goals={goals}
             habits={habits}
             xpLog={xpLog}
             healthLog={healthLog}
+            brief={user.homeBrief}
+            briefLoading={briefLoading}
+            onRefreshBrief={hasAssistantApiKey() ? () => runHomeBrief(true) : null}
             onNavigate={handleNavigate}
             onResolveCommitment={handleArchiveCommitmentResolve}
+            onCompleteTask={completeTaskById}
+            onToggleHabitDay={handleToggleHabitDay}
+            onPlanDay={() => openPlanner()}
+            onStartFocus={() => setFocusModeOpen(true)}
+            onStartFocusBlock={startFocusFromBlock}
           />
         );
       case 'statistics':
@@ -1188,7 +1221,8 @@ function App() {
         </div>
       )}
 
-      {nearestEvent && !eventPopupDismissed && (
+      {/* Home shows its own Now panel and weekly priority, so these popups skip it. */}
+      {nearestEvent && !eventPopupDismissed && currentPage !== 'welcome' && (
         eventPopupMinimized ? (
           <button className="event-popup-mini" onClick={() => setEventPopupMinimized(false)}>
             <CalendarDays size={14} /> <span>Next event</span>
@@ -1211,7 +1245,7 @@ function App() {
         )
       )}
 
-      {currentWeekPriority && !priorityPopupDismissed && (
+      {currentWeekPriority && !priorityPopupDismissed && currentPage !== 'welcome' && (
         priorityPopupMinimized ? (
           <button className="priority-popup-mini" onClick={() => setPriorityPopupMinimized(false)}>
             <Target size={14} /> <span>Priority</span>

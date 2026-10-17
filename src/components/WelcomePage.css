@@ -1,20 +1,41 @@
-/* ── Page Layout ─────────────────────────────────────────────────────────── */
-.wp-bg {
-  position: relative;
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+/* ── Home ─────────────────────────────────────────────────────────────────────
+   One screen that answers "what do I do now". Layout by width:
+   - wide / laptop (>1024px): 3 columns — Now (2) + Score, habits, tasks · commitment · why
+   - tablet (769–1024px): 2 columns, scrolls if it must
+   - phone (≤768px): fits one screen with no scrolling, above the bottom nav and AI bar */
+
+/* Scoped button reset: the global `button` style adds padding/background that
+   squashes icons. :where() keeps this at class-level specificity so each
+   component's own rules below still win. */
+.wp-layout :where(button) {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
 }
 
-.wp-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.62);
-  pointer-events: none;
+.wp-layout :where(button):hover {
+  background: none;
+}
+
+/* ── Page shell ───────────────────────────────────────────────────────────── */
+.wp-bg {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  /* A faint accent glow instead of a photo: busy backgrounds bleed through the
+     glass cards. Not fixed-attachment, so it stays put while the page scrolls. */
+  background:
+    radial-gradient(900px 500px at 15% -10%, rgba(56, 189, 248, 0.10), transparent 60%),
+    radial-gradient(700px 500px at 100% 110%, rgba(56, 189, 248, 0.05), transparent 60%),
+    var(--bg-base);
 }
 
 .wp-layout {
@@ -22,371 +43,670 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
+  gap: 0.9rem;
   width: 100%;
-  min-height: 100%;
-  max-width: 1160px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 0 2rem;
+  /* Bottom room so the floating AI bar never covers the last row. */
+  padding: 1.75rem 2rem 5.5rem;
   box-sizing: border-box;
 }
 
+/* ── Top bar ──────────────────────────────────────────────────────────────── */
 .wp-topbar {
   display: flex;
   align-items: baseline;
-  padding-top: 2rem;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .wp-topbar-greeting {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
+  min-width: 0;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
-  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wp-topbar-when {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .wp-topbar-clock {
-  display: none;
-}
-
-.wp-top-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  align-items: stretch;
-  margin-top: 1.25rem;
-}
-
-/* ── Live Clock ──────────────────────────────────────────────────────────── */
-.wp-clock-zone {
-  flex: 1 1 auto;
-  box-sizing: border-box;
-  min-height: 220px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.75) 20%,
-    rgba(0, 0, 0, 0.75) 80%,
-    rgba(0, 0, 0, 0) 100%
-  );
-}
-
-.wp-clock {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  max-width: 100%;
-}
-
-.wp-clock-time {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  justify-content: center;
-  font-size: clamp(3rem, 7vw, 5rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
   color: var(--text-primary);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.45);
-}
-
-.wp-clock-colon {
-  display: inline-block;
-  color: var(--text-secondary);
-  animation: wpClockBlink 1s step-end infinite;
-}
-
-@keyframes wpClockBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
-}
-
-.wp-clock-ampm {
-  font-size: 0.3em;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  margin-left: 0.2em;
-  padding-bottom: 0.15em;
 }
 
-.wp-clock-date {
-  margin-top: 0.6rem;
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-}
-
-.wp-bottom-grid {
-  display: grid;
-  grid-template-columns: 1.3fr 1.3fr 1fr;
-  gap: 1rem;
-  align-items: start;
-  padding-bottom: 3rem;
-}
-
-.wp-bottom-side {
+/* ── AI one-liner ─────────────────────────────────────────────────────────── */
+.wp-brief {
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--accent-wash), rgba(56, 189, 248, 0.02));
+  border: 1px solid rgba(56, 189, 248, 0.22);
 }
 
-.wp-tile--goals {
-  align-self: stretch;
+.wp-brief-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
 }
 
-/* ── Next Up hero card ───────────────────────────────────────────────────── */
-.wp-hero {
+.wp-brief-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.wp-brief--loading .wp-brief-text {
+  color: var(--text-tertiary);
+  animation: wpPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes wpPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.wp-brief-refresh {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--text-tertiary);
+  transition: color var(--duration) var(--ease);
+}
+
+.wp-brief-refresh:hover {
+  color: var(--accent);
+}
+
+/* ── Grid ─────────────────────────────────────────────────────────────────── */
+.wp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "now now score"
+    "habits habits habits"
+    "tasks commit why";
+  gap: 0.9rem;
+}
+
+.wp-now { grid-area: now; }
+.wp-score { grid-area: score; }
+.wp-habits { grid-area: habits; }
+.wp-tile--tasks { grid-area: tasks; }
+.wp-tile--commitment { grid-area: commit; }
+.wp-tile--why { grid-area: why; }
+
+/* Shared glass surface */
+.wp-now,
+.wp-score,
+.wp-tile {
   position: relative;
-  appearance: none;
-  -webkit-appearance: none;
+  min-width: 0;
+  box-sizing: border-box;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-shadow);
-  padding: 22px 24px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.wp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform var(--duration) var(--ease), background var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+.wp-btn:active {
+  transform: scale(0.97);
+}
+
+.wp-btn--primary {
+  background: var(--accent);
+  color: #04131c;
+}
+
+.wp-btn--primary:hover {
+  background: var(--accent-pressed);
+}
+
+.wp-btn--ghost {
+  border: 1px solid var(--separator-strong);
+  color: var(--text-secondary);
+}
+
+.wp-btn--ghost:hover {
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
+}
+
+/* ── Now panel ────────────────────────────────────────────────────────────── */
+.wp-now {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 210px;
+  padding: 26px 28px;
+  overflow: hidden;
+}
+
+.wp-now::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 90% at 0% 0%, rgba(56, 189, 248, 0.12), transparent 55%);
+  pointer-events: none;
+}
+
+.wp-now--live {
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.wp-now-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  color: inherit;
-  transition: transform 0.3s var(--ease);
-}
-
-.wp-hero:hover,
-.wp-hero:focus-visible,
-.wp-hero:active {
-  transform: translateY(-2px);
-}
-
-.wp-hero--now {
-  border-color: rgba(56, 189, 248, 0.4);
-}
-
-.wp-hero--empty {
-  cursor: default;
-}
-
-.wp-hero-label {
   font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 650;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--accent);
 }
 
-.wp-hero--now .wp-hero-label {
-  color: var(--accent);
-}
-
-.wp-hero-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.01em;
-}
-
-.wp-hero-badge {
+.wp-now-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--danger);
-  background: var(--danger-wash);
+  padding: 2px 8px;
   border-radius: 999px;
-  padding: 3px 8px;
-  margin-left: 2px;
+  background: var(--danger-wash);
+  color: var(--danger);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
 }
 
-.wp-hero-meta {
-  font-size: 0.9rem;
+.wp-now-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 0;
+  font-size: 1.75rem;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.wp-now-title-icon {
+  flex-shrink: 0;
   color: var(--text-secondary);
 }
 
-.wp-hero-empty-text {
-  font-size: 1rem;
+.wp-now-meta {
+  margin: 0;
+  font-size: 0.92rem;
   color: var(--text-secondary);
 }
 
-.wp-hero-cta {
-  align-self: flex-start;
+.wp-now-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.wp-now-then {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+}
+
+/* Evening: close the day */
+.wp-now-mini {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
 }
 
-/* ── Tiles ───────────────────────────────────────────────────────────────── */
-.wp-tile {
+.wp-now-mini-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.wp-now-mini-meta {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.wp-close-list {
   position: relative;
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow);
-  padding: 16px 18px;
+  z-index: 1;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+
+.wp-close-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 550;
+  color: var(--text-primary);
+  transition: background var(--duration) var(--ease);
+}
+
+.wp-close-step:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.wp-close-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--text-tertiary);
+  color: #04131c;
+}
+
+.wp-close-step.is-done .wp-close-check {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.wp-close-step.is-done .wp-close-label {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.wp-close-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.wp-close-arrow {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+/* ── Score ────────────────────────────────────────────────────────────────── */
+.wp-score {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "ring body"
+    "chips chips"
+    "move move";
+  grid-template-rows: auto auto 1fr;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 20px;
+}
+
+.wp-score-ring {
+  grid-area: ring;
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+}
+
+.wp-score-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wp-score-number {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.wp-score-body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wp-score-title {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.wp-score-goal {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--warning);
+  background: var(--warning-wash);
+}
+
+.wp-score-goal.is-safe {
+  color: var(--success);
+  background: var(--success-wash);
+}
+
+.wp-score-chips {
+  grid-area: chips;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.wp-score-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--bg-elevated-2);
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.wp-score-chip[data-tier="good"] { color: var(--success); border-color: rgba(48, 209, 88, 0.3); }
+.wp-score-chip[data-tier="mid"]  { color: var(--warning); border-color: rgba(255, 159, 10, 0.3); }
+
+.wp-move {
+  grid-area: move;
+  align-self: end;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.84rem;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+button.wp-move:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.wp-move-label {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.wp-move-text {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wp-move-gain {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
+
+.wp-move--done {
+  color: var(--success);
+}
+
+/* ── Habits ───────────────────────────────────────────────────────────────── */
+.wp-habits {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.wp-habits-label {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.wp-habits-count {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wp-habits-row {
+  display: flex;
   gap: 8px;
-  text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  color: inherit;
-  transition: transform 0.3s var(--ease);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Let chips scroll sideways with a soft fade instead of wrapping into extra rows. */
+  mask-image: linear-gradient(90deg, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent);
+  padding: 2px 24px 2px 2px;
 }
 
-.wp-tile:hover,
-.wp-tile:focus-visible,
-.wp-tile:active {
-  transform: translateY(-2px);
+.wp-habits-row::-webkit-scrollbar {
+  display: none;
 }
 
-.wp-tile--tasks {
-  cursor: default;
-  min-height: 200px;
+.wp-habit {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 14px 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease);
 }
 
-.wp-tile--tasks:hover,
-.wp-tile--tasks:focus-visible,
-.wp-tile--tasks:active {
-  transform: none;
+.wp-habit:hover {
+  border-color: var(--glass-border-hover);
+}
+
+.wp-habit-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--text-tertiary);
+  color: #04131c;
+  box-sizing: border-box;
+}
+
+.wp-habit.is-done {
+  background: var(--success-wash);
+  border-color: rgba(48, 209, 88, 0.4);
+}
+
+.wp-habit.is-done .wp-habit-check {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.wp-habit-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.wp-habit--add {
+  padding: 0 14px;
+  color: var(--accent);
+}
+
+/* ── Tiles ────────────────────────────────────────────────────────────────── */
+.wp-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  overflow: hidden;
 }
 
 .wp-tile-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
-.wp-tile-header-btn {
-  appearance: none;
-  -webkit-appearance: none;
-  background: none;
-  border: none;
-  padding: 0;
-  font-family: inherit;
-  cursor: pointer;
-  align-self: flex-start;
+.wp-tile-header svg {
+  flex-shrink: 0;
 }
 
-.wp-tile-headline {
-  font-size: 1.15rem;
-  font-weight: 600;
+.wp-tile-header > span:not(.wp-tile-count) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wp-tile-count {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-elevated-2);
   color: var(--text-primary);
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.wp-tile-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 .wp-tile-text {
   font-size: 0.95rem;
-  color: var(--text-primary);
   line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.wp-tile-empty {
+  font-size: 0.88rem;
+  color: var(--text-tertiary);
 }
 
 .wp-tile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 0.8rem;
   font-weight: 600;
 }
 
-.wp-tile-status--pending {
-  color: var(--text-tertiary);
-}
-
-.wp-tile-status--kept {
-  color: var(--success);
-}
-
-.wp-tile-status--missed {
-  color: var(--danger);
-}
-
-.wp-tile-empty {
-  font-size: 0.9rem;
-  color: var(--text-tertiary);
-}
-
-.wp-tile--commitment {
-  cursor: default;
-}
-
-.wp-tile--commitment:hover,
-.wp-tile--commitment:focus-visible,
-.wp-tile--commitment:active {
-  transform: none;
-}
-
-.wp-tile-inner {
-  appearance: none;
-  -webkit-appearance: none;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  text-align: left;
-  font-family: inherit;
-  color: inherit;
-  cursor: pointer;
-}
+.wp-tile-status--pending { color: var(--text-tertiary); }
+.wp-tile-status--kept { color: var(--success); }
+.wp-tile-status--missed { color: var(--danger); }
 
 .wp-commitment-actions {
   display: flex;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: auto;
 }
 
 .wp-commitment-btn {
-  appearance: none;
-  -webkit-appearance: none;
   flex: 1;
+  min-height: 36px;
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: transform var(--duration) var(--ease), background var(--duration) var(--ease);
-}
-
-.wp-commitment-btn:hover,
-.wp-commitment-btn:focus-visible {
-  transform: translateY(-1px);
+  text-align: center;
+  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), color var(--duration) var(--ease);
 }
 
 .wp-commitment-btn--kept {
   background: var(--accent);
-  border: 1px solid var(--accent);
-  color: #fff;
+  color: #04131c;
 }
 
 .wp-commitment-btn--kept:hover {
@@ -394,7 +714,6 @@
 }
 
 .wp-commitment-btn--missed {
-  background: none;
   border: 1px solid var(--separator-strong);
   color: var(--text-secondary);
 }
@@ -404,49 +723,30 @@
   color: var(--danger);
 }
 
-.wp-tile-list {
-  margin: 0;
-  padding: 0 0 0 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.wp-tile-list li {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .wp-task-list {
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
 .wp-task-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .wp-task-checkbox {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 17px;
-  height: 17px;
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
   border: 2px solid var(--text-tertiary);
-  border-radius: 5px;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border-color var(--duration) var(--ease);
 }
 
 .wp-task-checkbox:hover {
@@ -455,336 +755,332 @@
 
 .wp-task-text {
   flex: 1;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .wp-tile-more {
+  align-self: flex-start;
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+.wp-tile-more--phone {
   display: none;
 }
 
-.wp-goal-row {
-  display: flex;
+/* Why tile */
+.wp-tile--why {
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 10px;
+}
+
+.wp-why-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon key bar"
+    "icon text bar";
   align-items: center;
-  gap: 6px;
+  column-gap: 10px;
+  row-gap: 1px;
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+  transition: background var(--duration) var(--ease);
 }
 
-.wp-goal-pin {
-  flex-shrink: 0;
-  font-size: 0.7rem;
+.wp-why-row:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.wp-goal-period {
-  flex-shrink: 0;
-  font-size: 0.7rem;
-  font-weight: 600;
+.wp-why-icon {
+  grid-area: icon;
+  align-self: start;
+  margin-top: 2px;
   color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
-.wp-goal-title {
-  flex: 1;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
+.wp-why-key {
+  grid-area: key;
+  font-size: 0.66rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
   white-space: nowrap;
 }
 
-.wp-goal-progress-bar {
-  flex-shrink: 0;
-  width: 40px;
+.wp-why-text {
+  grid-area: text;
+  min-width: 0;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wp-why-text.is-empty {
+  color: var(--accent);
+}
+
+.wp-why-bar {
+  grid-area: bar;
+  width: 44px;
   height: 5px;
   border-radius: 999px;
   background: var(--bg-elevated-2);
   overflow: hidden;
 }
 
-.wp-goal-progress-fill {
+.wp-why-bar span {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: inherit;
   background: var(--accent);
 }
 
-/* ── Daily Score Hero ────────────────────────────────────────────────────── */
-.wp-score-hero {
-  width: 100%;
-  box-sizing: border-box;
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow);
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
-  text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  color: inherit;
-  transition: transform 0.3s var(--ease);
+/* ── Wide monitors ────────────────────────────────────────────────────────── */
+@media (min-width: 1600px) {
+  .wp-layout {
+    max-width: 1320px;
+    padding-top: 2.5rem;
+  }
+
+  .wp-now {
+    min-height: 250px;
+  }
+
+  .wp-now-title {
+    font-size: 2rem;
+  }
 }
 
-.wp-score-hero:hover,
-.wp-score-hero:focus-visible {
-  transform: translateY(-2px);
+/* Tall desktop screens: center the dashboard vertically instead of leaving the
+   bottom third empty. Auto margins (not justify-content) collapse to 0 when the
+   content is taller than the screen, so nothing can be pushed off the top. */
+@media (min-width: 1025px) and (min-height: 1000px) {
+  .wp-layout {
+    min-height: 100%;
+  }
+
+  .wp-topbar {
+    margin-top: auto;
+  }
+
+  .wp-grid {
+    margin-bottom: auto;
+  }
 }
 
-.wp-score-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+/* ── Tablet / narrow laptop ───────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .wp-layout {
+    padding: 1.5rem 1.5rem 5.5rem;
+  }
+
+  .wp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "now now"
+      "score why"
+      "habits habits"
+      "tasks commit";
+  }
+
+  .wp-now {
+    min-height: 180px;
+  }
 }
 
-.wp-score-ring-wrap {
-  position: relative;
-  flex-shrink: 0;
-  width: 64px;
-  height: 64px;
-}
-
-.wp-score-ring-wrap svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.wp-score-ring-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
-.wp-score-number {
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.wp-score-outof {
-  font-size: 0.52rem;
-  color: var(--text-secondary);
-  margin-top: 1px;
-}
-
-.wp-score-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.wp-score-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.01em;
-}
-
-.wp-score-streak {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: #ff9f0a;
-  background: rgba(255, 159, 10, 0.12);
-  border: 1px solid rgba(255, 159, 10, 0.25);
-  padding: 3px 9px;
-  border-radius: 999px;
-}
-
-.wp-score-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.wp-score-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--bg-elevated-2);
-  color: var(--text-secondary);
-  border: 1px solid transparent;
-}
-
-.wp-score-chip[data-tier="good"] { color: #30d158; border-color: rgba(48, 209, 88, 0.3); }
-.wp-score-chip[data-tier="mid"]  { color: #ff9f0a; border-color: rgba(255, 159, 10, 0.3); }
-.wp-score-chip[data-tier="low"]  { color: var(--text-secondary); }
-
-.wp-score-chip-icon {
-  font-size: 0.85rem;
-}
-
-@media (max-width: 640px) {
-  /* Zero-scroll shell: bound the page to exactly the space below the
-     60px bottom-nav so .content-container (height:auto on mobile) never
-     grows past one screen. overflow:hidden is a safety net, not the
-     primary mechanism — the compacted sizing below is what actually
-     keeps content within budget. */
+/* ── Phone: one screen, no scrolling ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* The page is exactly the space above the 60px bottom nav; the bottom padding
+     keeps the floating AI bar (~56px + gap) off the content. Spare height goes
+     to the tasks/commitment row. Nothing is ever clipped: if a screen is too
+     short even after the trims below, the page scrolls as a last resort. */
   .wp-bg {
     height: calc(100dvh - 60px);
-    overflow: hidden;
   }
 
   .wp-layout {
-    padding: 0 1rem;
-  }
-
-  /* ── Topbar: greeting + compact inline clock ──────────────────────────── */
-  .wp-topbar {
-    padding-top: 0.85rem;
-    justify-content: space-between;
-    align-items: center;
+    min-height: 100%;
+    gap: 0.55rem;
+    padding: 0.8rem 0.9rem 4.6rem;
   }
 
   .wp-topbar-greeting {
-    font-size: 0.92rem;
+    font-size: 1.05rem;
   }
 
-  .wp-topbar-clock {
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    margin-left: 0.75rem;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    font-variant-numeric: tabular-nums;
+  .wp-topbar-when {
+    font-size: 0.8rem;
   }
 
-  /* ── Top grid: Score + Next Up side by side ───────────────────────────── */
-  .wp-top-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6rem;
-    margin-top: 0.6rem;
-  }
-
-  .wp-score-hero {
-    padding: 12px;
-    gap: 8px;
-  }
-
-  .wp-score-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .wp-score-ring-wrap {
-    width: 36px;
-    height: 36px;
-  }
-
-  .wp-score-number {
-    font-size: 0.62rem;
-  }
-
-  .wp-score-outof {
-    font-size: 0.42rem;
-  }
-
-  .wp-score-title {
-    font-size: 0.78rem;
-  }
-
-  .wp-score-streak {
-    font-size: 0.6rem;
-    padding: 2px 6px;
-  }
-
-  .wp-score-chips {
-    gap: 4px;
-  }
-
-  .wp-score-chip {
-    font-size: 0.6rem;
-    padding: 2px 6px;
-  }
-
-  /* Keep only the 3 highest-weighted chips (habits/tasks/focus) so the
-     compact card never grows with the number of breakdown categories. */
-  .wp-score-chips .wp-score-chip:nth-child(n+4) {
+  .wp-topbar-date,
+  .wp-wide-only {
     display: none;
   }
 
-  .wp-hero {
-    padding: 12px;
-    gap: 4px;
+  .wp-brief {
+    padding: 8px 10px;
+    gap: 8px;
   }
 
-  .wp-hero-label {
-    font-size: 0.6rem;
-  }
-
-  .wp-hero-title {
-    font-size: 0.95rem;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .wp-hero-title span {
+  .wp-brief-text {
+    font-size: 0.82rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
-  .wp-hero-meta,
-  .wp-hero-empty-text {
-    font-size: 0.72rem;
+  .wp-grid {
+    flex: 1 0 auto;
+    gap: 0.55rem;
+    grid-template-rows: auto auto auto minmax(min-content, 1fr) auto;
+    grid-template-areas:
+      "now now"
+      "score score"
+      "habits habits"
+      "tasks commit"
+      "why why";
   }
 
-  .wp-hero-cta {
-    font-size: 0.72rem;
+  .wp-now {
+    min-height: 0;
+    gap: 4px;
+    padding: 14px 16px;
   }
 
-  /* ── Live clock hero folded into the topbar on mobile ─────────────────── */
-  .wp-clock-zone {
-    display: none;
-  }
-
-  /* ── Bottom grid: Tasks/Goals/Commitment/Priority as a 2×2 grid ───────── */
-  .wp-bottom-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    margin-top: 0.6rem;
-    padding-bottom: 0.5rem;
-  }
-
-  .wp-bottom-side {
-    display: contents;
-  }
-
-  .wp-tile {
-    min-width: 0;
-    padding: 10px 12px;
+  .wp-now-label {
+    font-size: 0.66rem;
     gap: 6px;
   }
 
-  .wp-tile--tasks {
-    min-height: 0;
+  .wp-now-title {
+    font-size: 1.2rem;
+    gap: 8px;
+  }
+
+  .wp-now-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .wp-now-title-icon {
+    display: none;
+  }
+
+  .wp-now-meta {
+    font-size: 0.8rem;
+  }
+
+  .wp-now-actions {
+    margin-top: 8px;
+    gap: 8px;
+  }
+
+  .wp-btn {
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: 0.84rem;
+  }
+
+  .wp-now-then {
+    display: none;
+  }
+
+  .wp-close-list {
+    margin-top: 2px;
+    gap: 0;
+  }
+
+  .wp-close-step {
+    padding: 6px 4px;
+    font-size: 0.9rem;
+  }
+
+  /* Score: one compact row (ring · title/goal · next move under it) */
+  /* Score: ring beside the streak goal and the next move, no title or chips. */
+  .wp-score {
+    grid-template-areas:
+      "ring body"
+      "ring move";
+    grid-template-rows: auto auto;
+    gap: 3px 10px;
+    padding: 9px 12px;
+  }
+
+  .wp-score-title {
+    display: none;
+  }
+
+  .wp-score-ring {
+    width: 44px;
+    height: 44px;
+  }
+
+  .wp-score-number {
+    font-size: 0.8rem;
+  }
+
+  .wp-score-body {
+    gap: 3px;
+  }
+
+  .wp-score-goal {
+    font-size: 0.66rem;
+    padding: 2px 7px;
+  }
+
+  .wp-score-chips {
+    display: none;
+  }
+
+  .wp-move {
+    padding: 0;
+    background: none;
+    font-size: 0.78rem;
+  }
+
+  button.wp-move:hover {
+    background: none;
+  }
+
+  .wp-move-text {
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .wp-habits {
+    gap: 8px;
+  }
+
+  .wp-habits-label {
+    font-size: 0.66rem;
+  }
+
+  .wp-habit {
+    min-height: 32px;
+    font-size: 0.8rem;
+  }
+
+  .wp-tile {
+    padding: 10px 12px;
+    gap: 7px;
   }
 
   .wp-tile-header {
@@ -792,85 +1088,154 @@
     gap: 5px;
   }
 
-  .wp-tile-headline {
-    font-size: 0.85rem;
-  }
-
   .wp-tile-text {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
-  .wp-tile-status {
-    font-size: 0.68rem;
+  .wp-tile-empty {
+    font-size: 0.76rem;
   }
 
-  .wp-tile-empty {
-    font-size: 0.72rem;
+  .wp-tile-status {
+    font-size: 0.7rem;
   }
 
   .wp-commitment-actions {
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 2px;
+    gap: 5px;
   }
 
   .wp-commitment-btn {
-    padding: 7px 8px;
+    min-height: 30px;
     font-size: 0.72rem;
   }
 
   .wp-task-list {
-    gap: 4px;
+    gap: 7px;
   }
 
   .wp-task-row {
-    min-width: 0;
-    gap: 6px;
+    gap: 7px;
   }
 
   .wp-task-checkbox {
+    width: 16px;
+    height: 16px;
+  }
+
+  .wp-task-text {
+    font-size: 0.78rem;
+  }
+
+  .wp-task-list li:nth-child(n+4) {
+    display: none;
+  }
+
+  .wp-tile-more--wide {
+    display: none;
+  }
+
+  .wp-tile-more--phone {
+    display: block;
+    font-size: 0.7rem;
+  }
+
+  .wp-tile--why {
+    padding: 4px 6px;
+    gap: 0;
+  }
+
+  .wp-why-row {
+    padding: 5px 6px;
+    column-gap: 7px;
+    grid-template-columns: 15px 66px minmax(0, 1fr) auto;
+  }
+
+  .wp-why-icon {
     width: 14px;
     height: 14px;
   }
 
-  .wp-task-text {
-    min-width: 0;
-    font-size: 0.72rem;
+  .wp-why-key {
+    font-size: 0.6rem;
   }
 
-  /* Only ever show 2 complete rows, regardless of real data volume. */
-  .wp-tile--tasks .wp-task-list li:nth-child(n+3),
-  .wp-tile--goals .wp-task-list li:nth-child(n+3) {
-    display: none;
+  .wp-why-row {
+    grid-template-areas: "icon key text bar";
   }
 
-  .wp-tile-more {
+  .wp-why-icon {
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .wp-why-text {
     display: block;
-    font-size: 0.66rem;
-    color: var(--text-tertiary);
-    margin-top: 2px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
-  .wp-goal-row {
-    min-width: 0;
-    gap: 4px;
-    flex-wrap: wrap;
+  .wp-why-bar {
+    width: 32px;
+  }
+}
+
+/* Short phones (iPhone SE / landscape-ish heights): drop the least important
+   lines so everything still fits without scrolling. */
+@media (max-width: 768px) and (max-height: 700px) {
+  .wp-layout,
+  .wp-grid {
+    gap: 0.45rem;
   }
 
-  .wp-goal-period {
+  .wp-layout {
+    padding-top: 0.6rem;
+  }
+
+  .wp-now {
+    padding: 12px 14px;
+  }
+
+  .wp-why-row {
+    padding: 4px 6px;
+  }
+
+  .wp-brief-text {
+    -webkit-line-clamp: 1;
+  }
+
+  .wp-now-then,
+  .wp-now-meta {
     display: none;
   }
 
-  .wp-goal-title {
-    min-width: 0;
-    font-size: 0.72rem;
+  .wp-now-title {
+    -webkit-line-clamp: 1;
   }
 
-  .wp-goal-progress-bar {
-    width: 28px;
+  .wp-why-row:nth-child(3) {
+    display: none;
+  }
+
+  /* Commitment: one line of text; the two buttons already ask the question. */
+  .wp-tile--commitment .wp-tile-text {
+    -webkit-line-clamp: 1;
+  }
+
+  .wp-tile-status--pending {
+    display: none;
+  }
+
+  .wp-close-step {
+    padding: 4px;
+  }
+
+  /* Evening's checklist is taller, and the why matters least at day's end. */
+  .wp-bg[data-mode="evening"] .wp-tile--why {
+    display: none;
   }
 }

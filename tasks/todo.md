@@ -1,5 +1,54 @@
 # Todo
 
+## Done, uncommitted (2026-10-16): Home screen redesign: "locked in" Home
+
+Goal: Home goes from a status board to a "what do I do now" screen. Minimal, one screen,
+good on phone / tablet / laptop / wide monitor.
+
+**Locked decisions (Q&A 2026-10-16):** Now panel replaces the big clock (clock moves small into
+the top bar) · AI = one sentence per day from My Assistant, generated once and saved · all four
+additions: next-best-move hint, habit quick-tick, North Star + priority line (Goals shrink to the
+pinned goal), morning/evening modes · phone keeps the zero-scroll rule.
+
+**My defaults:** evening mode = 20:00–23:59 (Now panel becomes "Close the day": Daily Log,
+tomorrow's commitment, Submit & get review); morning 4–11 leads with Plan my day when today has
+no time blocks · brief stored as `user.homeBrief = {date, text, generatedAt}` (user key already
+syncs) and generated on Home only, after sync settles, retry after 1h on failure, manual refresh
+icon · next-best-move is computed in code from the Daily Score formula, never by the AI · the
+global "Next event" and "Priority" popups are hidden on Home (the page already shows both) ·
+Home task ticks go through `completeTaskById` (completionUtils, same XP as everywhere) · phone
+budget reserves room for the floating AI bar.
+
+- [x] `src/utils/homeUtils.js`: getNextUp (moved, carries the block instance), getDayMode,
+      getYesterdayCommitment (shared pending rule), getNextMove (score gains), getCloseDaySteps.
+- [x] `src/utils/homeBrief.js`: context, schema, prompt, generateHomeBrief; `briefHome` in useAssistant.
+- [x] WelcomePage rebuild: top bar (greeting, date, clock), brief line, Now panel (now / next /
+      unplanned / evening close-the-day), score card + next move, habit chips, tasks,
+      commitment, Why tile (North Star, week priority, pinned goal).
+- [x] App wiring: new props, brief effect, hide duplicate popups on Home, habit XP label uses
+      `name`.
+- [x] CSS: desktop / tablet / phone layouts, phone zero-scroll incl. AI bar.
+- [x] Verify: node unit checks, lint diff, build, real App harness (auth stubbed, Gemini faked) at
+      375 / 390 / 430 / 768 / 1024 / 1440, empty and heavy data, morning / day / evening.
+
+**Also changed on the way:** the Apex logo background photo is gone from Home (it bled through the
+glass cards; a faint blue glow replaces it) · the "Mark it" commitment nudge is hidden while on Home
+(the tile is right there) · habit XP log labels were `undefined` (`habit.text`), now the name.
+
+**Verified:** 14 node tests (modes, getNextUp current/next/planned/no-phone, commitment statuses,
+next-move gains + time-of-day tie-breaks, close-day steps, brief context/tidy/truncate/empty).
+Lint: new files clean, App.jsx 27 before / 27 after, none new. Build OK. Real App in a scratchpad
+harness (auth stubbed, Gemini faked at fetch, fake clock): habit tick (+0.5, XP label set), task
+tick via completeTaskById (+1.0), "I kept it" (+1.0), Start focus opens Focus Mode linked to the
+block, Plan my day opens the planner, next-move link → Daily Log, evening checklist + "Now:" line,
+brief generated once / saved on user / not re-called on reload / refresh replaces it / failure
+hides the line and doesn't retry within the hour, popups + self-pointing nudge hidden only on Home.
+Layout: 10 sizes x 4 data states — no clipped tile, no horizontal overflow, nothing under the AI
+bar; phones 375x667 and up fit with zero scroll. **Known:** 320x568 scrolls ~100px (fallback,
+nothing hidden); 1024x768 uses the 2-column tablet layout and scrolls. **Not verified:** a real
+Gemini call for the brief (local key invalid) — check the first live line on the deployed site.
+
+
 ## Done, uncommitted (2026-10-16): Plan My Day + Focus session coach
 
 Goal: the AI turns "what matters today" into a real schedule, and every focus session runs
