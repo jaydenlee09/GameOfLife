@@ -4,30 +4,55 @@
 // the payout can't differ depending on where you tapped. Pure: each returns the
 // XP awards plus a state updater; the caller applies both.
 
-import { expandEventsForDates, isInstanceCompleted } from './calendarUtils';
+import { expandEventsForDates, getBlockOutcome } from './calendarUtils';
 import { xpForBlockMinutes } from './xpUtils';
 
 const blockMinutes = (ev) => (ev.endHour * 60 + ev.endMin) - (ev.startHour * 60 + ev.startMin);
 
+const CHECKIN_STATUSES = ['done', 'partly', 'skipped'];
+
 /**
- * One block instance (as expanded, with `_instanceDate`). XP is earned from the
- * block's scheduled length, split across its attributes. Returns null if done.
+ * Answer how a block instance (as expanded, with `_instanceDate`) went. XP is earned
+ * from the block's scheduled length, split across its attributes: done pays it all,
+ * partly half, skipped nothing. Partly can be raised to done later (pays the rest)
+ * and skipped can be re-answered; done is final, and partly can't be lowered, so XP
+ * is never taken back. Returns null when the answer changes nothing. `taskId` is
+ * set when a task block is marked done, so the caller completes that task too.
  */
-export const completeBlock = (ev) => {
-  if (!ev || isInstanceCompleted(ev)) return null;
+export const checkInBlock = (ev, status, { reason = null, now = Date.now() } = {}) => {
+  if (!ev || !CHECKIN_STATUSES.includes(status)) return null;
+  const prev = getBlockOutcome(ev)?.status || null;
+  if (prev === status || prev === 'done' || (prev === 'partly' && status !== 'done')) return null;
+
   const attrs = ev.attributes || [];
-  const total = xpForBlockMinutes(blockMinutes(ev));
-  const each = Math.max(1, Math.floor(total / Math.max(1, attrs.length)));
+  const each = Math.max(1, Math.floor(xpForBlockMinutes(blockMinutes(ev)) / Math.max(1, attrs.length)));
+  const half = Math.max(1, Math.floor(each / 2));
+  const pay = status === 'done' ? (prev === 'partly' ? each - half : each)
+    : status === 'partly' ? half : 0;
+
+  const outcome = { status, ...(status === 'skipped' && reason ? { reason } : {}), at: now };
+  const closes = status !== 'skipped';
+  const date = ev._instanceDate || ev.date;
   const recurring = ev.recurrence && ev.recurrence !== 'none';
   return {
-    awards: attrs.map((stat) => ({ stat, amount: each, source: 'calendar', label: ev.title })),
-    xp: attrs.length ? each * attrs.length : 0,
+    awards: pay > 0 ? attrs.map((stat) => ({ stat, amount: pay, source: 'calendar', label: ev.title })) : [],
+    xp: pay > 0 ? pay * attrs.length : 0,
+    taskId: status === 'done' ? ev.plan?.taskId ?? null : null,
     update: (events) => events.map((e) => {
       if (e.id !== ev.id) return e;
-      return recurring ? { ...e, completedDates: [...(e.completedDates || []), ev._instanceDate] } : { ...e, completed: true };
+      if (!recurring) return { ...e, outcome, completed: closes };
+      const dates = e.completedDates || [];
+      return {
+        ...e,
+        outcomes: { ...e.outcomes, [date]: outcome },
+        completedDates: closes && !dates.includes(date) ? [...dates, date] : dates,
+      };
     }),
   };
 };
+
+/** Marking a block done (the grid's check, the focus debrief). Returns null if already done. */
+export const completeBlock = (ev, opts) => checkInBlock(ev, 'done', opts);
 
 /**
  * One task. XP is the task's own (timeframe-based) amount split across its

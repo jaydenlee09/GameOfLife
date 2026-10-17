@@ -3,13 +3,17 @@ import STAT_META from './statMeta';
 import './CalendarPage.css';
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
-import { completeBlock } from '../utils/completionUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
   toDateKey, buildDayEventTargetMs, fmtRemaining,
   normalizeEvent, expandEventsForDates, isInstanceCompleted,
   cloneSubEvents, cloneBonusTasks, normalizeBonusTask,
+  getBlockStatus, getBlockOutcome, PLAN_KEPT_START,
 } from '../utils/calendarUtils';
+import { computeFreeGaps } from '../utils/dayPlanner';
+import TodayStrip from './calendar/TodayStrip';
+import TaskTray from './calendar/TaskTray';
+import BlockCheckIn from './calendar/BlockCheckIn';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SLOT_HEIGHT = 16;
@@ -21,6 +25,7 @@ const HOVER_CARD_DELAY = 320; // ms of dwell before a block's detail card appear
 const HOVER_CARD_WIDTH = 268; // keep in sync with .cal-hovercard width in CalendarPage.css
 const HOVER_CARD_GAP = 10;    // gap between the block and its card
 const HOVER_CARD_MARGIN = 8;  // min distance the card keeps from the viewport edge
+const TASK_BLOCK_MINS = 60;   // a task placed from the tray becomes a block this long
 const DAYS_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']; // index = Date#getDay() (0=Sun…6=Sat)
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -117,6 +122,26 @@ const primaryColor = (ev) => {
   if (!ev.attributes?.length) return '#38bdf8';
   return STAT_META[ev.attributes[0]]?.color || '#38bdf8';
 };
+// The check-in saved for this instance (not one derived from `completed`).
+const storedOutcome = (ev) => ((ev.recurrence === 'none' || !ev.recurrence) ? ev.outcome : ev.outcomes?.[ev._instanceDate]) || null;
+// A task from the tray, as a block. `plan.kind: 'task'` links it, so marking the
+// block done also completes the task (see App's checkInBlockInstance).
+const taskToBlock = (task, dateKey, startMins) => {
+  const start = Math.max(0, Math.min(startMins, 24 * 60 - TASK_BLOCK_MINS));
+  const end = Math.min(start + TASK_BLOCK_MINS, 24 * 60 - 1); // the grid ends at 23:59
+  return {
+    id: Date.now(),
+    title: (task.text || 'Task').trim().slice(0, 60),
+    date: dateKey,
+    startHour: Math.floor(start / 60), startMin: start % 60,
+    endHour: Math.floor(end / 60), endMin: end % 60,
+    xpAmount: 20,
+    attributes: task.categories || (task.category ? [task.category] : []),
+    recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [],
+    completed: false, completedDates: [],
+    plan: { kind: 'task', taskId: task.id, intent: '' },
+  };
+};
 const buildDetachedInstanceEvent = (ev, overrides = {}) => {
   const normalizedEvent = normalizeEvent(ev);
   const instanceDate = ev._instanceDate || normalizedEvent.date;
@@ -146,6 +171,7 @@ const buildDetachedInstanceEvent = (ev, overrides = {}) => {
         }),
     completed: isInstanceCompleted(ev),
     completedDates: [],
+    ...(storedOutcome(ev) ? { outcome: storedOutcome(ev) } : {}),
   };
 };
 const buildDetachedNoPhoneInstance = (block, overrides = {}) => {
@@ -192,6 +218,8 @@ export default function CalendarPage({
   logs = {},
   onPlanDay,
   onStartFocus,
+  onCheckInBlock,
+  planner,
 }) {
   const [view, setView] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_calendarView');
@@ -227,6 +255,8 @@ export default function CalendarPage({
   const [noPhoneEditScope, setNoPhoneEditScope] = useState(null);
   const [noPhoneDeleteScope, setNoPhoneDeleteScope] = useState(null);
   const [logViewerDate, setLogViewerDate] = useState(null);
+  const [checkInEv, setCheckInEv] = useState(null); // block whose "did you do it?" is open
+  const [draggingTask, setDraggingTask] = useState(null); // task dragged from the tray
   const [hoverCard, setHoverCard] = useState(null); // { ev, rect } — detail card for a hovered time block
   const hoverTimerRef = useRef(null);
   const hoverAnchorRef = useRef(null); // the .cal-event element the card is glued to
@@ -450,7 +480,9 @@ export default function CalendarPage({
   // ─── Duplicate ───────────────────────────────────────────────────────────────
   const duplicateEvent = (ev, e) => {
     e.stopPropagation();
-    const newEvent = { ...buildDetachedInstanceEvent(ev, { id: Date.now() }), completed: false, completedDates: [] };
+    // eslint-disable-next-line no-unused-vars
+    const { outcome, ...copy } = buildDetachedInstanceEvent(ev, { id: Date.now() });
+    const newEvent = { ...copy, completed: false, completedDates: [] };
     setCalendarEvents(prev => [...prev, newEvent]);
   };
 
@@ -581,15 +613,28 @@ export default function CalendarPage({
     return () => window.removeEventListener('mouseup', finalize);
   }, [npDragStart]);
 
-  // ─── Complete ────────────────────────────────────────────────────────────────
-  const completeEvent = (ev, e) => {
-    e.stopPropagation();
-    // XP is EARNED from the block's scheduled length and split across its attributes,
-    // so it can't be inflated by typing a big number or piling on attributes.
-    const done = completeBlock(ev);
-    if (!done) return;
-    done.awards.forEach(a => onUpdateStat(a.stat, a.amount, { source: a.source, label: a.label }));
-    setCalendarEvents(done.update);
+  // ─── Check in ─────────────────────────────────────────────────────────────────
+  // Done / Partly / Skipped all go through App (same XP rules everywhere; a task
+  // block marked done completes its task too).
+  const checkIn = (ev, status, reason) => {
+    onCheckInBlock?.(ev, status, reason);
+    setCheckInEv(null);
+  };
+  const openCheckIn = (ev, e) => {
+    e?.stopPropagation();
+    cancelHoverCard();
+    setCheckInEv(ev);
+  };
+
+  // ─── Tray: tasks into time blocks ────────────────────────────────────────────
+  // Schedule = the first free hour left today, inside the usual day set in the planner.
+  const scheduleTask = (task) => {
+    const { gaps } = computeFreeGaps({ dateKey: todayKey, settings: planner, now: new Date(), calendarEvents });
+    const gap = gaps.find((g) => g.end - g.start >= TASK_BLOCK_MINS);
+    if (!gap) return { ok: false, text: 'No free hour left today. Make room on the grid, or plan it for tomorrow.' };
+    const block = taskToBlock(task, todayKey, gap.start);
+    setCalendarEvents((prev) => [...prev, block]);
+    return { ok: true, text: `Scheduled for ${fmtTime(block.startHour, block.startMin)}.` };
   };
 
   const setBonusTaskCompletion = (ev, task, shouldBeCompleted) => {
@@ -735,13 +780,14 @@ export default function CalendarPage({
       }
     } else if (draggingTemplate) {
       openCreate(date, slot, draggingTemplate);
+    } else if (draggingTask) {
+      const task = draggingTask;
+      setCalendarEvents((prev) => [...prev, taskToBlock(task, date, slotToMinutes(slot))]);
     }
-    setDragOver(null);
-    setDraggingTemplate(null);
-    setDraggingEvent(null);
+    handleDragEnd();
   };
 
-  const handleDragEnd = () => { setDragOver(null); setDraggingTemplate(null); setDraggingEvent(null); };
+  const handleDragEnd = () => { setDragOver(null); setDraggingTemplate(null); setDraggingEvent(null); setDraggingTask(null); };
 
   // ─── Event Resize (drag top/bottom edge, snapped to 15-min increments) ───────
   const resizeSessionRef = useRef(null);
@@ -1182,12 +1228,15 @@ export default function CalendarPage({
                   const width=`calc(${(1/ev.totalCols)*100}% - 4px)`;
                   const color=primaryColor(ev);
                   const done=isInstanceCompleted(ev);
+                  // Missed/partly/skipped only from the day check-ins began; older blocks look as they did.
+                  const rawStatus=getBlockStatus(ev, nowMs);
+                  const status=rawStatus==='missed' && ev._instanceDate<PLAN_KEPT_START ? 'past' : rawStatus;
                   const dispStartH=Math.floor(startMin/60), dispStartM=startMin%60;
                   const dispEndH=Math.floor(endMin/60), dispEndM=endMin%60;
                   return (
                     <div
                       key={`${ev.id}-${ev._instanceDate}-${ei}`}
-                      className={`cal-event ${done?'cal-event--done':''} ${isResizing?'cal-event--resizing':''}`}
+                      className={`cal-event cal-event--${status} ${isResizing?'cal-event--resizing':''}`}
                       style={{top,height,left,width,'--ev-color':color}}
                       draggable={!resizeSession}
                       onDragStart={(e)=>{cancelHoverCard();handleEventDragStart(e,ev);}}
@@ -1205,8 +1254,11 @@ export default function CalendarPage({
                         onClick={(e)=>e.stopPropagation()}
                       />
                       <div className="cal-event-inner">
-                        <div className="cal-event-title">{ev.plan && <Sparkles size={9} className="cal-event-planned" aria-label="Planned by My Assistant" />}{ev.title}</div>
+                        <div className="cal-event-title">{ev.plan?.id && <Sparkles size={9} className="cal-event-planned" aria-label="Planned by My Assistant" />}{ev.title}</div>
                         {height>30&&<div className="cal-event-time">{fmtTime(dispStartH,dispStartM)} – {fmtTime(dispEndH,dispEndM)}</div>}
+                        {status==='missed'&&height>=48&&(
+                          <button type="button" className="cal-event-checkin" onClick={(e)=>openCheckIn(ev,e)} onMouseDown={(e)=>e.stopPropagation()}>Check in</button>
+                        )}
                         {height>48&&ev.attributes.length>0&&(
                           <div className="cal-event-attrs">
                             {ev.attributes.map(a=><span key={a} className="cal-event-attr-dot" style={{background:STAT_META[a]?.color}} title={STAT_META[a]?.label}/>)}
@@ -1242,7 +1294,7 @@ export default function CalendarPage({
                       </div>
                       <div className="cal-event-actions">
                         {!done && onStartFocus && <button className="cal-event-btn cal-event-focus" onClick={(e)=>{e.stopPropagation();cancelHoverCard();onStartFocus(ev);}} title="Start focus"><Play size={11} strokeWidth={3} /></button>}
-                        <button className={`cal-event-btn cal-event-complete ${done?'cal-event-complete--done':''}`} onClick={(e)=>completeEvent(ev,e)} title={done?'Completed':'Mark complete'}>{done ? <Check size={11} strokeWidth={3} /> : <Circle size={11} strokeWidth={3} />}</button>
+                        <button className={`cal-event-btn cal-event-complete ${status==='done'?'cal-event-complete--done':''}`} onClick={(e)=>{ if (status!=='done') openCheckIn(ev,e); else e.stopPropagation(); }} title={status==='done'?'Done':'Check in: done, partly or skipped'}>{status==='done' ? <Check size={11} strokeWidth={3} /> : <Circle size={11} strokeWidth={3} />}</button>
                         <button className="cal-event-btn cal-event-duplicate" onClick={(e)=>duplicateEvent(ev,e)} title="Duplicate"><Copy size={11} strokeWidth={3} /></button>
                         <button className="cal-event-btn cal-event-delete" onClick={(e)=>requestDelete(ev,e)} title="Delete"><X size={11} strokeWidth={3} /></button>
                       </div>
@@ -1384,6 +1436,21 @@ export default function CalendarPage({
       {sidebarOpen&&(
         <div className="cal-sidebar-content">
           <div className="cal-sidebar-header">
+            <span className="cal-sidebar-title">Needs a time slot</span>
+          </div>
+          <p className="cal-sidebar-hint">Today&rsquo;s tasks with no block yet</p>
+          <TaskTray
+            todos={todos}
+            calendarEvents={calendarEvents}
+            todayKey={todayKey}
+            onDragStart={setDraggingTask}
+            onDragEnd={handleDragEnd}
+            onSchedule={scheduleTask}
+          />
+
+          <div className="cal-sidebar-divider" />
+
+          <div className="cal-sidebar-header">
             <span className="cal-sidebar-title">Quick Time Blocks</span>
             <button className="cal-sidebar-add-btn" onClick={openTmplCreate} title="Add template" aria-label="Add template">
               <Plus size={14} strokeWidth={3} />
@@ -1418,10 +1485,6 @@ export default function CalendarPage({
             ))}
             {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click the + button to add one.</p>}
           </div>
-                    <span className="cal-dayevents-mini-label">
-                      <Plus size={12} strokeWidth={3} />
-                      Add event
-                    </span>
 
           <div className="cal-sidebar-divider" />
 
@@ -1521,7 +1584,8 @@ export default function CalendarPage({
     const totalXp = durMin > 0 ? xpForBlockMinutes(durMin) : 0;
     const attrs = ev.attributes || [];
     const perAttrXp = attrs.length ? Math.max(1, Math.floor(totalXp / attrs.length)) : 0;
-    const done = isInstanceCompleted(ev);
+    const outcome = getBlockOutcome(ev);
+    const missed = !outcome && ev._instanceDate >= PLAN_KEPT_START && getBlockStatus(ev, nowMs) === 'missed';
     const subEvents = ev.subEvents || [];
     const bonusTasks = ev.bonusTasks || [];
     const notes = (ev.notes || '').trim();
@@ -1543,7 +1607,10 @@ export default function CalendarPage({
       >
         <div className="cal-hovercard-head">
           <span className="cal-hovercard-title">{ev.title || 'Untitled'}</span>
-          {done && <span className="cal-hovercard-done"><Check size={10} strokeWidth={3} />Done</span>}
+          {outcome?.status === 'done' && <span className="cal-hovercard-done"><Check size={10} strokeWidth={3} />Done</span>}
+          {outcome?.status === 'partly' && <span className="cal-hovercard-done cal-hovercard-done--partly">Partly</span>}
+          {outcome?.status === 'skipped' && <span className="cal-hovercard-done cal-hovercard-done--skipped">Skipped{outcome.reason ? ` · ${outcome.reason}` : ''}</span>}
+          {missed && <span className="cal-hovercard-done cal-hovercard-done--missed">Missed</span>}
         </div>
 
         <div className="cal-hovercard-time">
@@ -1711,11 +1778,48 @@ export default function CalendarPage({
       <div className="cal-body">
         {renderSidebar()}
         <div className="cal-main">
+          <TodayStrip
+            calendarEvents={calendarEvents}
+            nowMs={nowMs}
+            onCheckIn={checkIn}
+            onStartFocus={onStartFocus}
+            onPlanDay={onPlanDay}
+          />
+          <div className="cal-tray-row">
+            <TaskTray
+              variant="row"
+              todos={todos}
+              calendarEvents={calendarEvents}
+              todayKey={todayKey}
+              onDragStart={setDraggingTask}
+              onDragEnd={handleDragEnd}
+              onSchedule={scheduleTask}
+            />
+          </div>
           {view==='day'&&renderTimeGrid([anchor])}
           {view==='week'&&renderTimeGrid(weekDates)}
           {view==='month'&&renderMonthView()}
         </div>
       </div>
+
+      {/* ── Block check-in (from the grid) ── */}
+      {checkInEv && (
+        <div className="cal-modal-overlay" onClick={()=>setCheckInEv(null)}>
+          <div className="cal-modal cal-checkin-modal" onClick={(e)=>e.stopPropagation()} role="dialog" aria-label="Check in on this block">
+            <div className="cal-modal-header">
+              <h3>Check in</h3>
+              <button className="cal-modal-close" onClick={()=>setCheckInEv(null)} aria-label="Close"><X size={14} strokeWidth={3} /></button>
+            </div>
+            <div className="cal-modal-body">
+              <BlockCheckIn
+                ev={checkInEv}
+                dayLabel={checkInEv._instanceDate === todayKey ? 'Today' : formatLogDate(checkInEv._instanceDate)}
+                onAnswer={(status, reason)=>checkIn(checkInEv, status, reason)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Hover detail card for a time block ── */}
       {renderEventHoverCard()}

@@ -332,7 +332,7 @@ const DailyLogPage = ({
   logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], northStar, logPatterns,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
   setFoodPoints, onUpdateStat, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
-  onExpandLesson, onAskAssistant, onNavigate,
+  onExpandLesson, onAskAssistant, onNavigate, calendarEvents = [],
 }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
@@ -529,6 +529,7 @@ const DailyLogPage = ({
             northStar={northStar}
             logPatterns={logPatterns}
             xpLog={xpLog}
+            calendarEvents={calendarEvents}
             reviewingDate={reviewingDate}
             onSubmitLog={onSubmitLog}
             onOpenAssistant={onOpenAssistant}

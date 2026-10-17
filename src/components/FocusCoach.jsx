@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Lightbulb, Check, Loader2, Sparkles, CalendarCheck, ListChecks } from 'lucide-react';
 import { FOCUS_BLOCKERS, FOCUS_OUTCOMES } from '../utils/focusInsights';
-import { isInstanceCompleted } from '../utils/calendarUtils';
+import { getBlockOutcome } from '../utils/calendarUtils';
 import './FocusCoach.css';
 
 /** "This session I will…": the one outcome the session is for. */
@@ -94,8 +94,14 @@ export function FocusDebrief({
   const [blockers, setBlockers] = useState([]);
   const [note, setNote] = useState('');
   const [comment, setComment] = useState({ status: 'idle' });
-  const [blockXp, setBlockXp] = useState(() => (block && isInstanceCompleted(block) ? 0 : null));
+  const [blockXp, setBlockXp] = useState(() => (block && getBlockOutcome(block)?.status === 'done' ? 0 : null));
   const [taskXp, setTaskXp] = useState(null);
+
+  // A task block marked done completes its task too (App's check-in does both).
+  const completeLinkedBlock = () => {
+    setBlockXp(onCompleteBlock() ?? 0);
+    if (task && String(block.plan?.taskId) === String(task.id)) setTaskXp((xp) => xp ?? 0);
+  };
 
   const toggleBlocker = (id) => setBlockers((list) => (list.includes(id) ? list.filter((b) => b !== id) : [...list, id]));
 
@@ -169,7 +175,7 @@ export function FocusDebrief({
           {block && (
             blockXp !== null
               ? <p className="fc-linked-done"><Check size={14} /> Block completed{blockXp ? ` (+${blockXp} XP)` : ''}</p>
-              : <button className="fc-btn fc-btn--link" onClick={() => setBlockXp(onCompleteBlock() ?? 0)}><CalendarCheck size={14} /> Complete "{block.title}"</button>
+              : <button className="fc-btn fc-btn--link" onClick={completeLinkedBlock}><CalendarCheck size={14} /> Complete "{block.title}"</button>
           )}
           {task && (
             taskXp !== null

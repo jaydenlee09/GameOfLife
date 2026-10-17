@@ -76,13 +76,12 @@ export const computeNudges = (now, state, checkins) => {
   const hour = now.getHours();
   const dismissed = checkins?.nudges || {};
   const habits = state.habits || [];
-  const inputs = [habits, state.xpLog || [], state.logs || {}, state.commitmentArchive || [], state.healthLog || {}];
   const nudges = [];
 
   if (hour >= 17) {
-    const { score } = computeDailyScore(...inputs, today);
+    const { score } = computeDailyScore(state, today);
     if (score < STREAK_THRESHOLD) {
-      const streak = computeStreak(...inputs);
+      const streak = computeStreak(state);
       if (streak > 0) {
         nudges.push({
           id: 'streak_risk',

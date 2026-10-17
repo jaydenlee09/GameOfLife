@@ -16,7 +16,7 @@
 // or resolves commitments, and undo refuses to remove anything XP was already
 // earned on.
 
-import { expandEventsForDates, isInstanceCompleted } from './calendarUtils';
+import { expandEventsForDates, isInstanceCompleted, getBlockOutcome } from './calendarUtils';
 import {
   computeDailyScore, computeDailyScoreHistory, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD,
 } from './scoreUtils';
@@ -24,6 +24,13 @@ import { getHabitStreak } from './habitUtils';
 import { getGoalProgress } from './goalUtils';
 import { ACHIEVEMENTS } from './achievementsMeta';
 import { carriedDays, isTop } from './taskUtils';
+
+// How the user said a block went, when it wasn't simply done ("partly", "skipped: Distracted").
+const checkInOf = (ev) => {
+  const o = getBlockOutcome(ev);
+  if (!o || o.status === 'done') return null;
+  return o.reason ? `${o.status}: ${o.reason}` : o.status;
+};
 
 export const TASK_TIMEFRAME_XP = {
   today: 20,
@@ -241,6 +248,7 @@ const READ_TOOLS = [
         title: ev.title,
         recurrence: ev.recurrence || 'none',
         done: !!isInstanceCompleted(ev),
+        ...(checkInOf(ev) ? { checkIn: checkInOf(ev) } : {}),
         ...(ev.attributes?.length ? { attributes: ev.attributes } : {}),
         ...(ev.notes ? { notes: ev.notes } : {}),
       }));
@@ -355,11 +363,10 @@ const READ_TOOLS = [
     parameters: OBJ({ days: I('How many days back, including today (default 14, max 60).') }),
     run: (args, { state }) => {
       const days = clamp(Math.round(toNumber(args?.days, 14)), 1, 60);
-      const inputs = [state.habits || [], state.xpLog || [], state.logs || {}, state.commitmentArchive || [], state.healthLog || {}];
-      const today = computeDailyScore(...inputs);
-      const rank = computeRankStatus(...inputs);
+      const today = computeDailyScore(state);
+      const rank = computeRankStatus(state);
       return {
-        history: computeDailyScoreHistory(...inputs, days),
+        history: computeDailyScoreHistory(state, days),
         today: { score: today.score, breakdown: Object.fromEntries(Object.entries(today.breakdown).map(([k, v]) => [k, `${v.label} → ${v.value}/10 (weight ${v.weight}%)`])) },
         rank: { tier: rank.tier.name, streakDays: rank.streakDays, nextTier: rank.nextTier?.name || null, nextTierMin: rank.nextTier?.min ?? null },
       };

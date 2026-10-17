@@ -1,6 +1,6 @@
 import { xpCapForLevel } from './xpUtils';
 import { computeDailyScore, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD } from './scoreUtils';
-import { toDateKey, expandEventsForDates, isInstanceCompleted } from './calendarUtils';
+import { toDateKey, expandEventsForDates, isInstanceCompleted, getBlockOutcome } from './calendarUtils';
 import { getHabitStreak } from './habitUtils';
 import { getGoalProgress } from './goalUtils';
 import { carriedDays, isTop, todayQueue } from './taskUtils';
@@ -64,9 +64,8 @@ const summarizeMemory = (memory) => {
 };
 
 const summarizeToday = (state) => {
-  const inputs = [state.habits || [], state.xpLog || [], state.logs || {}, state.commitmentArchive || [], state.healthLog || {}];
-  const { score, breakdown } = computeDailyScore(...inputs);
-  const rank = computeRankStatus(...inputs);
+  const { score, breakdown } = computeDailyScore(state);
+  const rank = computeRankStatus(state);
   const parts = Object.values(breakdown).map((b) => b.label).join(' · ');
   const next = rank.nextTier ? ` Next tier: ${rank.nextTier.name} (needs ${rank.nextTier.min}+ daily).` : '';
   return `Daily Score so far: ${score}/10 (${parts}). Streak counts at ${STREAK_THRESHOLD}+.\nRank: ${rank.tier.name}, ${rank.streakDays}-day streak.${next}`;
@@ -120,7 +119,8 @@ const summarizeCalendar = (calendarEvents, noPhoneBlocks, calendarDayEvents) => 
       .filter(ev => ev._instanceDate === dateKey)
       .sort(byStart)
       .forEach(ev => {
-        const done = isInstanceCompleted(ev) ? ' (done)' : '';
+        const outcome = getBlockOutcome(ev);
+        const done = outcome ? ` (${outcome.status}${outcome.reason ? `: ${outcome.reason}` : ''})` : '';
         lines.push(`  ${fmtTime(ev.startHour, ev.startMin)}-${fmtTime(ev.endHour, ev.endMin)} ${ev.title}${done}`);
       });
     blocks

@@ -59,12 +59,11 @@ export const buildReviewContext = (state, dateKey) => {
   const from = shiftDateKey(dateKey, -TREND_DAYS);
   const prevDay = shiftDateKey(dateKey, -1);
   const run = (name, args) => getTool(name).run(args, { state });
-  const scoreInputs = [state.habits || [], state.xpLog || [], state.logs || {}, state.commitmentArchive || [], state.healthLog || {}];
 
-  const day = computeDailyScore(...scoreInputs, dateKey);
+  const day = computeDailyScore(state, dateKey);
   const scoreTrend = Array.from({ length: TREND_DAYS }, (_, i) => {
     const key = shiftDateKey(dateKey, i - TREND_DAYS);
-    return { date: key, score: computeDailyScore(...scoreInputs, key).score };
+    return { date: key, score: computeDailyScore(state, key).score };
   });
 
   const health = run('get_health', { from, to: dateKey }).days;

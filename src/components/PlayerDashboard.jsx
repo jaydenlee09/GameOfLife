@@ -303,7 +303,7 @@ const PlayerDashboard = ({
   xpCap = 100,
   commitmentArchive = [],
   xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {},
-  goals = [], healthLog = {}, noPhoneBlocks = [],
+  goals = [], healthLog = {}, noPhoneBlocks = [], calendarEvents = [],
   onNavigate,
   rankStatus = { tier: RANK_TIERS[0], streakDays: 0, nextTier: null, nextTierStreak: 0 },
 }) => {
@@ -317,9 +317,9 @@ const PlayerDashboard = ({
 
   const attributes = user.stats ? Object.entries(user.stats) : [];
 
-  const data = { habits, xpLog, logs, commitmentArchive, healthLog, pomodoroSessions, todos, goals };
+  const data = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions, todos, goals };
   /* eslint-disable react-hooks/exhaustive-deps */
-  const deps = [habits, xpLog.length, logs, commitmentArchive, healthLog, pomodoroSessions.length, todos.length, goals];
+  const deps = [habits, xpLog.length, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions.length, todos.length, goals];
   const verdict = useMemo(() => getWeekVerdict(data), deps);
   const leaks   = useMemo(() => getScoreLeaks(data), deps);
   const deltas  = useMemo(() => getWeekDeltas(data), deps);
@@ -340,7 +340,7 @@ const PlayerDashboard = ({
           <StrengthCard leaks={leaks} />
         </div>
 
-        <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} />
+        <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} calendarEvents={calendarEvents} />
 
         <WeekDeltas deltas={deltas} />
       </div>

@@ -4,8 +4,9 @@
 
 import {
   toDateKey, parseDateKey, buildDayEventTargetMs, expandEventsForDates, isInstanceCompleted,
+  getPlanKept, getPendingCheckIns,
 } from './calendarUtils';
-import { computeDailyScore, STREAK_THRESHOLD } from './scoreUtils';
+import { computeDailyScore, scoreWeights, STREAK_THRESHOLD } from './scoreUtils';
 import { countTaskCompletions } from './taskUtils';
 
 const EVENING_FROM = 20;
@@ -92,25 +93,29 @@ export const getYesterdayCommitment = (logs, commitmentArchive, now) => {
 
 // Which move to suggest first when two are worth the same, by time of day.
 const MODE_ORDER = {
-  morning: ['sleep', 'commitment', 'tasks', 'habits', 'log'],
-  day: ['tasks', 'habits', 'commitment', 'sleep', 'log'],
-  evening: ['log', 'habits', 'tasks', 'commitment', 'sleep'],
+  morning: ['sleep', 'commitment', 'plan', 'tasks', 'habits', 'log'],
+  day: ['plan', 'tasks', 'habits', 'commitment', 'sleep', 'log'],
+  evening: ['log', 'plan', 'habits', 'tasks', 'commitment', 'sleep'],
 };
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
 /**
  * The single action that raises today's Daily Score the most, computed from the
- * score's own formula (see computeDailyScore). Returns
+ * score's own formula and weights (see computeDailyScore). `inputs` is the same
+ * object the score takes. Returns
  * { score, toThreshold, move: { key, text, gain, page } | null }.
  * `page` is where the action happens; null when it's on Home itself.
  */
-export const getNextMove = ({ habits, xpLog, logs, commitmentArchive, healthLog }, now) => {
+export const getNextMove = (inputs, now) => {
+  const { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents } = inputs;
   const todayKey = toDateKey(now);
-  const { score } = computeDailyScore(habits || [], xpLog || [], logs || {}, commitmentArchive || [], healthLog || {}, todayKey);
+  const weights = scoreWeights(todayKey);
+  const pts = (key) => (weights[key] || 0) / 10; // a part's full value, in score points
+  const { score } = computeDailyScore(inputs, todayKey);
   const habitsTotal = (habits || []).length;
   const habitsDone = (habits || []).filter((h) => h.history?.[todayKey]).length;
-  const tasksDone = countTaskCompletions(xpLog, todayKey);
+  const tasksDone = countTaskCompletions(xpLog || [], todayKey);
   const sleepLogged = healthLog?.[todayKey]?.sleepHours != null;
   const entry = logs?.[todayKey];
   const logFilled = !!entry && ((entry.emotions?.length > 0) || entry.proud?.some((p) => p?.trim()));
@@ -118,12 +123,21 @@ export const getNextMove = ({ habits, xpLog, logs, commitmentArchive, healthLog 
 
   const moves = [];
   if (habitsTotal > 0 && habitsDone < habitsTotal) {
-    moves.push({ key: 'habits', text: 'Tick off a habit', gain: round1(3 / habitsTotal), page: null });
+    moves.push({ key: 'habits', text: 'Tick off a habit', gain: round1(pts('habits') / habitsTotal), page: null });
   }
-  if (tasksDone < 3) moves.push({ key: 'tasks', text: 'Finish a task', gain: 1, page: null });
-  if (!sleepLogged) moves.push({ key: 'sleep', text: 'Log your sleep (9h+ counts)', gain: 2, page: 'daily-log' });
-  if (!logFilled) moves.push({ key: 'log', text: 'Fill in today’s Daily Log', gain: 1, page: 'daily-log' });
-  if (commitment.isPending) moves.push({ key: 'commitment', text: 'Mark yesterday’s commitment', gain: 1, page: null });
+  if (tasksDone < 3) moves.push({ key: 'tasks', text: 'Finish a task', gain: round1(pts('tasks') / 3), page: null });
+  if (weights.plan) {
+    const kept = getPlanKept(calendarEvents, todayKey);
+    const pending = getPendingCheckIns(calendarEvents, now).filter((ev) => ev._instanceDate === todayKey);
+    if (pending.length) {
+      moves.push({ key: 'plan', text: `Check in on “${pending[0].title}”`, gain: round1(pts('plan') / kept.total), page: 'calendar' });
+    } else if (!kept.total && getDayMode(now) !== 'evening') {
+      moves.push({ key: 'plan', text: 'Put a time block on today’s calendar', gain: round1(pts('plan')), page: 'calendar' });
+    }
+  }
+  if (!sleepLogged) moves.push({ key: 'sleep', text: 'Log your sleep (9h+ counts)', gain: round1(pts('sleep')), page: 'daily-log' });
+  if (!logFilled) moves.push({ key: 'log', text: 'Fill in today’s Daily Log', gain: round1(pts('log')), page: 'daily-log' });
+  if (commitment.isPending) moves.push({ key: 'commitment', text: 'Mark yesterday’s commitment', gain: round1(pts('commitment')), page: null });
 
   const order = MODE_ORDER[getDayMode(now)];
   moves.sort((a, b) => b.gain - a.gain || order.indexOf(a.key) - order.indexOf(b.key));

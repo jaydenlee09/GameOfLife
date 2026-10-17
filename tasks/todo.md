@@ -1,5 +1,74 @@
 # Todo
 
+## Done, uncommitted (2026-10-17): Calendar that holds you to the plan
+
+Goal: the calendar should hold you to the plan, not just record it. Four parts: a missed-block
+state plus an end-of-block check-in, a Today strip, "Plan kept" in the Daily Score, and an
+unscheduled Top 3 tray.
+
+User choices: Plan kept = 10% (Habits 25, Tasks 25, Sleep 20, Plan 10, Log 10, Commitment 10),
+counted only from 2026-10-17 on (earlier days keep the old formula, so streak and rank history
+don't change) · a day with no blocks scores 0 for Plan · Done = full XP + credit, Partly = half
+of both, Skipped = nothing + a one-tap reason · check-in shown in the app (Calendar + Home) and
+sent as a push · Done on a task block also completes the task · the tray shows unscheduled Top 3,
+then today's other tasks · task → 60-minute block.
+
+Design:
+- Outcome per instance: `outcomes: { [dateKey]: { status: 'done'|'partly'|'skipped', reason?, at } }`
+  on every block (one-off and recurring alike). Done and Partly still set `completed`/`completedDates`,
+  so every existing "is it finished" check (Home, push, planner, focus) keeps working unchanged.
+  Old data (completed, no outcome) reads as Done. No migration needed.
+- `getBlockStatus(ev, nowMs)` in calendarUtils: done / partly / skipped / missed (ended, no answer)
+  / now / upcoming. Single source for the grid, strip, Home, push and score.
+- `checkInBlock(ev, status, reason)` in completionUtils replaces direct `completeBlock` calls:
+  pays XP (Partly = half; Partly → Done pays the rest; Skipped can be re-answered; Done is final,
+  as it is now), records the outcome, and returns `taskId` for a task block marked Done.
+  One App-level `checkInBlock` handler (it also completes the linked task) is used by Calendar,
+  Home, the focus debrief and the assistant's complete-block path.
+- Score: the score functions take one inputs object `{ habits, xpLog, logs, commitmentArchive,
+  healthLog, calendarEvents }` instead of 5 positional arrays (all ~15 callers updated; a missed
+  caller crashes loudly instead of scoring wrong). Days >= PLAN_KEPT_START get the `plan` part:
+  credit / blocks × 10, labelled "2/5 blocks kept · 1 skipped (Distracted)". Anything that
+  hard-codes weights (Statistics SCORE_COMPONENTS, TrendChart, explainScore, getNextMove) reads
+  the per-day weight from the breakdown instead, and skips parts the day doesn't have.
+
+Steps:
+- [x] calendarUtils: outcomes, `getBlockStatus`, `blockEndMs`, `PLAN_KEPT_START`, `SKIP_REASONS`
+- [x] completionUtils `checkInBlock` + App handler (task completion, XP log) wired into Calendar,
+      FocusCoach debrief and the assistant tools
+- [x] scoreUtils: inputs object + plan part + date-based weights; update every caller, App memo deps
+- [x] Calendar grid: missed (dim + red edge + "Check in"), partly, skipped styles; circle button
+      opens a check-in popover (Done / Partly / Skipped → reason chips)
+- [x] Today strip above the grid (all views, always today): planned time · kept x/y · missed ·
+      Now/Next with Start focus · first unanswered block with inline Done/Partly/Skipped (+N more,
+      today and yesterday) · empty day → "No blocks today" + Plan my day
+- [x] Home: check-in card for the oldest unanswered block (today/yesterday)
+- [x] Tray: "Needs a time slot" at the top of the sidebar (desktop; drag onto the grid or tap
+      Schedule) and a chip row under the strip on phones (Schedule = next free 60-min gap today,
+      via dayPlanner's `computeFreeGaps` + `user.planner`). Block carries `plan: { kind: 'task', taskId }`
+- [x] Push: new `checkins` type ("After each time block ends"): "Did you do X?" within 60 min of a
+      block's end if still unanswered, opens Calendar. Toggle in NotificationSettings
+- [x] Plan row in Close the Day's "Where your points went" (fix → Calendar), Statistics leak +
+      trend series, Home next move ("Check in on a block")
+- [x] Verify: node checks (pre-start days score identical to before; weights; no-blocks = 0; partly
+      half; XP top-up; push decisions), lint vs baseline, build, harness at 1440 + 375 (check-in
+      flow end to end with data shaped like the real write path, tray drag + Schedule, strip states)
+
+**Verified:** node checks (60 pre-start days score and break down identically to HEAD's formula;
+weights sum 100; no blocks = 0; done/partly/skipped credit + label; partly→done XP top-up, done final,
+partly can't drop; recurring per-date outcomes; taskId only on done; explainScore plan row absent on
+old days; check-in push fires once, skips answered/off/>60 min late; pending excludes pre-start days;
+tray hides tasks with a block in the week ahead, a skipped block frees the task; next move suggests a
+check-in). Lint findings identical to HEAD (42), app + functions build pass. Harness (own port, seeded)
+at 1440, 375, 320: strip states, Partly/Skipped+reason/Done from the strip, Done from the grid popup
+also completed the linked task (+task XP), Schedule → 11:30 block, drag to Sunday, Home card advances
+then disappears, Close the Day Plan row, Statistics legend; no horizontal overflow.
+Found + fixed in testing: the grid "Check in" pill sat under the hover action bar (a click hit
+Duplicate) → moved into the block's content; Close the Day crashed on the new `plan` key (icon map
+had no entry); tray kept showing a task dragged onto tomorrow → counts blocks in the week ahead.
+Also removed a stray, handler-less "Add event" label in the calendar sidebar (leftover in HEAD).
+Not verifiable here: a real push on the phone (needs the GitHub Actions tick after deploy).
+
 ## Done, uncommitted (2026-10-17): Mobile nav + smaller popups
 
 User choices: tabs Home/Tasks/Calendar/Log + More; event pill top-right that shrinks to an icon;

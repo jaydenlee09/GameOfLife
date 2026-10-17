@@ -269,6 +269,7 @@ const round1 = (n) => Math.round(n * 10) / 10;
 export const SCORE_PARTS = [
   { key: 'habits', label: 'Habits' },
   { key: 'tasks', label: 'Tasks' },
+  { key: 'plan', label: 'Plan kept' },
   { key: 'sleep', label: 'Sleep' },
   { key: 'log', label: 'Daily Log' },
   { key: 'commitment', label: 'Commitment' },
@@ -281,8 +282,9 @@ export const SCORE_PARTS = [
  * back tonight. The commitment's "fix" for a missed or absent one is about
  * tomorrow (lock tonight's), and says so.
  */
-export const explainScore = ({ breakdown, habitsTotal, sleepLogged, commitmentStatus, tonightLocked }) => {
-  const rows = SCORE_PARTS.map(({ key, label }) => {
+export const explainScore = ({ breakdown, habitsTotal, sleepLogged, commitmentStatus, tonightLocked, planPending = 0 }) => {
+  // Days scored before "Plan kept" existed have no plan part.
+  const rows = SCORE_PARTS.filter(({ key }) => breakdown[key]).map(({ key, label }) => {
     const part = breakdown[key];
     const max = part.weight / 10;
     const points = round1((part.value * part.weight) / 100);
@@ -295,7 +297,16 @@ export const explainScore = ({ breakdown, habitsTotal, sleepLogged, commitmentSt
           ? { label: `Tick a habit (+${round1(max / habitsTotal)})`, step: 'checkIn' }
           : { label: 'Add a habit', step: 'checkIn' };
       } else if (key === 'tasks') {
-        fix = { label: 'Finish a task (+1)', page: 'tasks' };
+        fix = { label: `Finish a task (+${round1(max / 3)})`, page: 'tasks' };
+      } else if (key === 'plan') {
+        const kept = part.kept || { total: 0, done: 0, partly: 0, skipped: 0 };
+        const toCome = kept.total - kept.done - kept.partly - kept.skipped - planPending;
+        if (planPending > 0) fix = { label: `Check in on ${planPending} block${planPending !== 1 ? 's' : ''}`, page: 'calendar' };
+        else if (!kept.total) {
+          note = 'No time blocks today.';
+          fix = { label: 'Plan tomorrow on the Calendar', page: 'calendar' };
+        } else if (toCome > 0) note = `${toCome} block${toCome !== 1 ? 's' : ''} still to come today.`;
+        else note = 'Partly counts half, skipped counts nothing.';
       } else if (key === 'sleep') {
         if (sleepLogged) note = 'Only counts above 9 hours.';
         else fix = { label: 'Log last night’s sleep', step: 'checkIn' };

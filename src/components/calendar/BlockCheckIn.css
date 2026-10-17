@@ -1,0 +1,39 @@
+/* ─── Block check-in ("Did you do it?") ──────────────────────────────────────── */
+.cci { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cci svg { stroke: currentColor; fill: none; flex-shrink: 0; }
+.cci-q { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cci-when { font-size: 0.68rem; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.02em; }
+.cci-title {
+  font-size: 0.86rem; font-weight: 600; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.cci-actions, .cci-reasons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cci-btn {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px;
+  border-radius: var(--radius-sm); border: 1px solid var(--separator); background: var(--bg-elevated-2);
+  color: var(--text-secondary); font-family: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+.cci-btn--done { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cci-btn--partly { color: var(--warning); }
+.cci-btn--skip { color: var(--text-secondary); }
+@media (hover: hover) {
+  .cci-btn--done:hover { background: var(--accent-pressed); border-color: var(--accent-pressed); }
+  .cci-btn--partly:hover { background: var(--warning-wash); border-color: var(--warning); }
+  .cci-btn--skip:hover { background: var(--danger-wash); border-color: var(--danger); color: var(--danger); }
+  .cci-reason:hover { background: var(--bg-elevated-3); color: var(--text-primary); border-color: var(--separator-strong); }
+  .cci-back:hover { color: var(--text-primary); }
+}
+.cci-btn:active, .cci-reason:active { transform: scale(0.97); }
+
+.cci-why { font-size: 0.74rem; font-weight: 600; color: var(--text-tertiary); margin-right: 2px; }
+.cci-back {
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  border: none; border-radius: var(--radius-sm); background: transparent; color: var(--text-tertiary); cursor: pointer;
+}
+.cci-reason {
+  height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--separator);
+  background: var(--bg-elevated-2); color: var(--text-secondary); font-family: inherit;
+  font-size: 0.74rem; font-weight: 500; cursor: pointer; transition: all var(--duration) var(--ease);
+}

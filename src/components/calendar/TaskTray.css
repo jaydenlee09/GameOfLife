@@ -1,0 +1,49 @@
+/* ─── Calendar: "Needs a time slot" tray ─────────────────────────────────────── */
+.ctt { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ctt svg { stroke: currentColor; fill: none; flex-shrink: 0; }
+.ctt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.ctt-item {
+  display: flex; align-items: center; gap: 5px; min-width: 0; padding: 5px 5px 5px 4px;
+  border-radius: var(--radius-sm); border: 1px solid var(--separator); background: var(--bg-elevated-2);
+  cursor: grab; transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+.ctt-item:active { cursor: grabbing; }
+.ctt-item--top { border-color: rgba(56,189,248,0.35); }
+.ctt-grip { color: var(--text-tertiary); }
+.ctt-star { color: var(--accent); }
+.ctt-text {
+  flex: 1; min-width: 0; font-size: 0.74rem; font-weight: 500; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ctt-schedule {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 7px; flex-shrink: 0;
+  border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--accent);
+  font-family: inherit; font-size: 0.68rem; font-weight: 600; cursor: pointer; transition: all var(--duration) var(--ease);
+}
+.ctt-more {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px;
+  border: none; background: transparent; color: var(--text-tertiary); font-family: inherit;
+  font-size: 0.7rem; font-weight: 600; cursor: pointer;
+}
+.ctt-note { margin: 0; font-size: 0.7rem; color: var(--success); line-height: 1.35; }
+.ctt-note--warn { color: var(--warning); }
+.ctt-empty { margin: 0 0 4px; font-size: 0.72rem; color: var(--text-tertiary); }
+@media (hover: hover) {
+  .ctt-item:hover { background: var(--bg-elevated-3); }
+  .ctt-schedule:hover { background: var(--accent-wash); border-color: rgba(56,189,248,0.35); }
+  .ctt-more:hover { color: var(--text-primary); }
+}
+
+/* Sidebar: the label button only shows on hover-less screens or when the row is wide. */
+.ctt--sidebar .ctt-schedule-label { display: none; }
+@media (hover: none) { .ctt--sidebar .ctt-schedule-label { display: inline; } }
+
+/* Phones: a row under the Today strip. */
+.ctt--row { padding: 10px 12px; border-bottom: 1px solid var(--separator); flex-shrink: 0; }
+.ctt-row-label {
+  font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary);
+}
+.ctt--row .ctt-item { padding: 6px 6px 6px 8px; cursor: default; }
+.ctt--row .ctt-grip { display: none; }
+.ctt--row .ctt-text { font-size: 0.8rem; }
+.ctt--row .ctt-schedule { height: 30px; padding: 0 10px; border-color: rgba(56,189,248,0.35); background: var(--accent-wash); font-size: 0.72rem; }

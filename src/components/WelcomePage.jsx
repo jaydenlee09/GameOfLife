@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
-  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Pin, Star,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Pin, Star, CalendarCheck,
 } from 'lucide-react';
 import './WelcomePage.css';
-import { toDateKey, fmtRemaining } from '../utils/calendarUtils';
+import { toDateKey, fmtRemaining, getPendingCheckIns } from '../utils/calendarUtils';
+import BlockCheckIn from './calendar/BlockCheckIn';
 import { getGoalProgress, getFocusGoal } from '../utils/goalUtils';
 import { getHabitStreak } from '../utils/habitUtils';
 import { computeDailyScore, computeStreak, scoreColor } from '../utils/scoreUtils';
@@ -183,14 +184,12 @@ function NowPanel({ mode, now, nextUp, closeSteps, onNavigate, onPlanDay, onStar
 }
 
 // ── Daily Score + next best move ─────────────────────────────────────────────
-const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, sleep: Moon, log: NotebookText, commitment: Handshake };
+const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, plan: CalendarCheck, sleep: Moon, log: NotebookText, commitment: Handshake };
 
 function ScoreCard({ scoreInputs, now, onNavigate }) {
-  const { score, breakdown } = computeDailyScore(...scoreInputs);
-  const streak = computeStreak(...scoreInputs);
-  const { toThreshold, move } = getNextMove({
-    habits: scoreInputs[0], xpLog: scoreInputs[1], logs: scoreInputs[2], commitmentArchive: scoreInputs[3], healthLog: scoreInputs[4],
-  }, now);
+  const { score, breakdown } = computeDailyScore(scoreInputs);
+  const streak = computeStreak(scoreInputs);
+  const { toThreshold, move } = getNextMove(scoreInputs, now);
   const color = scoreColor(score);
   const R = 46;
   const C = 2 * Math.PI * R;
@@ -244,6 +243,30 @@ function ScoreCard({ scoreInputs, now, onNavigate }) {
         )
       ) : (
         <div className="wp-move wp-move--done"><Check size={13} /> Perfect day. Nothing left to raise.</div>
+      )}
+    </section>
+  );
+}
+
+// ── Block check-in ───────────────────────────────────────────────────────────
+// The oldest block that ended without an answer (today's, or yesterday's while it
+// still counts). Answering here is the same check-in as on the Calendar.
+function CheckInCard({ calendarEvents, now, todayKey, onCheckInBlock, onNavigate }) {
+  const pending = getPendingCheckIns(calendarEvents, now);
+  const ev = pending[0];
+  if (!ev || !onCheckInBlock) return null;
+  return (
+    <section className="wp-checkin" aria-label="Check in on a time block">
+      <BlockCheckIn
+        key={`${ev.id}-${ev._instanceDate}`}
+        ev={ev}
+        dayLabel={ev._instanceDate === todayKey ? 'Ended' : 'Yesterday'}
+        onAnswer={(status, reason) => onCheckInBlock(ev, status, reason)}
+      />
+      {pending.length > 1 && (
+        <button type="button" className="wp-checkin-more" onClick={() => onNavigate('calendar')}>
+          +{pending.length - 1} more on the Calendar <ArrowRight size={12} />
+        </button>
       )}
     </section>
   );
@@ -417,11 +440,12 @@ export default function WelcomePage({
   onPlanDay,
   onStartFocus,
   onStartFocusBlock,
+  onCheckInBlock,
 }) {
   const now = useNow(30000);
   const todayKey = toDateKey(now);
   const mode = getDayMode(now);
-  const scoreInputs = [habits || [], xpLog || [], logs || {}, commitmentArchive || [], healthLog || {}];
+  const scoreInputs = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents };
   const nextUp = getNextUp({ calendarEvents, noPhoneBlocks, calendarDayEvents, now });
   const todaysBrief = brief?.date === todayKey ? brief : null;
 
@@ -430,6 +454,7 @@ export default function WelcomePage({
       <div className="wp-layout">
         <TopBar name={user?.name} now={now} />
         <BriefLine brief={todaysBrief} loading={briefLoading} onRefresh={onRefreshBrief} />
+        <CheckInCard calendarEvents={calendarEvents} now={now} todayKey={todayKey} onCheckInBlock={onCheckInBlock} onNavigate={onNavigate} />
 
         <div className="wp-grid">
           <NowPanel

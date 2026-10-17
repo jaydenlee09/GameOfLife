@@ -40,7 +40,6 @@ const habitName = (h) => h.name || h.text || 'Unnamed habit';
 export const buildBriefContext = (state, now, { weekPriority, logReviews } = {}) => {
   const todayKey = toDateKey(now);
   const yesterdayKey = shiftDateKey(todayKey, -1);
-  const scoreInputs = [state.habits || [], state.xpLog || [], state.logs || {}, state.commitmentArchive || [], state.healthLog || {}];
   const calendar = getTool('get_calendar').run({ from: todayKey, to: todayKey }, { state });
 
   // Top 3 first (marked), then what else is on today.
@@ -74,7 +73,7 @@ export const buildBriefContext = (state, now, { weekPriority, logReviews } = {})
     })),
     activeGoals: goals,
     yesterday: {
-      dailyScore: computeDailyScore(...scoreInputs, yesterdayKey).score,
+      dailyScore: computeDailyScore(state, yesterdayKey).score,
       commitmentForToday: yesterdayCommitment,
       reviewSaidFocusOn: yesterdayReview?.tomorrowFocus || null,
     },

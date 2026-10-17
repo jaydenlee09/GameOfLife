@@ -31,7 +31,7 @@ import BrainDumpPage from './components/BrainDumpPage'
 import FocusMode from './components/FocusMode'
 import DayPlanner from './components/DayPlanner'
 import { getTool, applySliceOp } from './utils/assistantTools'
-import { completeBlock, completeTask, findBlockInstance } from './utils/completionUtils'
+import { checkInBlock, completeTask, findBlockInstance } from './utils/completionUtils'
 import { pruneDoneTasks } from './utils/taskUtils'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
 import { normalizeGoal } from './utils/goalUtils'
@@ -360,8 +360,8 @@ function App() {
   // habit writes `habits[i].history[dateKey]` and leaves the array length alone, so
   // a length-keyed memo would leave a stale score on screen until the next reload.
   const dailyScore = useMemo(
-    () => computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog),
-    [habits, xpLog, logs, commitmentArchive, healthLog]
+    () => computeDailyScore({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
+    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents]
   );
 
   // ─── Rank ──────────────────────────────────────────────────────────────────────
@@ -371,9 +371,9 @@ function App() {
   // Navbar recompute it independently) so the transition-detection effect below and
   // every display of it can never silently drift apart.
   const rankStatus = useMemo(
-    () => computeRankStatus(habits, xpLog, logs, commitmentArchive, healthLog),
+    () => computeRankStatus({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]
+    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog, calendarEvents]
   );
 
   useEffect(() => {
@@ -892,14 +892,18 @@ function App() {
     });
   }, []);
 
-  // One-tap completes from the focus debrief: same XP rules as the Calendar/Tasks pages.
-  const completeBlockById = (blockId, dateKey) => {
-    const done = completeBlock(findBlockInstance(calendarEvents, blockId, dateKey));
-    if (!done) return null;
-    done.awards.forEach(a => updateStat(a.stat, a.amount, { source: a.source, label: a.label }));
-    setCalendarEvents(done.update);
-    return done.xp;
+  // Every block check-in (Calendar, Home, focus debrief) lands here: same XP rules
+  // everywhere, and a task block marked done completes its task too.
+  const checkInBlockInstance = (ev, status, reason = null) => {
+    const res = checkInBlock(ev, status, { reason });
+    if (!res) return null;
+    res.awards.forEach(a => updateStat(a.stat, a.amount, { source: a.source, label: a.label }));
+    setCalendarEvents(res.update);
+    if (res.taskId != null) completeTaskById(res.taskId);
+    return res.xp;
   };
+  const completeBlockById = (blockId, dateKey) =>
+    checkInBlockInstance(findBlockInstance(calendarEvents, blockId, dateKey), 'done');
   const completeTaskById = (taskId) => {
     const done = completeTask(todos.find(t => String(t.id) === String(taskId)));
     if (!done) return null;
@@ -1042,6 +1046,7 @@ function App() {
             onPlanDay={() => openPlanner()}
             onStartFocus={() => setFocusModeOpen(true)}
             onStartFocusBlock={startFocusFromBlock}
+            onCheckInBlock={checkInBlockInstance}
           />
         );
       case 'statistics':
@@ -1087,6 +1092,7 @@ function App() {
             commitmentArchive={commitmentArchive}
             onResolveCommitment={handleArchiveCommitmentResolve}
             xpLog={xpLog}
+            calendarEvents={calendarEvents}
             goals={goals}
             northStar={user.northStar}
             logPatterns={user.logPatterns}
@@ -1136,6 +1142,8 @@ function App() {
             logs={logs}
             onPlanDay={openPlanner}
             onStartFocus={startFocusFromBlock}
+            onCheckInBlock={checkInBlockInstance}
+            planner={user.planner}
           />
         );
       case 'goals':
@@ -1184,7 +1192,7 @@ function App() {
           />
         );
       default:
-        return <PlayerDashboard user={user} onUpdateName={updateName} xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} commitmentArchive={commitmentArchive} rankStatus={rankStatus} goals={goals} healthLog={healthLog} noPhoneBlocks={noPhoneBlocks} onNavigate={handleNavigate} />;
+        return <PlayerDashboard user={user} onUpdateName={updateName} xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} commitmentArchive={commitmentArchive} rankStatus={rankStatus} goals={goals} healthLog={healthLog} noPhoneBlocks={noPhoneBlocks} calendarEvents={calendarEvents} onNavigate={handleNavigate} />;
     }
   };
 

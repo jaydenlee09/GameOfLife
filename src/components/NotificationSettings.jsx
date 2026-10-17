@@ -8,6 +8,7 @@ const TYPE_ROWS = [
   { type: 'evening', label: 'Daily Log reminder', hint: "If today's log is empty or not submitted", timeKey: 'evening' },
   { type: 'streak', label: 'Streak at risk', hint: 'If your score or a habit streak will break tonight', timeKey: 'streak', min: '18:00' },
   { type: 'blocks', label: 'Time block heads-up', hint: 'Before each time block and No Phone block' },
+  { type: 'checkins', label: 'Block check-in', hint: 'When a time block ends: did you do it?' },
 ];
 
 /**

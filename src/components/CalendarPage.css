@@ -473,6 +473,18 @@
 .cal-event:hover .cal-event-actions { opacity: 1; }
 .cal-event--done { opacity: 0.4; }
 .cal-event--done .cal-event-title { text-decoration: line-through; color: var(--text-tertiary); }
+/* Check-in states (see getBlockStatus). Missed = ended with no answer yet. */
+.cal-event--missed { border-left-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--bg-elevated-2)); }
+.cal-event--partly { opacity: 0.7; border-left-style: dashed; border-left-color: var(--warning); }
+.cal-event--skipped { opacity: 0.38; border-left-style: dashed; border-left-color: var(--text-tertiary); }
+.cal-event--skipped .cal-event-title { text-decoration: line-through; color: var(--text-tertiary); }
+.cal-event--now { box-shadow: var(--shadow-sm), 0 0 0 1px var(--ev-color, #38bdf8); }
+.cal-event-checkin {
+  align-self: flex-start; flex-shrink: 0; margin-top: 3px; height: 18px; padding: 0 7px; border-radius: 999px;
+  border: 1px solid rgba(255,69,58,0.45); background: var(--danger-wash); color: var(--danger);
+  font-family: inherit; font-size: 0.6rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.cal-event-checkin:hover { background: var(--danger); color: #fff; }
 
 .cal-event-inner { padding: 2px 5px 1px; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
 .cal-event-title { font-size: 0.7rem; font-weight: 500; color: var(--text-primary); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; }
@@ -534,6 +546,9 @@
   color: var(--success); background: var(--success-wash);
   border-radius: 999px; padding: 2px 7px;
 }
+.cal-hovercard-done--partly { color: var(--warning); background: var(--warning-wash); }
+.cal-hovercard-done--skipped { color: var(--text-secondary); background: var(--bg-elevated-3); text-transform: none; letter-spacing: 0; }
+.cal-hovercard-done--missed { color: var(--danger); background: var(--danger-wash); }
 .cal-hovercard-time {
   display: flex; align-items: baseline; gap: 7px;
   font-size: 0.72rem; font-weight: 500; color: var(--text-secondary); letter-spacing: 0;
@@ -750,6 +765,10 @@
 .cal-logview-text { margin: 0; font-size: 0.85rem; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; }
 .cal-modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 20px 18px; border-top: 1px solid var(--separator); flex-shrink: 0; }
 
+/* ─── Block check-in popup + phone tray row ─────────────────────────────────── */
+.cal-checkin-modal { max-width: 440px; }
+.cal-tray-row { display: none; }
+
 /* ─── Form Fields ────────────────────────────────────────────────────────────── */
 .cal-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .cal-field-row { display: flex; gap: 12px; }
@@ -868,6 +887,9 @@
 
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+  /* The sidebar (and its tray) is hidden on phones; the tray sits under the Today strip. */
+  .cal-tray-row { display: block; }
+
   .cal-page {
     height: auto;
     overflow: visible;

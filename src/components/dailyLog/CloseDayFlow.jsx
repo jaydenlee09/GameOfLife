@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Moon, Plus, X, Trophy, TrendingUp, Lightbulb, PenLine, Target,
   Repeat, HeartPulse, MessageCircle, Sparkles, Shuffle, History, AlertTriangle, LoaderCircle, Lock, Pencil, Flame,
-  CheckSquare, NotebookText, Handshake, PieChart,
+  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck,
 } from 'lucide-react';
 import EMOTIONS from '../../utils/logMeta';
 import {
@@ -14,6 +14,7 @@ import {
 import { getHabitLeak } from '../../utils/logPatterns';
 import { getYesterdayCommitment } from '../../utils/homeUtils';
 import { getFocusGoal } from '../../utils/goalUtils';
+import { getPendingCheckIns } from '../../utils/calendarUtils';
 import { computeDailyScore, computeStreak, scoreColor, shiftDateKey, STREAK_THRESHOLD } from '../../utils/scoreUtils';
 import { entryHasContent, entryFingerprint } from '../../utils/logReview';
 import STAT_META from '../statMeta';
@@ -477,7 +478,7 @@ const TomorrowStep = ({ entry, updateField, todayKey, commitmentLocked, suggesti
   );
 };
 
-const SCORE_PART_ICON = { habits: Repeat, tasks: CheckSquare, sleep: Moon, log: NotebookText, commitment: Handshake };
+const SCORE_PART_ICON = { habits: Repeat, tasks: CheckSquare, plan: CalendarCheck, sleep: Moon, log: NotebookText, commitment: Handshake };
 
 /** Points earned vs possible for each part of the Daily Score, with tonight's fixes. */
 const ScoreBreakdown = ({ explained, score, streak, onFix }) => {
@@ -634,7 +635,7 @@ const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints, onUpdateStat,
-  goals, northStar, logPatterns, xpLog, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
+  goals, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
 }) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
@@ -674,10 +675,11 @@ const CloseDayFlow = ({
   const habitLeak = useMemo(() => getHabitLeak(habits, todayKey), [habits, todayKey]);
   const suggestions = getCommitmentSuggestions({ entry, goals, now, flags });
 
-  const { score, breakdown } = computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog, todayKey);
+  const scoreInputs = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents };
+  const { score, breakdown } = computeDailyScore(scoreInputs, todayKey);
   const streak = useMemo(
-    () => computeStreak(habits, xpLog, logs, commitmentArchive, healthLog),
-    [habits, xpLog, logs, commitmentArchive, healthLog]
+    () => computeStreak({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
+    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents]
   );
 
   const pending = getPendingHealthAwards(healthLog[todayKey] || {}, foodLog[todayKey]?.entries || []);
@@ -692,6 +694,7 @@ const CloseDayFlow = ({
     sleepLogged: healthLog[todayKey]?.sleepHours != null,
     commitmentStatus: commitment.status,
     tonightLocked: commitmentLocked,
+    planPending: getPendingCheckIns(calendarEvents, now).filter((ev) => ev._instanceDate === todayKey).length,
   });
   const fixScore = (fix) => {
     if (fix.page) onNavigate?.(fix.page);

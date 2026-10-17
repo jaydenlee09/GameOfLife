@@ -10,6 +10,7 @@
 //   dueDate        hard deadline
 //   createdAt / completedAt  ms timestamps (old tasks: id is Date.now() at creation)
 
+import { plannedTaskIds } from './calendarUtils';
 
 export const TOP_LIMIT = 3;
 // Finished tasks stay visible ("Done today") for a week, then get pruned.
@@ -301,4 +302,16 @@ export const migrateLegacyTomorrow = (todos, today = getLocalDateKey(0)) => {
     const day = upcomingKey(t);
     return { ...t, timeFrame: 'today', xp: XP_BY_TIMEFRAME.today, scheduledDate: day && day > today ? day : null };
   });
+};
+
+/**
+ * Today's open tasks that don't have a time block yet (today or in the week ahead,
+ * so one dragged onto tomorrow counts as placed), for the Calendar's tray: the
+ * Top 3 first, then the rest of today's queue (carried, then today's).
+ */
+export const getUnscheduledTasks = (todos, calendarEvents, today = getLocalDateKey(0)) => {
+  const planned = plannedTaskIds(calendarEvents, Array.from({ length: 7 }, (_, i) => shiftDateKey(today, i)));
+  const open = (t) => !planned.has(String(t.id));
+  const b = bucketTasks(todos || [], today);
+  return { top: b.top.filter(open), rest: [...b.carried, ...b.today].filter(open) };
 };

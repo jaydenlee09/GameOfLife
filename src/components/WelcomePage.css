@@ -169,6 +169,22 @@
   box-shadow: var(--glass-shadow);
 }
 
+/* ── Block check-in (above the grid while a block waits for an answer) ────── */
+.wp-checkin {
+  display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px;
+  margin-bottom: 0.9rem; padding: 14px 18px; box-sizing: border-box; min-width: 0;
+  background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); border-left: 3px solid var(--danger);
+  border-radius: var(--radius-lg); box-shadow: var(--glass-shadow);
+}
+.wp-checkin .cci { flex: 1 1 300px; }
+.wp-checkin-more {
+  display: inline-flex; align-items: center; gap: 4px; padding: 6px 0; border: none; background: transparent;
+  color: var(--text-tertiary); font-family: inherit; font-size: 0.74rem; font-weight: 600; cursor: pointer;
+}
+.wp-checkin-more svg { stroke: currentColor; fill: none; }
+@media (hover: hover) { .wp-checkin-more:hover { color: var(--text-primary); } }
+
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .wp-btn {
   display: inline-flex;

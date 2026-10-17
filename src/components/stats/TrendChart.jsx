@@ -16,11 +16,11 @@ const ScoreTooltip = ({ active, payload }) => {
   return (
     <div className="trend-tooltip" style={TOOLTIP_STYLE}>
       <div className="trend-tooltip-head">{row.dateKey} · <strong>{row.value.toFixed(1)}</strong></div>
-      {[...SCORE_COMPONENTS].reverse().map((c) => (
+      {[...SCORE_COMPONENTS].reverse().filter((c) => row.max[c.key] != null).map((c) => (
         <div key={c.key} className="trend-tooltip-row">
           <span className="trend-swatch" style={{ background: c.color }} />
           <span>{c.label}</span>
-          <span className="trend-tooltip-val">{row[c.key].toFixed(1)} / {(c.weight * 10).toFixed(0)}</span>
+          <span className="trend-tooltip-val">{row[c.key].toFixed(1)} / {row.max[c.key].toFixed(1).replace(/\.0$/, '')}</span>
         </div>
       ))}
     </div>
@@ -57,7 +57,7 @@ const MODES = {
 // One card, three day-by-day metrics (score / screentime / sleep) toggled via
 // a small pill switcher — never averaged, so a single bad day stays visible.
 // Score bars are stacked by Daily Score component, so a low day shows *why*.
-const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog }) => {
+const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }) => {
   const [mode, setMode] = useState('score');
   const cfg = MODES[mode];
 
@@ -65,10 +65,15 @@ const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog }) => {
     if (mode === 'score') {
       return Array.from({ length: 30 }, (_, i) => {
         const dateKey = getLocalDateKey(-(29 - i));
-        const { score, breakdown } = computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog, dateKey);
+        const { score, breakdown } = computeDailyScore({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }, dateKey);
         const [, m, d] = dateKey.split('-').map(Number);
-        const row = { dateKey, value: score, label: `${m}/${d}` };
-        for (const c of SCORE_COMPONENTS) row[c.key] = breakdown[c.key].value * c.weight;
+        const row = { dateKey, value: score, label: `${m}/${d}`, max: {} };
+        // Each day uses its own weights; a part the day didn't have stacks as 0.
+        for (const c of SCORE_COMPONENTS) {
+          const part = breakdown[c.key];
+          row[c.key] = part ? (part.value * part.weight) / 100 : 0;
+          if (part) row.max[c.key] = part.weight / 10;
+        }
         // Topmost non-empty segment gets the rounded cap.
         row.top = [...SCORE_COMPONENTS].reverse().find((c) => row[c.key] > 0)?.key || null;
         return row;
@@ -87,7 +92,7 @@ const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog }) => {
       return { dateKey, value: hours, label: `${m}/${d}`, color: getColor(hours) };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog]);
+  }, [mode, habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog, calendarEvents]);
 
   return (
     <div className="dashboard-card trend-chart-card">

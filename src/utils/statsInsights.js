@@ -4,15 +4,17 @@ import { computeStatsForDays, STAT_ITEMS } from './weekStatsUtils';
 // Statistics page insights. Everything here is plain Daily Score math, never AI:
 // day-by-day and traceable, so every number can be checked against a single day.
 
-// The five Daily Score components, in the order the formula weights them. `weight`
-// is the share of the 10-point score the component can contribute. `color` is the
-// stacked-trend series color (validated categorical slots, dark surface).
+// The Daily Score components, heaviest first. Weights come from each day's own
+// breakdown (they changed when "Plan kept" arrived, and days before it have no plan
+// part at all), so nothing here hard-codes them. `color` is the stacked-trend
+// series color (categorical slots, dark surface).
 export const SCORE_COMPONENTS = [
-  { key: 'habits',     label: 'Habits',     weight: 0.3, color: '#3987e5', page: 'daily-log', fix: 'Open habits' },
-  { key: 'tasks',      label: 'Tasks',      weight: 0.3, color: '#d95926', page: 'tasks',     fix: 'Open tasks' },
-  { key: 'sleep',      label: 'Sleep',      weight: 0.2, color: '#199e70', page: 'daily-log', fix: 'Log sleep' },
-  { key: 'log',        label: 'Daily Log',  weight: 0.1, color: '#c98500', page: 'daily-log', fix: 'Open Daily Log' },
-  { key: 'commitment', label: 'Commitment', weight: 0.1, color: '#d55181', page: 'daily-log', fix: 'Set a commitment' },
+  { key: 'habits',     label: 'Habits',     color: '#3987e5', page: 'daily-log', fix: 'Open habits' },
+  { key: 'tasks',      label: 'Tasks',      color: '#d95926', page: 'tasks',     fix: 'Open tasks' },
+  { key: 'sleep',      label: 'Sleep',      color: '#199e70', page: 'daily-log', fix: 'Log sleep' },
+  { key: 'plan',       label: 'Plan kept',  color: '#8b6fd6', page: 'calendar',  fix: 'Open Calendar' },
+  { key: 'log',        label: 'Daily Log',  color: '#c98500', page: 'daily-log', fix: 'Open Daily Log' },
+  { key: 'commitment', label: 'Commitment', color: '#d55181', page: 'daily-log', fix: 'Set a commitment' },
 ];
 
 const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -33,8 +35,7 @@ export const getMondayOf = (dateKey) => {
 const daysFrom = (startKey, count) =>
   Array.from({ length: count }, (_, i) => shiftDateKey(startKey, i));
 
-const scoreDay = (data, dateKey) =>
-  computeDailyScore(data.habits || [], data.xpLog || [], data.logs || {}, data.commitmentArchive || [], data.healthLog || {}, dateKey);
+const scoreDay = (data, dateKey) => computeDailyScore(data, dateKey);
 
 /**
  * This week, Mon-Sun, one entry per day. A day "clears" at STREAK_THRESHOLD, the same
@@ -43,7 +44,7 @@ const scoreDay = (data, dateKey) =>
  */
 export const getWeekVerdict = (data, todayKey = getLocalDateKey(0)) => {
   const monday = getMondayOf(todayKey);
-  const earliest = getEarliestActivityKey(data.habits || [], data.xpLog || [], data.logs || {}, data.commitmentArchive || [], data.healthLog || {});
+  const earliest = getEarliestActivityKey(data);
   const days = daysFrom(monday, 7).map((dateKey, i) => {
     const isFuture = dateKey > todayKey;
     const score = isFuture ? null : scoreDay(data, dateKey).score;
@@ -91,6 +92,18 @@ const evidenceFor = (key, { full, n, dayKeys, data, breakdowns }) => {
       const base = `Over 9h on ${full} of ${n} nights`;
       return unlogged > 0 ? `${base}, ${unlogged} not logged` : base;
     }
+    case 'plan': {
+      const kept = breakdowns.map((b) => b.plan?.kept).filter(Boolean);
+      const blocks = kept.reduce((sum, k) => sum + k.total, 0);
+      const done = kept.reduce((sum, k) => sum + k.done, 0);
+      const empty = kept.filter((k) => !k.total).length;
+      const reasons = {};
+      kept.forEach((k) => Object.entries(k.reasons).forEach(([r, c]) => { reasons[r] = (reasons[r] || 0) + c; }));
+      const top = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0];
+      const base = blocks ? `${done} of ${blocks} blocks done` : 'No time blocks planned';
+      return [base, empty && blocks ? `${empty} day${empty !== 1 ? 's' : ''} with none planned` : null, top ? `most skipped for: ${top[0]}` : null]
+        .filter(Boolean).join(', ');
+    }
     case 'log':
       return `Daily Log filled on ${full} of ${n} days`;
     case 'commitment': {
@@ -122,17 +135,19 @@ export const getScoreLeaks = (data, todayKey = getLocalDateKey(0)) => {
   const n = dayKeys.length;
   const empty = scored.every((s) => s.score === 0);
 
+  // A part only counts on days that had it (Plan kept is new), weighted as that day was.
   const components = SCORE_COMPONENTS.map((c) => {
-    const values = breakdowns.map((b) => b[c.key].value);
-    const lost = round1(values.reduce((sum, v) => sum + (10 - v) * c.weight, 0));
-    const full = values.filter((v) => v === 10).length;
+    const parts = breakdowns.map((b) => b[c.key]).filter(Boolean);
+    const lost = round1(parts.reduce((sum, p) => sum + ((10 - p.value) * p.weight) / 100, 0));
+    const full = parts.filter((p) => p.value === 10).length;
     return {
       ...c,
       lost,
       full,
-      evidence: evidenceFor(c.key, { full, n, dayKeys, data, breakdowns }),
+      days: parts.length,
+      evidence: evidenceFor(c.key, { full, n: parts.length, dayKeys, data, breakdowns }),
     };
-  });
+  }).filter((c) => c.days > 0);
 
   // Stable sort keeps formula order on ties, so equal losses favor the heavier weight.
   const leaks = components.filter((c) => c.lost > 0).sort((a, b) => b.lost - a.lost);
@@ -141,7 +156,7 @@ export const getScoreLeaks = (data, todayKey = getLocalDateKey(0)) => {
   // Strength: the component at full marks on the most days, at least half of them,
   // and never the same thing we just called the biggest leak.
   const strength = components
-    .filter((c) => c.key !== biggest?.key && c.full * 2 >= n && c.full > 0)
+    .filter((c) => c.key !== biggest?.key && c.full * 2 >= c.days && c.full > 0)
     .sort((a, b) => b.full - a.full)[0] || null;
 
   return { windowLabel, days: n, empty, components, leaks, biggest, strength };

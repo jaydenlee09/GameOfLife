@@ -7,6 +7,7 @@
 
 import RANK_TIERS from './rankMeta';
 import { countTaskCompletions } from './taskUtils';
+import { getPlanKept, PLAN_KEPT_START } from './calendarUtils';
 
 export const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -21,11 +22,36 @@ export const shiftDateKey = (dateKey, offsetDays) => {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 };
 
-// Score for a single day. `dateKey` defaults to today; pass a past key to score history.
-export const computeDailyScore = (
-  habits, xpLog, logs, commitmentArchive, healthLog, dateKey = getLocalDateKey(0)
-) => {
+// Weights in percent. Days from PLAN_KEPT_START on also score how well that day's
+// time blocks were kept; earlier days keep the formula they were scored with, so
+// history (and the streak and rank built on it) never shifts under you.
+const WEIGHTS = { habits: 30, tasks: 30, sleep: 20, log: 10, commitment: 10 };
+const WEIGHTS_WITH_PLAN = { habits: 25, tasks: 25, plan: 10, sleep: 20, log: 10, commitment: 10 };
+export const scoreWeights = (dateKey) => (dateKey >= PLAN_KEPT_START ? WEIGHTS_WITH_PLAN : WEIGHTS);
+
+const planLabel = (kept) => {
+  if (!kept.total) return 'No blocks planned';
+  const topReason = Object.entries(kept.reasons).sort((x, y) => y[1] - x[1])[0]?.[0];
+  return [
+    `${kept.done}/${kept.total} block${kept.total !== 1 ? 's' : ''} done`,
+    kept.partly ? `${kept.partly} partly` : null,
+    kept.skipped ? `${kept.skipped} skipped${topReason ? ` (${topReason})` : ''}` : null,
+  ].filter(Boolean).join(' · ');
+};
+
+// Score for a single day. `inputs` is any object carrying { habits, xpLog, logs,
+// commitmentArchive, healthLog, calendarEvents } (app state works as is; missing ones
+// count as empty). `dateKey` defaults to today; pass a past key to score history.
+export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
+  if (!inputs || Array.isArray(inputs)) throw new TypeError('computeDailyScore takes an inputs object');
+  const habits = inputs.habits || [];
+  const xpLog = inputs.xpLog || [];
+  const logs = inputs.logs || {};
+  const commitmentArchive = inputs.commitmentArchive || [];
+  const healthLog = inputs.healthLog || {};
+  const calendarEvents = inputs.calendarEvents || [];
   const prevKey = shiftDateKey(dateKey, -1);
+  const weights = scoreWeights(dateKey);
 
   // Habits: completed on this day / total
   const habitsTotal = habits.length;
@@ -35,6 +61,10 @@ export const computeDailyScore = (
   // Tasks: tasks completed on this day, once each however many stats they train (3 = full score)
   const tasksDone   = countTaskCompletions(xpLog, dateKey);
   const taskScore   = Math.min(tasksDone / 3, 1) * 10;
+
+  // Plan kept: share of the day's time blocks done (partly = half). No blocks = 0.
+  const kept        = weights.plan ? getPlanKept(calendarEvents, dateKey) : null;
+  const planScore   = kept?.total ? (kept.credit / kept.total) * 10 : 0;
 
   // Sleep: logged and over 9h = full score
   const sleepHours  = healthLog?.[dateKey]?.sleepHours;
@@ -50,23 +80,24 @@ export const computeDailyScore = (
   const lastCommit  = commitmentArchive.find(a => a.date === prevKey);
   const commitScore = lastCommit?.denied === false || (lastCommit?.confirmedOn && lastCommit.denied !== true) ? 10 : 0;
 
-  const raw = habitScore * 0.3 + taskScore * 0.3 + sleepScore * 0.2 + logScore * 0.1 + commitScore * 0.1;
-  return {
-    score: Math.round(raw * 10) / 10,
-    breakdown: {
-      habits:     { value: Math.round(habitScore * 10) / 10, weight: 30, label: `${habitsDone}/${habitsTotal} habits` },
-      tasks:      { value: Math.round(taskScore  * 10) / 10, weight: 30, label: `${tasksDone} task${tasksDone !== 1 ? 's' : ''} done` },
-      sleep:      { value: sleepScore, weight: 20, label: sleepLogged ? `${Math.round(sleepHours * 10) / 10}h sleep` : 'Sleep not logged' },
-      log:        { value: logScore,   weight: 10, label: logFilled ? 'Log filled' : 'Log empty' },
-      commitment: {
-        value: commitScore,
-        weight: 10,
-        label: !lastCommit ? 'No commitment'
-          : commitScore > 0 ? 'Commitment kept'
-            : lastCommit.denied === true ? 'Commitment missed' : 'Not marked yet',
-      },
+  const values = { habits: habitScore, tasks: taskScore, plan: planScore, sleep: sleepScore, log: logScore, commitment: commitScore };
+  const raw = Object.entries(weights).reduce((sum, [key, w]) => sum + values[key] * (w / 100), 0);
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const breakdown = {
+    habits:     { value: r1(habitScore), weight: weights.habits, label: `${habitsDone}/${habitsTotal} habits` },
+    tasks:      { value: r1(taskScore),  weight: weights.tasks,  label: `${tasksDone} task${tasksDone !== 1 ? 's' : ''} done` },
+    ...(kept ? { plan: { value: r1(planScore), weight: weights.plan, label: planLabel(kept), kept } } : {}),
+    sleep:      { value: sleepScore, weight: weights.sleep, label: sleepLogged ? `${Math.round(sleepHours * 10) / 10}h sleep` : 'Sleep not logged' },
+    log:        { value: logScore,   weight: weights.log,   label: logFilled ? 'Log filled' : 'Log empty' },
+    commitment: {
+      value: commitScore,
+      weight: weights.commitment,
+      label: !lastCommit ? 'No commitment'
+        : commitScore > 0 ? 'Commitment kept'
+          : lastCommit.denied === true ? 'Commitment missed' : 'Not marked yet',
     },
   };
+  return { score: r1(raw), breakdown };
 };
 
 // Shared traffic-light color for a 0-10 Daily Score, so every surface that shows
@@ -76,13 +107,11 @@ export const scoreColor = (score) =>
 
 // Day-by-day score history, oldest first — never averaged/blended, so a dip on any
 // single day stays visible (mirrors the streak's own day-by-day mechanic below).
-export const computeDailyScoreHistory = (
-  habits, xpLog, logs, commitmentArchive, healthLog, days = 30
-) => {
+export const computeDailyScoreHistory = (inputs, days = 30) => {
   const history = [];
   for (let i = days - 1; i >= 0; i--) {
     const dateKey = shiftDateKey(getLocalDateKey(0), -i);
-    const { score } = computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog, dateKey);
+    const { score } = computeDailyScore(inputs, dateKey);
     history.push({ dateKey, score });
   }
   return history;
@@ -100,7 +129,11 @@ const daysBetweenKeys = (laterKey, earlierKey) => {
 // Daily Score reads from. Used to cap how many consecutive days are REQUIRED to
 // hold a rank, so a brand-new or returning user isn't stranded at the bottom tier
 // just for lacking history yet (see computeRankStatus below).
-export const getEarliestActivityKey = (habits, xpLog, logs, commitmentArchive, healthLog) => {
+export const getEarliestActivityKey = (inputs) => {
+  const habits = inputs.habits || [];
+  const xpLog = inputs.xpLog || [];
+  const commitmentArchive = inputs.commitmentArchive || [];
+  const { logs, healthLog } = inputs;
   let earliest = null;
   const consider = (key) => { if (key && (!earliest || key < earliest)) earliest = key; };
   habits.forEach(h => Object.keys(h.history || {}).forEach(consider));
@@ -117,11 +150,8 @@ export const STREAK_THRESHOLD = 6;
 // Consecutive days (ending today) at or above the threshold. Today is counted only
 // once it clears the bar, but a below-bar *today* does NOT break the streak — the day
 // is still in progress. The streak only breaks on a completed past day that fell short.
-export const computeStreak = (
-  habits, xpLog, logs, commitmentArchive, healthLog, threshold = STREAK_THRESHOLD
-) => {
-  const scoreOn = (key) =>
-    computeDailyScore(habits, xpLog, logs, commitmentArchive, healthLog, key).score;
+export const computeStreak = (inputs, threshold = STREAK_THRESHOLD) => {
+  const scoreOn = (key) => computeDailyScore(inputs, key).score;
 
   const todayKey = getLocalDateKey(0);
   let streak = 0;
@@ -143,8 +173,8 @@ export const computeStreak = (
 
 export const REQUIRED_STREAK_DAYS = 5;
 
-export const computeRankStatus = (habits, xpLog, logs, commitmentArchive, healthLog) => {
-  const earliest = getEarliestActivityKey(habits, xpLog, logs, commitmentArchive, healthLog);
+export const computeRankStatus = (inputs) => {
+  const earliest = getEarliestActivityKey(inputs);
   if (!earliest) return { tier: RANK_TIERS[0], streakDays: 0, nextTier: RANK_TIERS[1], nextTierStreak: 0 };
 
   const daysTracked = daysBetweenKeys(getLocalDateKey(0), earliest) + 1;
@@ -157,7 +187,7 @@ export const computeRankStatus = (habits, xpLog, logs, commitmentArchive, health
   // real-history cap already used for requiredDays) as its honest streak length.
   let streakAbove = 0;
   for (let i = RANK_TIERS.length - 1; i >= 1; i--) {
-    const streak = computeStreak(habits, xpLog, logs, commitmentArchive, healthLog, RANK_TIERS[i].min);
+    const streak = computeStreak(inputs, RANK_TIERS[i].min);
     if (streak >= requiredDays) {
       const nextTier = RANK_TIERS[i + 1] || null;
       return { tier: RANK_TIERS[i], streakDays: streak, nextTier, nextTierStreak: nextTier ? streakAbove : 0 };

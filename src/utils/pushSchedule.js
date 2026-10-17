@@ -9,18 +9,18 @@
 // if the log was filled at 8:29pm).
 
 import { computeNudges } from './assistantTriggers';
-import { expandEventsForDates, isInstanceCompleted } from './calendarUtils';
+import { expandEventsForDates, isInstanceCompleted, getBlockStatus, blockRange } from './calendarUtils';
 import { shiftDateKey } from './scoreUtils';
 import { isTop, todayQueue } from './taskUtils';
 
-export const PUSH_TYPES = ['morning', 'evening', 'streak', 'blocks', 'commitment'];
+export const PUSH_TYPES = ['morning', 'evening', 'streak', 'blocks', 'checkins', 'commitment'];
 
 export const DEFAULT_PUSH_SETTINGS = {
   enabled: false,
   timezone: null,
   appUrl: null,
   tokens: [],                  // [{ token, platform, addedAt }]
-  types: { morning: true, evening: true, streak: true, blocks: true, commitment: true },
+  types: { morning: true, evening: true, streak: true, blocks: true, checkins: true, commitment: true },
   times: { morning: '07:30', commitment: '13:00', evening: '20:30', streak: '21:00' },
   blockLeadMinutes: 20,        // generous: GitHub Actions ticks often run late
   testRequestedAt: null,       // set by "Send a test"; the next tick sends one
@@ -31,6 +31,9 @@ const WINDOW_MINUTES = { morning: 180, commitment: 240, evening: 180, streak: 15
 // A late tick that lands just after a block started still says so, rather than
 // silently skipping it.
 const BLOCK_GRACE_MINUTES = 5;
+// "Did you do it?" goes out once a block has ended, while it's still fresh; a tick
+// later than this skips it (the Calendar and Home still ask).
+const CHECKIN_WINDOW_MINUTES = 60;
 
 const pad = (n) => String(n).padStart(2, '0');
 const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -149,6 +152,18 @@ export const decidePushes = (now, rawSettings, state, pushState = {}) => {
     });
     upcoming(state.calendarEvents, 'block');
     upcoming(state.noPhoneBlocks, 'nophone');
+  }
+
+  // Same "missed" rule as the Calendar: ended, not answered yet.
+  if (on('checkins')) {
+    expandEventsForDates(state.calendarEvents || [], [today]).forEach((ev) => {
+      const sinceEnd = nowMin - (ev.endHour * 60 + ev.endMin);
+      if (sinceEnd < 0 || sinceEnd >= CHECKIN_WINDOW_MINUTES) return;
+      if (getBlockStatus(ev, now.getTime()) !== 'missed') return;
+      const id = `checkin_${ev.id}_${today}_${fmt(ev.endHour, ev.endMin)}`;
+      if (!fresh(id)) return;
+      pushes.push({ id, type: 'checkins', title: `Did you do ${ev.title}?`, body: `${blockRange(ev)} just ended. Tap to check in: done, partly or skipped.`, page: 'calendar' });
+    });
   }
 
   return pushes;
