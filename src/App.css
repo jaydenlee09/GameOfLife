@@ -110,174 +110,126 @@
   100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) rotate(var(--rot)); }
 }
 
-/* ─── Bottom Navigation Bar (mobile only) ───────────────────────────────── */
-.bottom-nav {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: var(--bg-elevated-1);
-  border-top: 1px solid var(--separator);
-  z-index: 9000;
-  padding-bottom: env(safe-area-inset-bottom);
-  box-sizing: border-box;
+/* ─── Next-event pill ──────────────────────────────────────────────────── */
+/* Opens to show the title + countdown, then shrinks to just the icon. */
+@keyframes eventPillIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
-.bottom-nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  padding: 6px 2px;
-  font-family: inherit;
-  transition: color var(--duration) var(--ease);
-  border-radius: 0;
-}
-
-.bottom-nav-item.active {
-  color: var(--accent);
-}
-
-.bottom-nav-item:hover {
-  color: var(--text-primary);
-  background: transparent;
-  border-color: transparent;
-}
-
-.bottom-nav-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-}
-
-.bottom-nav-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.bottom-nav-label {
-  font-size: 0.6rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1;
-}
-
-/* ─── Event Popup ───────────────────────────────────────────────────────── */
-@keyframes eventPopupIn {
-  from { opacity: 0; transform: translateX(calc(100% + 1.5rem)); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.event-popup {
+.event-pill {
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
   z-index: 9998;
-  width: 230px;
-  background: var(--bg-elevated-1);
-  border: 1px solid var(--separator);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1rem 0.9rem;
-  box-shadow: var(--shadow-md);
-  animation: eventPopupIn 0.35s var(--ease) both;
-}
-
-.event-popup-actions {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.55rem;
   display: flex;
-  gap: 2px;
+  align-items: center;
+  max-width: calc(100vw - 20px);
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.86);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  animation: eventPillIn 0.3s var(--ease) both;
+  transform-origin: right center;
 }
 
-.event-popup-action-btn {
+.event-pill button,
+.event-pill button:hover {
   background: none;
   border: none;
-  color: var(--text-tertiary);
-  font-size: 0.7rem;
+  padding: 0;
+  font-family: inherit;
   cursor: pointer;
-  line-height: 1;
-  padding: 2px 4px;
-  transition: color 0.15s;
-  border-radius: 3px;
+  -webkit-tap-highlight-color: transparent;
 }
-.event-popup-action-btn:hover { color: var(--text-primary); }
 
-.event-popup-mini {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  z-index: 9998;
+.event-pill .event-pill-icon,
+.event-pill .event-pill-icon:hover {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  background: var(--bg-elevated-1);
-  border: 1px solid var(--separator);
-  border-radius: 20px;
-  padding: 0.35rem 0.75rem;
+  justify-content: center;
+  background: var(--accent-wash);
   color: var(--accent);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  animation: eventPopupIn 0.3s var(--ease) both;
-  transition: border-color var(--duration) var(--ease);
-}
-.event-popup-mini:hover {
-  border-color: var(--separator-strong);
 }
 
-.event-popup-label {
-  font-size: 0.58rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-  margin-bottom: 0.35rem;
+/* Small dot so the shrunken icon still reads as "something's coming up" */
+.event-pill:not(.open) .event-pill-icon::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg-elevated-1);
 }
 
-.event-popup-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-primary);
+.event-pill-body {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 280px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-width 0.3s var(--ease), opacity 0.2s var(--ease);
+}
+
+.event-pill:not(.open) .event-pill-body {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.event-pill .event-pill-info {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0 0.35rem 0 0.55rem;
   white-space: nowrap;
+}
+
+.event-pill-title {
+  min-width: 0;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0.3rem;
-  padding-right: 0.5rem;
-}
-
-.event-popup-meta {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin-bottom: 0.5rem;
-}
-
-.event-popup-dot { opacity: 0.4; }
-
-.event-popup-countdown {
   font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.event-pill-when {
+  flex-shrink: 0;
+  font-size: 0.72rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
-  background: var(--accent-wash);
-  border-radius: var(--radius-sm);
-  padding: 0.2rem 0.5rem;
-  display: inline-block;
+}
+
+.event-pill .event-pill-close {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: color var(--duration) var(--ease);
+}
+
+.event-pill .event-pill-close:hover {
+  color: var(--text-primary);
 }
 
 /* ─── Weekly Priority Popup ─────────────────────────────────────────────── */
@@ -369,44 +321,48 @@
 }
 
 /* ─── Mobile breakpoint ─────────────────────────────────────────────────── */
+/* Floating cards sit above the AI bar (~62px with its gap) and under the More sheet. */
 @media (max-width: 768px) {
   .content-container {
     padding-left: 0;
-    padding-bottom: 60px;
+    padding-bottom: var(--bottom-nav-h);
     height: auto;
     min-height: 100svh;
   }
 
-  .bottom-nav {
-    display: flex;
-  }
-
   .achievement-toast {
-    bottom: calc(60px + 0.75rem);
+    bottom: calc(var(--bottom-nav-h) + 0.75rem);
     max-width: calc(100vw - 2rem);
   }
 
   .commitment-toast {
-    bottom: calc(60px + 0.75rem);
+    bottom: calc(var(--bottom-nav-h) + 0.75rem);
     max-width: calc(100vw - 2rem);
   }
 
-  .event-popup {
-    bottom: calc(60px + 0.75rem);
-    right: 0.75rem;
-    width: calc(100vw - 1.5rem);
-    max-width: 320px;
+  .event-pill {
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    bottom: auto;
+    right: 10px;
+    z-index: 1060;
+  }
+
+  /* Daily Log has its Entries/Lessons tabs across the top; sit just under them. */
+  .event-pill--below-tabs {
+    top: calc(env(safe-area-inset-top, 0px) + 66px);
   }
 
   .priority-popup {
-    bottom: calc(60px + 0.75rem);
+    bottom: calc(var(--bottom-nav-h) + 0.75rem + 62px);
     left: 0.75rem;
     width: calc(100vw - 1.5rem);
     max-width: 320px;
+    z-index: 1060;
   }
 
   .priority-popup-mini {
-    bottom: calc(60px + 0.75rem);
+    bottom: calc(var(--bottom-nav-h) + 0.75rem + 62px);
     left: 0.75rem;
+    z-index: 1060;
   }
 }

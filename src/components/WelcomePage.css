@@ -909,12 +909,12 @@ button.wp-move:hover {
 
 /* ── Phone: one screen, no scrolling ──────────────────────────────────────── */
 @media (max-width: 768px) {
-  /* The page is exactly the space above the 60px bottom nav; the bottom padding
+  /* The page is exactly the space above the bottom nav; the bottom padding
      keeps the floating AI bar (~56px + gap) off the content. Spare height goes
      to the tasks/commitment row. Nothing is ever clipped: if a screen is too
      short even after the trims below, the page scrolls as a last resort. */
   .wp-bg {
-    height: calc(100dvh - 60px);
+    height: calc(100dvh - var(--bottom-nav-h));
   }
 
   .wp-layout {

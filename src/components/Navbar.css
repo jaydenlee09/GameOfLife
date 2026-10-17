@@ -400,16 +400,98 @@
   }
 }
 
-/* ─── Mobile drawer (hidden on desktop) ────────────────────────────────── */
-.mobile-drawer-backdrop {
-  display: none;
-}
-
+/* ─── Mobile tab bar + More sheet (hidden on desktop) ──────────────────── */
+.bottom-nav,
+.mobile-drawer-backdrop,
 .mobile-drawer {
   display: none;
 }
 
 @media (max-width: 768px) {
+  /* ── Tab bar ── */
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--bottom-nav-h);
+    padding: 0 0.35rem env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+    background: rgba(28, 28, 30, 0.86);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--separator);
+    z-index: 9000;
+  }
+
+  .bottom-nav-item,
+  .bottom-nav-item:hover {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--duration) var(--ease);
+  }
+
+  .bottom-nav-item.active {
+    color: var(--accent);
+  }
+
+  /* Phones keep :hover after a tap, so only real pointers get a hover color. */
+  @media (hover: hover) {
+    .bottom-nav-item:not(.active):hover {
+      color: var(--text-primary);
+    }
+  }
+
+  /* Active tab: a soft pill behind the icon */
+  .bottom-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 30px;
+    border-radius: 15px;
+    transition: background var(--duration) var(--ease), transform 0.12s var(--ease);
+  }
+
+  .bottom-nav-item.active .bottom-nav-icon {
+    background: var(--accent-wash);
+  }
+
+  .bottom-nav-item:active .bottom-nav-icon {
+    transform: scale(0.9);
+  }
+
+  .bottom-nav-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .bottom-nav-label {
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+
+  .bottom-nav-item.active .bottom-nav-label {
+    font-weight: 600;
+  }
+
+  /* ── More sheet ── */
   .mobile-drawer-backdrop {
     display: block;
     position: fixed;
@@ -430,12 +512,13 @@
     display: flex;
     flex-direction: column;
     position: fixed;
-    bottom: 60px;
+    bottom: var(--bottom-nav-h);
     left: 0;
     right: 0;
-    max-height: 82dvh;
+    max-height: calc(100dvh - var(--bottom-nav-h) - 1rem);
     background: var(--bg-elevated-1);
-    border-top: 1px solid var(--separator);
+    border: 1px solid var(--separator);
+    border-bottom: none;
     border-radius: 20px 20px 0 0;
     z-index: 1110;
     overflow: hidden;
@@ -447,44 +530,40 @@
     to   { transform: translateY(0); }
   }
 
-  .mobile-drawer-close {
-    position: absolute;
-    top: 0.85rem;
-    right: 1rem;
-    background: var(--bg-elevated-2);
-    border: none;
-    color: var(--text-secondary);
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
+  .mobile-drawer-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
-    font-family: inherit;
+    justify-content: space-between;
+    padding: 0.85rem 0.85rem 0.35rem 1.25rem;
   }
 
-  .mobile-drawer-close:hover {
-    background: var(--bg-elevated-3);
+  .mobile-drawer-title {
+    font-size: 1rem;
+    font-weight: 600;
     color: var(--text-primary);
   }
 
-  .mobile-drawer-brand {
+  .mobile-drawer-close,
+  .mobile-drawer-close:hover {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--bg-elevated-2);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 1rem 1.25rem 0.85rem;
-    border-bottom: 1px solid var(--separator);
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .mobile-drawer-nav {
-    flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    padding: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.5rem 1rem 1rem;
     overflow-y: auto;
     scrollbar-width: none;
   }
@@ -493,20 +572,49 @@
     display: none;
   }
 
-  .mobile-drawer-nav .sidebar-link {
-    border-radius: 12px;
-    padding: 0.85rem 1rem;
-    gap: 0.6rem;
-    justify-content: flex-start;
+  .mobile-drawer-tile,
+  .mobile-drawer-tile:hover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0.95rem 0.25rem 0.85rem;
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-secondary);
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s var(--ease), color var(--duration) var(--ease);
   }
 
-  .mobile-drawer-nav .sidebar-link.active {
+  .mobile-drawer-tile.active {
+    color: var(--accent);
     background: var(--accent-wash);
+    border-color: var(--glass-border-hover);
   }
 
-  /* Hide active bar inside grid drawer (doesn't fit 2-col layout) */
-  .mobile-drawer-nav .sidebar-link-active-bar {
-    display: none;
+  .mobile-drawer-tile:active {
+    transform: scale(0.96);
+  }
+
+  .mobile-drawer-tile-icon {
+    display: flex;
+  }
+
+  .mobile-drawer-tile-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .mobile-drawer-tile-label {
+    font-size: 0.74rem;
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
   }
 
   .mobile-drawer .sidebar-footer {

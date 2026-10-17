@@ -1,5 +1,28 @@
 # Todo
 
+## Done, uncommitted (2026-10-17): Mobile nav + smaller popups
+
+User choices: tabs Home/Tasks/Calendar/Log + More; event pill top-right that shrinks to an icon;
+priority card becomes a pill too.
+
+- [x] Bottom nav moves into Navbar.jsx (one place owns navigation). Tabs: Home, Tasks, Calendar,
+      Log, More. More highlights when the current page lives in the sheet.
+- [x] More sheet lists only the pages not in the bar (3-col tiles), real header + close, footer kept.
+- [x] Bar polish: bigger labels, active pill behind icon, hover only on hover devices (fixes the
+      sticky-white active tab on iPhone), press feedback, re-tap active tab scrolls to top.
+- [x] Page change scrolls to top (mobile scrolls the window, so pages opened mid-way down).
+- [x] Safe area: viewport-fit=cover + `--bottom-nav-h` token replacing every hard-coded 60px.
+- [x] Event pill: top-right, icon + title + countdown, shrinks to an icon after 4s, tap to expand,
+      X to dismiss. Hidden on Home and Calendar; sits below Daily Log's tabs.
+- [x] Priority: starts as a pill on phones, above the AI bar; popups stay under the More sheet.
+- [x] Verify (harness, 375x812, 320x568, 1440x900): Home tab active on Home; pill opens on first
+      view and shrinks after 5s (timer only runs while visible; first try shrank it on Home);
+      tap icon/info toggles; Daily Log pill at y66 under the tabs; priority pill 10px above the AI
+      bar; page change and tab re-tap land at top; More sheet lists 6 pages, More stays lit on
+      them, pills sit under its backdrop; no label/tile overflow at 320; desktop has no tab bar,
+      --bottom-nav-h 0, pill clear of the AI bar. Lint counts unchanged (27/56), build passes.
+      Not verifiable here: the real iPhone home-indicator inset (needs the installed app).
+
 ## Done, uncommitted (2026-10-17): Daily Log fills the screen on monitors
 
 At >= 1400px (same breakpoint as Statistics) the routine drops its 680px column and uses the full

@@ -1392,7 +1392,7 @@
 
   .tk-toast-wrap {
     left: 0;
-    bottom: calc(60px + 0.75rem + 62px + env(safe-area-inset-bottom));
+    bottom: calc(var(--bottom-nav-h) + 0.75rem + 62px);
   }
 }
 

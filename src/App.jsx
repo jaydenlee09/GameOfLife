@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import './App.css'
 import { useAuth } from './context/AuthContext'
 import { loadAllUserData, saveDataKey, flushPendingWrites, migrateLocalStorageToFirestore, subscribeToUserData } from './services/firestoreService'
 import PlayerDashboard from './components/PlayerDashboard'
 import WelcomePage from './components/WelcomePage'
-import Navbar, { StatIcon, TaskIcon, LogIcon, TargetIcon, CalIcon } from './components/Navbar'
+import Navbar from './components/Navbar'
 import { CalendarDays, X, ChevronDown, Target, PartyPopper } from 'lucide-react'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
@@ -73,6 +73,9 @@ function App() {
     setCurrentPage(page);
     setMobileMenuOpen(false);
   };
+
+  // On phones the window scrolls, so a new page would otherwise open part-way down.
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, [currentPage]);
 
   // ─── Core Data ────────────────────────────────────────────────────────────────
   const [todos, setTodos] = useState(() => {
@@ -244,7 +247,8 @@ function App() {
   });
 
   const [priorityPopupDismissed, setPriorityPopupDismissed] = useState(false);
-  const [priorityPopupMinimized, setPriorityPopupMinimized] = useState(false);
+  // Phones start with the small pill so the card doesn't cover the page.
+  const [priorityPopupMinimized, setPriorityPopupMinimized] = useState(() => window.matchMedia('(max-width: 768px)').matches);
 
   const currentWeekPriority = useMemo(() => {
     const lastWeekKey = getMondayKey(-1);
@@ -274,17 +278,26 @@ function App() {
     return candidates[0];
   }, [calendarDayEvents]);
 
+  // The pill opens to show the title + countdown, then shrinks back to an icon.
   const [eventPopupDismissed, setEventPopupDismissed] = useState(false);
-  const [eventPopupMinimized, setEventPopupMinimized] = useState(false);
+  const [eventPillOpen, setEventPillOpen] = useState(true);
   const prevNearestRef = useRef(null);
   useEffect(() => {
     const id = nearestEvent?._ts ?? null;
     if (id !== prevNearestRef.current) {
       setEventPopupDismissed(false);
-      setEventPopupMinimized(false);
+      setEventPillOpen(true);
       prevNearestRef.current = id;
     }
   }, [nearestEvent]);
+  // Home shows its own Now panel and Calendar shows the event itself, so the pill skips them.
+  const showEventPill = !!nearestEvent && !eventPopupDismissed && currentPage !== 'welcome' && currentPage !== 'calendar';
+  // Only count down while it's on screen, so it isn't already shrunk when you first see it.
+  useEffect(() => {
+    if (!eventPillOpen || !showEventPill) return;
+    const t = setTimeout(() => setEventPillOpen(false), 5000);
+    return () => clearTimeout(t);
+  }, [eventPillOpen, showEventPill]);
 
   const [eventCountdown, setEventCountdown] = useState('');
   useEffect(() => {
@@ -1188,6 +1201,7 @@ function App() {
         dailyScore={dailyScore.score}
         onOpenDataModal={() => setDataModalOpen(true)}
         isMobileMenuOpen={mobileMenuOpen}
+        onMobileMenuToggle={() => setMobileMenuOpen(o => !o)}
         onMobileMenuClose={() => setMobileMenuOpen(false)}
         firebaseUser={firebaseUser}
         onSignOut={signOut}
@@ -1271,27 +1285,36 @@ function App() {
       )}
 
       {/* Home shows its own Now panel and weekly priority, so these popups skip it. */}
-      {nearestEvent && !eventPopupDismissed && currentPage !== 'welcome' && (
-        eventPopupMinimized ? (
-          <button className="event-popup-mini" onClick={() => setEventPopupMinimized(false)}>
-            <CalendarDays size={14} /> <span>Next event</span>
+      {showEventPill && (
+        <div className={`event-pill${eventPillOpen ? ' open' : ''}${currentPage === 'daily-log' ? ' event-pill--below-tabs' : ''}`}>
+          <button
+            className="event-pill-icon"
+            onClick={() => setEventPillOpen(o => !o)}
+            aria-expanded={eventPillOpen}
+            aria-label={`Next event: ${nearestEvent.title}`}
+          >
+            <CalendarDays size={15} />
           </button>
-        ) : (
-          <div className="event-popup">
-            <div className="event-popup-actions">
-              <button className="event-popup-action-btn" onClick={() => setEventPopupMinimized(true)} title="Minimize"><ChevronDown size={14} /></button>
-              <button className="event-popup-action-btn" onClick={() => setEventPopupDismissed(true)} title="Dismiss"><X size={14} /></button>
-            </div>
-            <div className="event-popup-label">Next event</div>
-            <div className="event-popup-title">{nearestEvent.title}</div>
-            <div className="event-popup-meta">
-              <span>{formatEventPopupDate(nearestEvent)}</span>
-              <span className="event-popup-dot">·</span>
-              <span>{formatEventPopupTime(nearestEvent)}</span>
-            </div>
-            <div className="event-popup-countdown">{eventCountdown}</div>
+          <div className="event-pill-body" aria-hidden={!eventPillOpen}>
+            <button
+              className="event-pill-info"
+              onClick={() => setEventPillOpen(false)}
+              tabIndex={eventPillOpen ? 0 : -1}
+              title={`${nearestEvent.title} · ${formatEventPopupDate(nearestEvent)} ${formatEventPopupTime(nearestEvent)}`}
+            >
+              <span className="event-pill-title">{nearestEvent.title}</span>
+              <span className="event-pill-when">{eventCountdown}</span>
+            </button>
+            <button
+              className="event-pill-close"
+              onClick={() => setEventPopupDismissed(true)}
+              tabIndex={eventPillOpen ? 0 : -1}
+              aria-label="Dismiss next event"
+            >
+              <X size={13} />
+            </button>
           </div>
-        )
+        </div>
       )}
 
       {currentWeekPriority && !priorityPopupDismissed && currentPage !== 'welcome' && (
@@ -1324,39 +1347,6 @@ function App() {
           onNudgeDismiss={handleNudgeDismiss}
         />
       )}
-
-      {/* Mobile bottom navigation bar */}
-      <nav className="bottom-nav">
-        {[
-          { id: 'statistics', label: 'Stats',   icon: <StatIcon /> },
-          { id: 'tasks',      label: 'Tasks',   icon: <TaskIcon /> },
-          { id: 'calendar',   label: 'Calendar', icon: <CalIcon /> },
-          { id: 'daily-log',  label: 'Log',     icon: <LogIcon /> },
-          { id: 'goals',      label: 'Goals',   icon: <TargetIcon /> },
-        ].map(({ id, label, icon }) => (
-          <button
-            key={id}
-            className={`bottom-nav-item${currentPage === id ? ' active' : ''}`}
-            onClick={() => handleNavigate(id)}
-          >
-            <span className="bottom-nav-icon">{icon}</span>
-            <span className="bottom-nav-label">{label}</span>
-          </button>
-        ))}
-        <button
-          className={`bottom-nav-item${mobileMenuOpen ? ' active' : ''}`}
-          onClick={() => setMobileMenuOpen(o => !o)}
-        >
-          <span className="bottom-nav-icon">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="3" cy="8" r="1.5" fill="currentColor"/>
-              <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
-              <circle cx="13" cy="8" r="1.5" fill="currentColor"/>
-            </svg>
-          </span>
-          <span className="bottom-nav-label">More</span>
-        </button>
-      </nav>
     </div>
   );
 }

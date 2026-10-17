@@ -19,6 +19,25 @@ const NAV_LINKS = [
   { id: 'brain-dump', label: 'Brain Dump',  icon: <BrainDumpIcon /> },
 ];
 
+// Phone tab bar: the daily-use pages. Everything else lives in the More sheet.
+const TAB_LINKS = [
+  { id: 'welcome',   label: 'Home',     icon: <HomeIcon /> },
+  { id: 'tasks',     label: 'Tasks',    icon: <TaskIcon /> },
+  { id: 'calendar',  label: 'Calendar', icon: <CalIcon /> },
+  { id: 'daily-log', label: 'Log',      icon: <LogIcon /> },
+];
+const MORE_LINKS = NAV_LINKS.filter(link => !TAB_LINKS.some(tab => tab.id === link.id));
+
+function MoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="3" cy="8" r="1.5" fill="currentColor"/>
+      <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+      <circle cx="13" cy="8" r="1.5" fill="currentColor"/>
+    </svg>
+  );
+}
+
 export function HomeIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -174,9 +193,16 @@ function ScoreChip({ score, onNavigate }) {
   );
 }
 
-const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, dailyScore, onOpenDataModal, isMobileMenuOpen, onMobileMenuClose, firebaseUser, onSignOut }) => {
+const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, dailyScore, onOpenDataModal, isMobileMenuOpen, onMobileMenuToggle, onMobileMenuClose, firebaseUser, onSignOut }) => {
   const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
   const RankIcon = rankStatus ? TIER_ICONS[rankStatus.tier.icon] : null;
+  const moreActive = isMobileMenuOpen || MORE_LINKS.some(link => link.id === activePage);
+
+  // Tapping the tab you're already on goes back to the top, like native tab bars.
+  const handleTab = (id) => {
+    if (id === activePage && !isMobileMenuOpen) window.scrollTo({ top: 0, behavior: 'smooth' });
+    else onNavigate(id);
+  };
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true');
 
@@ -287,25 +313,26 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
         <SidebarFooter />
       </aside>
 
-      {/* Mobile drawer — only rendered when open to avoid event interception */}
+      {/* Mobile More sheet — only rendered when open to avoid event interception */}
       {isMobileMenuOpen && (
         <>
           <div className="mobile-drawer-backdrop" onClick={onMobileMenuClose} />
 
-          <div className="mobile-drawer">
-            <button className="mobile-drawer-close" onClick={onMobileMenuClose}><X size={14} /></button>
-
-            <div className="mobile-drawer-brand" />
+          <div className="mobile-drawer" role="dialog" aria-label="More pages">
+            <div className="mobile-drawer-header">
+              <span className="mobile-drawer-title">More</span>
+              <button className="mobile-drawer-close" onClick={onMobileMenuClose} aria-label="Close"><X size={16} /></button>
+            </div>
 
             <nav className="mobile-drawer-nav">
-              {NAV_LINKS.map(({ id, label, icon }) => (
+              {MORE_LINKS.map(({ id, label, icon }) => (
                 <button
                   key={id}
-                  className={`sidebar-link ${activePage === id ? 'active' : ''}`}
+                  className={`mobile-drawer-tile ${activePage === id ? 'active' : ''}`}
                   onClick={() => onNavigate(id)}
                 >
-                  <span className="sidebar-link-icon">{icon}</span>
-                  <span className="sidebar-link-label">{label}</span>
+                  <span className="mobile-drawer-tile-icon">{icon}</span>
+                  <span className="mobile-drawer-tile-label">{label}</span>
                 </button>
               ))}
             </nav>
@@ -314,6 +341,32 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
           </div>
         </>
       )}
+
+      {/* Mobile tab bar */}
+      <nav className="bottom-nav" aria-label="Main">
+        {TAB_LINKS.map(({ id, label, icon }) => {
+          const active = activePage === id && !isMobileMenuOpen;
+          return (
+            <button
+              key={id}
+              className={`bottom-nav-item${active ? ' active' : ''}`}
+              aria-current={active ? 'page' : undefined}
+              onClick={() => handleTab(id)}
+            >
+              <span className="bottom-nav-icon">{icon}</span>
+              <span className="bottom-nav-label">{label}</span>
+            </button>
+          );
+        })}
+        <button
+          className={`bottom-nav-item${moreActive ? ' active' : ''}`}
+          aria-expanded={isMobileMenuOpen}
+          onClick={onMobileMenuToggle}
+        >
+          <span className="bottom-nav-icon"><MoreIcon /></span>
+          <span className="bottom-nav-label">More</span>
+        </button>
+      </nav>
     </>
   );
 };

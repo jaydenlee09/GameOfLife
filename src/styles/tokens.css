@@ -69,3 +69,15 @@
   --glass-shadow-hover: 0 14px 36px rgba(0, 0, 0, 0.45), 0 0 28px rgba(56, 189, 248, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
 }
+
+/* Phone tab bar height, including the iPhone home-indicator inset (index.html sets
+   viewport-fit=cover so env() reports it). 0 on desktop, where there is no tab bar. */
+:root {
+  --bottom-nav-h: 0px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --bottom-nav-h: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
+}

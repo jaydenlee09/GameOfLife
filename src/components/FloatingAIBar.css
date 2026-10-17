@@ -203,7 +203,7 @@
 @media (max-width: 768px) {
   .ai-bar-wrap {
     left: 0;
-    bottom: calc(60px + 0.75rem);
+    bottom: calc(var(--bottom-nav-h) + 0.75rem);
     padding: 0 0.75rem;
   }
 

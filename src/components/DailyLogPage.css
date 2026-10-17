@@ -818,7 +818,7 @@
   .daily-log-container {
     flex-direction: column;
     height: auto;
-    min-height: calc(100dvh - 60px);
+    min-height: calc(100dvh - var(--bottom-nav-h));
     overflow: visible;
   }
 

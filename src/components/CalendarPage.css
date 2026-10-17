@@ -871,7 +871,7 @@
   .cal-page {
     height: auto;
     overflow: visible;
-    min-height: calc(100dvh - 60px);
+    min-height: calc(100dvh - var(--bottom-nav-h));
   }
 
   .cal-body {
