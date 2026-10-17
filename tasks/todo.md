@@ -1,5 +1,20 @@
 # Todo
 
+## Done, uncommitted (2026-10-17): Daily Log fills the screen on monitors
+
+At >= 1400px (same breakpoint as Statistics) the routine drops its 680px column and uses the full
+width: two columns per step, placed by `cd-a-*` area classes on each card (Block's new `area` prop)
+and a per-step `cd-body--<step>` grid. Check in = mood/rating/habits | body; Reflect = writing |
+question + lesson, pattern cards side by side; Tomorrow = ideas | promise; Finish = checklist,
+numbers, button | points; Day closed = numbers, points, tomorrow | review. A trailing `1fr` row
+absorbs a tall spanning card so the cards beside it stay packed. Past entries: two-column grid,
+mood/meta/review span both. Below 1400px nothing changes.
+
+- [x] Verify: 2560x1440, 1920x1080 (every step fits on screen), 1440x900 (no overflow/clipping),
+      1366 and 375 unchanged, past entry at 1920. Found + fixed at 1440: the Workouts card (191px)
+      overflowed; a container query wraps the type picker onto its own row when the card is
+      under 240px (needed higher specificity than the base `.hq-workout-add .health-select` rule).
+
 ## Done, uncommitted (2026-10-16): "Where your points went" on the Daily Log
 
 Goal: after the Daily Score, show where points were missed and how to win them back tonight.

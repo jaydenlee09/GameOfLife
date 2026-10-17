@@ -550,7 +550,7 @@ const DailyLogPage = ({
 
               {/* ── Day rating + loop check (Close the Day fields) ── */}
               {(currentEntry.dayRating > 0 || currentEntry.loopCheck?.result) && (
-                <div className="log-section log-past-meta">
+                <div className="log-section log-past-meta log-section--wide">
                   {currentEntry.dayRating > 0 && (
                     <span className="log-past-chip">
                       Rated <strong style={{ color: scoreColor(currentEntry.dayRating) }}>{currentEntry.dayRating}/10</strong>
@@ -565,7 +565,7 @@ const DailyLogPage = ({
               )}
 
               {/* ── Emotions ── */}
-              <div className="log-section">
+              <div className="log-section log-section--wide">
                 <h3 className="log-section-title"><MessageCircle size={18} /> How did you feel?</h3>
                 <div className="emotions-grid">
                   {EMOTIONS.map(emotion => {

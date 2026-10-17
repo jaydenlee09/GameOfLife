@@ -843,6 +843,15 @@
 .hq-st-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; }
 
 .hq-workout-add { display: flex; gap: 0.35rem; min-width: 0; }
+
+/* The Workouts card can get narrow (two-column monitor layout, small laptops):
+   when it does, the type picker takes its own row instead of overflowing. */
+.hq-card { container-type: inline-size; }
+@container (max-width: 240px) {
+  .hq-card .hq-workout-add { flex-wrap: wrap; }
+  .hq-card .hq-workout-add .health-select { flex: 1 1 100%; }
+  .hq-card .hq-workout-min { flex: 1; width: auto; min-width: 0; }
+}
 .hq-workout-add .health-select { flex: 1 1 auto; min-width: 0; }
 .hq-workout-min { width: 4.2rem; flex-shrink: 0; font-size: 1rem; }
 
@@ -1161,3 +1170,147 @@
 }
 
 .sb-fix:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+
+/* ─── Monitors (>= 1400px, same breakpoint as Statistics) ───────────
+   The routine stops being a 680px column and fills the screen: two
+   columns per step, laid out by the cd-a-* areas each card carries.
+   A trailing `1fr` row soaks up the extra height of a tall card that
+   spans several rows, so the short cards beside it stay packed. */
+@media (min-width: 1400px) {
+  .cd { max-width: none; }
+  .cd-steps { max-width: 760px; }
+
+  .cd-body,
+  .cd-closed {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.25rem;
+    row-gap: 0.9rem;
+    align-items: start;
+  }
+
+  .cd-body > .cd-title { grid-area: title; }
+  .cd-body > .cd-nav { grid-area: nav; }
+
+  .cd-a-commit { grid-area: commit; }
+  .cd-a-carry { grid-area: carry; }
+  .cd-a-focus { grid-area: focus; }
+  .cd-a-rate { grid-area: rate; }
+  .cd-a-feel { grid-area: feel; }
+  .cd-a-habits { grid-area: habits; }
+  .cd-a-body { grid-area: body; }
+  .cd-a-patterns { grid-area: patterns; }
+  .cd-a-wins { grid-area: wins; }
+  .cd-a-improve { grid-area: improve; }
+  .cd-a-prompt { grid-area: prompt; }
+  .cd-a-learned { grid-area: learned; }
+  .cd-a-notes { grid-area: notes; }
+  .cd-a-ideas { grid-area: ideas; }
+  .cd-a-promise { grid-area: promise; }
+  .cd-a-checklist { grid-area: checklist; }
+  .cd-a-stats { grid-area: stats; }
+  .cd-a-points { grid-area: points; }
+  .cd-a-awards { grid-area: awards; }
+  .cd-a-close { grid-area: close; }
+  .cd-a-hint { grid-area: hint; }
+  .cd-a-hero { grid-area: hero; }
+  .cd-a-tomorrow { grid-area: tomorrow; }
+  .cd-a-review,
+  .cd-closed > .log-review-section { grid-area: review; }
+  .cd-a-edit { grid-area: edit; }
+
+  /* Look back */
+  .cd-body--lookBack {
+    grid-template-areas:
+      "title title"
+      "commit carry"
+      "focus focus"
+      "nav nav";
+  }
+  .cd-body--lookBack .cd-a-commit,
+  .cd-body--lookBack .cd-a-carry { align-self: stretch; }
+  .cd-body--lookBack:not(:has(.cd-a-carry)) .cd-a-commit,
+  .cd-body--lookBack:not(:has(.cd-a-commit)) .cd-a-carry { grid-column: 1 / -1; }
+
+  /* Check in: mood + rating + habits on the left, the body check-in on the right */
+  .cd-body--checkIn {
+    grid-template-rows: auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "title title"
+      "rate body"
+      "feel body"
+      "habits body"
+      ". body"
+      "nav nav";
+  }
+
+  /* Reflect: writing on the left, the question + lesson on the right */
+  .cd-body--reflect {
+    grid-template-rows: auto auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "title title"
+      "patterns patterns"
+      "wins prompt"
+      "improve learned"
+      "notes learned"
+      ". learned"
+      "nav nav";
+  }
+  .cd-body--reflect:not(:has(.cd-a-patterns)) {
+    grid-template-rows: auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "title title"
+      "wins prompt"
+      "improve learned"
+      "notes learned"
+      ". learned"
+      "nav nav";
+  }
+  .cd-body--reflect .cd-a-wins,
+  .cd-body--reflect .cd-a-prompt { align-self: stretch; }
+  .cd-a-patterns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* Tomorrow */
+  .cd-body--tomorrow {
+    grid-template-areas:
+      "title title"
+      "ideas promise"
+      "nav nav";
+  }
+  .cd-body--tomorrow:not(:has(.cd-a-ideas)) {
+    grid-template-areas:
+      "title title"
+      "promise promise"
+      "nav nav";
+  }
+
+  /* Finish: checklist + numbers + the button on the left, the points on the right */
+  .cd-body--finish {
+    grid-template-rows: auto auto auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "title title"
+      "checklist points"
+      "stats points"
+      "awards points"
+      "close points"
+      "hint points"
+      ". points"
+      "nav nav";
+  }
+
+  /* Day closed: numbers + points + tomorrow on the left, the review on the right */
+  .cd-body--closed { display: block; }
+  .cd-closed {
+    grid-template-rows: auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "hero hero"
+      "stats review"
+      "points review"
+      "tomorrow review"
+      ". review"
+      "edit edit";
+  }
+  .cd-a-edit { justify-self: center; }
+  .cd-closed-hero { padding: 0.25rem 0 0.35rem; }
+  .cd-closed-moon { width: 56px; height: 56px; }
+}

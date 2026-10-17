@@ -45,8 +45,9 @@ const formatTime = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'num
 
 // ─── Small pieces ─────────────────────────────────────────────────────────────
 
-const Block = ({ Icon, title, hint, children, className = '' }) => (
-  <section className={`cd-block ${className}`}>
+// `area` names the block's slot in the monitor layout (CloseDay.css, >= 1400px).
+const Block = ({ Icon, title, hint, children, className = '', area }) => (
+  <section className={`cd-block ${area ? `cd-a-${area} ` : ''}${className}`}>
     {title && (
       <header className="cd-block-head">
         <h3 className="cd-block-title">{Icon && <Icon size={16} />} {title}</h3>
@@ -156,7 +157,7 @@ const LookBackStep = ({ lookBack, entry, todayKey, updateField, onResolveCommitm
   return (
     <>
       {commitment.status !== 'none' && (
-        <Block Icon={Target} title="Yesterday you committed to">
+        <Block Icon={Target} title="Yesterday you committed to" area="commit">
           <p className="cd-quote">{commitment.text}</p>
           {commitment.status === 'pending' ? (
             <div className="cd-actions">
@@ -176,7 +177,7 @@ const LookBackStep = ({ lookBack, entry, todayKey, updateField, onResolveCommitm
       )}
 
       {carry && (
-        <Block Icon={TrendingUp} title={`You wanted to improve ${daysAgoLabel(carry.from, todayKey)}`}>
+        <Block Icon={TrendingUp} title={`You wanted to improve ${daysAgoLabel(carry.from, todayKey)}`} area="carry">
           <p className="cd-quote">{carry.text}</p>
           <p className="cd-question">Did you work on it today?</p>
           <Segmented
@@ -193,7 +194,7 @@ const LookBackStep = ({ lookBack, entry, todayKey, updateField, onResolveCommitm
       )}
 
       {focus && (
-        <Block Icon={Sparkles} title="Last night’s review said to focus on" className="cd-block--quiet">
+        <Block Icon={Sparkles} title="Last night’s review said to focus on" className="cd-block--quiet" area="focus">
           <p className="cd-quote cd-quote--small">{focus}</p>
         </Block>
       )}
@@ -207,7 +208,7 @@ const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onTo
   const habitsDone = habits.filter(h => h.history?.[todayKey]).length;
   return (
     <>
-      <Block Icon={Sparkles} title="Rate today" hint="How it felt, not how it scored">
+      <Block Icon={Sparkles} title="Rate today" hint="How it felt, not how it scored" area="rate">
         <div className="cd-rating" role="radiogroup" aria-label="Rate today from 1 to 10">
           {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
             const active = entry.dayRating === n;
@@ -228,7 +229,7 @@ const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onTo
         </div>
       </Block>
 
-      <Block Icon={MessageCircle} title="How did you feel?" hint="Pick any">
+      <Block Icon={MessageCircle} title="How did you feel?" hint="Pick any" area="feel">
         <div className="cd-emotions">
           {EMOTIONS.map(em => {
             const selected = emotions.includes(em.id);
@@ -248,11 +249,11 @@ const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onTo
         </div>
       </Block>
 
-      <Block Icon={Repeat} title="Habits" hint={habits.length ? `${habitsDone}/${habits.length} done` : null}>
+      <Block Icon={Repeat} title="Habits" hint={habits.length ? `${habitsDone}/${habits.length} done` : null} area="habits">
         <HabitChecklist habits={habits} todayKey={todayKey} onToggleHabitDay={onToggleHabitDay} {...habitHandlers} />
       </Block>
 
-      <Block Icon={HeartPulse} title="Body">
+      <Block Icon={HeartPulse} title="Body" area="body">
         <HealthQuick todayKey={todayKey} {...health} />
       </Block>
     </>
@@ -281,7 +282,7 @@ const PatternCards = ({ flags, habitLeak, commitmentLocked, onMakeHabit, onUseFo
   ].filter(c => !hidden.includes(c.key));
   if (!cards.length) return null;
   return (
-    <div className="cd-patterns">
+    <div className="cd-patterns cd-a-patterns">
       {cards.map(c => (
         <div key={c.key} className="cd-pattern">
           <button type="button" className="cd-pattern-close" onClick={() => setHidden(h => [...h, c.key])} aria-label="Hide for tonight"><X size={14} /></button>
@@ -320,7 +321,7 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
     <>
       <PatternCards {...patterns} />
 
-      <Block Icon={Trophy} title="Wins" hint="At least one, however small">
+      <Block Icon={Trophy} title="Wins" hint="At least one, however small" area="wins">
         <ListInputs
           values={entry.proud}
           onChangeAt={(i, v) => updateArrayField('proud', i, v)}
@@ -330,7 +331,7 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
         />
       </Block>
 
-      <Block Icon={TrendingUp} title="One thing to improve" hint="Tomorrow night will ask about it">
+      <Block Icon={TrendingUp} title="One thing to improve" hint="Tomorrow night will ask about it" area="improve">
         <ListInputs
           values={entry.improve}
           onChangeAt={(i, v) => updateArrayField('improve', i, v)}
@@ -339,7 +340,7 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
         />
       </Block>
 
-      <Block>
+      <Block area="prompt">
         <div className="cd-prompt-head">
           <span className="cd-prompt-kicker"><Moon size={13} /> Tonight’s question</span>
           {!answer.trim() && (
@@ -356,7 +357,7 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
         />
       </Block>
 
-      <Block Icon={Lightbulb} title="One thing I learned">
+      <Block Icon={Lightbulb} title="One thing I learned" area="learned">
         <textarea
           className="cd-textarea"
           rows={2}
@@ -376,7 +377,7 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
       </Block>
 
       {notesOpen ? (
-        <Block Icon={PenLine} title="Notes">
+        <Block Icon={PenLine} title="Notes" area="notes">
           <textarea
             className="cd-textarea"
             rows={3}
@@ -386,7 +387,7 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
           />
         </Block>
       ) : (
-        <button type="button" className="cd-add-row cd-add-row--block" onClick={() => setNotesOpen(true)}>
+        <button type="button" className="cd-add-row cd-add-row--block cd-a-notes" onClick={() => setNotesOpen(true)}>
           <PenLine size={14} /> Add a note
         </button>
       )}
@@ -423,7 +424,7 @@ const TomorrowStep = ({ entry, updateField, todayKey, commitmentLocked, suggesti
   return (
     <>
       {editable && suggestions.length > 0 && (
-        <Block Icon={Lightbulb} title="Ideas from tonight" className="cd-block--quiet">
+        <Block Icon={Lightbulb} title="Ideas from tonight" className="cd-block--quiet" area="ideas">
           <div className="cd-chips">
             {suggestions.map(s => (
               <button key={s.text} type="button" className="cd-chip" onClick={() => pickSuggestion(s.text)}>
@@ -435,7 +436,7 @@ const TomorrowStep = ({ entry, updateField, todayKey, commitmentLocked, suggesti
         </Block>
       )}
 
-      <Block Icon={Target} title="Tomorrow I will…">
+      <Block Icon={Target} title="Tomorrow I will…" area="promise">
         {editable ? (
           <>
             {ifThen ? (
@@ -487,6 +488,7 @@ const ScoreBreakdown = ({ explained, score, streak, onFix }) => {
   return (
     <Block
       Icon={PieChart}
+      area="points"
       title="Where your points went"
       hint={explained.missing > 0 ? `${explained.missing.toFixed(1)} points missed` : 'Perfect day'}
     >
@@ -526,7 +528,7 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
   const xpTotal = pendingAwards.reduce((sum, a) => sum + a.amount, 0);
   return (
     <>
-      <Block className="cd-block--quiet">
+      <Block className="cd-block--quiet" area="checklist">
         <ul className="cd-checklist">
           {steps.filter(k => k !== 'finish').map(k => (
             <li key={k} className={status[k] ? 'done' : ''}>
@@ -538,7 +540,7 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
         </ul>
       </Block>
 
-      <div className="cd-finish-stats">
+      <div className="cd-finish-stats cd-a-stats">
         <div className="cd-stat">
           <span className="cd-stat-value" style={{ color: scoreColor(score) }}>{score}</span>
           <span className="cd-stat-label">Daily Score so far</span>
@@ -556,17 +558,17 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
       {breakdown}
 
       {pendingAwards.length > 0 && (
-        <p className="cd-awards">
+        <p className="cd-awards cd-a-awards">
           {pendingAwards.map((a, i) => (
             <span key={i} style={{ color: STAT_META[a.stat]?.color }}>+{a.amount} {STAT_META[a.stat]?.label || a.stat} · {a.label}</span>
           ))}
         </p>
       )}
 
-      <button type="button" className="cd-close-btn" onClick={onClose} disabled={!canClose}>
+      <button type="button" className="cd-close-btn cd-a-close" onClick={onClose} disabled={!canClose}>
         <Moon size={18} /> Close the day
       </button>
-      <p className="cd-close-hint">
+      <p className="cd-close-hint cd-a-hint">
         {canClose ? 'Saves everything, pays your health XP and asks your assistant for tonight’s review.' : 'Write something first, even one win.'}
       </p>
     </>
@@ -575,13 +577,13 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
 
 const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, reviewError, onSubmitLog, onOpenAssistant, onEdit, breakdown }) => (
   <div className="cd-closed">
-    <div className="cd-closed-hero">
+    <div className="cd-closed-hero cd-a-hero">
       <span className="cd-closed-moon"><Moon size={28} /></span>
       <h2 className="cd-title">Day closed.</h2>
       <p className="cd-closed-sub">Closed at {formatTime(entry.closedAt)}. Put the phone down. Tomorrow starts tonight.</p>
     </div>
 
-    <div className="cd-finish-stats">
+    <div className="cd-finish-stats cd-a-stats">
       <div className="cd-stat">
         <span className="cd-stat-value" style={{ color: scoreColor(score) }}>{score}</span>
         <span className="cd-stat-label">Daily Score</span>
@@ -599,13 +601,13 @@ const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, revi
     {breakdown}
 
     {entry.commitment?.trim() && (
-      <Block Icon={Target} title="Tomorrow">
+      <Block Icon={Target} title="Tomorrow" area="tomorrow">
         <p className="cd-quote">{entry.commitment}</p>
       </Block>
     )}
 
     {reviewingDate === todayKey && !review ? (
-      <div className="cd-reviewing"><LoaderCircle size={16} className="log-review-spin" /> Your assistant is reading your day…</div>
+      <div className="cd-reviewing cd-a-review"><LoaderCircle size={16} className="log-review-spin" /> Your assistant is reading your day…</div>
     ) : (
       <LogReviewSection
         key={`${todayKey}:${reviewError || ''}`}
@@ -620,7 +622,7 @@ const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, revi
       />
     )}
 
-    <button type="button" className="cd-btn cd-btn--ghost cd-edit-btn" onClick={onEdit}>
+    <button type="button" className="cd-btn cd-btn--ghost cd-edit-btn cd-a-edit" onClick={onEdit}>
       <Pencil size={14} /> Edit tonight’s entry
     </button>
   </div>
@@ -754,7 +756,7 @@ const CloseDayFlow = ({
       </header>
 
       <AnimatePresence mode="wait" initial={false} onExitComplete={scrollToTop}>
-        <MotionDiv key={current} className="cd-body" {...motionProps}>
+        <MotionDiv key={current} className={`cd-body cd-body--${current}`} {...motionProps}>
           {current === 'closed' ? (
             <DayClosed
               entry={entry}
