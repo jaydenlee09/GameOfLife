@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './FocusMode.css';
 import { X, ChevronDown, Play, Pause, RotateCcw, Timer, CalendarClock } from 'lucide-react';
-import STAT_META from './statMeta';
 import { xpForFocusMinutes } from '../utils/xpUtils';
 import { useCountdownTimer } from '../hooks/useCountdownTimer';
 import { makeFocusSession } from '../utils/focusInsights';
@@ -13,7 +12,6 @@ const getLocalDateKey = () => {
 };
 
 const PRESETS = [5 * 60, 10 * 60, 25 * 60, 45 * 60, 60 * 60, 90 * 60];
-const STAT_ATTRS = Object.keys(STAT_META);
 
 /**
  * Fullscreen focus session. `launch` (from a calendar block's "Start focus")
@@ -22,7 +20,7 @@ const STAT_ATTRS = Object.keys(STAT_META);
  * `linkedBlock` is that block's current instance (null once deleted).
  */
 const FocusMode = ({
-  todos = [], onUpdateStat, pomodoroSessions = [], onSessionComplete, onClose,
+  todos = [], onAwardXp, pomodoroSessions = [], onSessionComplete, onClose,
   launch = null, linkedBlock = null, onPark, onComment, onCommentSaved, onCompleteBlock, onCompleteTask,
 }) => {
   const launchedTask = launch?.taskId != null ? todos.find(t => String(t.id) === String(launch.taskId) && !t.completed) : null;
@@ -31,7 +29,6 @@ const FocusMode = ({
   const isLinked = launch?.blockId != null;
 
   const [pinnedId, setPinnedId]   = useState(launchedTask?.id ?? (isLinked ? null : todayTasks[0]?.id ?? null));
-  const [xpStat, setXpStat]       = useState('focus');
   const [showDone, setShowDone]   = useState(false);
   const [startedAt, setStartedAt] = useState(null);
   const [showTaskPicker, setShowTaskPicker] = useState(false);
@@ -51,10 +48,10 @@ const FocusMode = ({
     if (savedRef.current) return null;
     savedRef.current = true;
     const session = makeFocusSession({
-      startedAt, durationSecs: totalSecs, stat: xpStat, xpAmount, intent,
+      startedAt, durationSecs: totalSecs, xpAmount, intent,
       taskId: pinnedTask?.id, blockId: launch?.blockId, blockDate: launch?.blockDate, parked, debrief,
     });
-    if (!isLinked) onUpdateStat(xpStat, xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
+    if (!isLinked) onAwardXp(xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
     onSessionComplete?.(session);
     return session;
   };
@@ -103,7 +100,7 @@ const FocusMode = ({
   const R = 100, C = 2 * Math.PI * R;
   const xpLine = isLinked
     ? 'XP for these minutes comes from completing the block.'
-    : `+${xpAmount} XP → ${STAT_META[xpStat]?.label}`;
+    : `+${xpAmount} XP`;
 
   return (
     <div className="focus-overlay">
@@ -195,18 +192,6 @@ const FocusMode = ({
           <div className="focus-config-row focus-xp-earned-row">
             <span className="focus-xp-earned">+{xpAmount} XP</span>
             <span className="focus-xp-earned-note">earned · 1 XP / focused min</span>
-          </div>
-          <div className="focus-config-row focus-stat-row">
-            {STAT_ATTRS.map(attr => {
-              const meta = STAT_META[attr];
-              const { Icon } = meta;
-              const active = xpStat === attr;
-              return (
-                <button key={attr} className={`focus-stat-pill ${active ? 'active' : ''}`} style={active ? { borderColor: meta.color, color: meta.color, background: `${meta.color}18` } : {}} onClick={() => setXpStat(attr)}>
-                  <Icon size={10} strokeWidth={2.5} /> {meta.label.slice(0, 4)}
-                </button>
-              );
-            })}
           </div>
         </div>
       )}

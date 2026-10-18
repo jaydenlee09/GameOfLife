@@ -1,6 +1,5 @@
 import React from 'react';
 import { Star, Check, Target, ListChecks, History, ArrowUpRight, CalendarClock } from 'lucide-react';
-import STAT_META from '../statMeta';
 import { carriedLabel, dueLabel, TIMEFRAME_LABELS, isDayTask } from '../../utils/taskUtils';
 
 // One task. Tapping the circle completes it, the star puts it in the Top 3, and
@@ -16,7 +15,6 @@ const TaskRow = ({
   const carried = variant === 'carried' ? carriedLabel(task, today) : null;
   const subtasks = task.subtasks || [];
   const subDone = subtasks.filter((s) => s.completed).length;
-  const cats = task.categories || (task.category ? [task.category] : []);
   const top = task.topDate === today;
 
   const stop = (fn) => (e) => { e.stopPropagation(); fn?.(task); };
@@ -49,12 +47,6 @@ const TaskRow = ({
           {showTimeframe && !isDayTask(task) && <span className="tk-chip">{TIMEFRAME_LABELS[task.timeFrame]}</span>}
           {subtasks.length > 0 && <span className="tk-chip"><ListChecks size={11} />{subDone}/{subtasks.length}</span>}
           {goalTitle && <span className="tk-chip tk-chip--goal"><Target size={11} /><span className="tk-chip-clip">{goalTitle}</span></span>}
-          {cats.slice(0, 3).map((c) => {
-            const meta = STAT_META[c];
-            if (!meta) return null;
-            const { Icon } = meta;
-            return <span key={c} className="tk-stat" style={{ color: meta.color }} title={meta.label}><Icon size={12} strokeWidth={2.4} /></span>;
-          })}
           <span className="tk-xp">+{task.xp || 0} XP</span>
         </div>
       </div>

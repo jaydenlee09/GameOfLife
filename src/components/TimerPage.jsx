@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './TimerPage.css';
 import { Play, Pause, RotateCcw } from 'lucide-react';
-import STAT_META from './statMeta';
 import { xpForFocusMinutes } from '../utils/xpUtils';
 import { useCountdownTimer } from '../hooks/useCountdownTimer';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -17,9 +16,6 @@ const PRESETS = [
   { label: '60 min', seconds: 60 * 60 },
   { label: '90 min', seconds: 90 * 60 },
 ];
-
-const STAT_ATTRIBUTES = Object.keys(STAT_META);
-const STAT_LABELS = Object.fromEntries(Object.entries(STAT_META).map(([k, v]) => [k, v.label]));
 
 const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
@@ -45,11 +41,10 @@ const relativeTime = (ts) => {
 
 
 // ─── Timer Page ───────────────────────────────────────────────────────────────
-const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete, onPark, onComment, onCommentSaved }) => {
+const TimerPage = ({ onAwardXp, pomodoroSessions = [], onSessionComplete, onPark, onComment, onCommentSaved }) => {
   const [sessionStartedAt, setSessionStartedAt] = useState(null);
   const [customMinutes, setCustomMinutes] = useState('');
   const [customSeconds, setCustomSeconds] = useState('');
-  const [xpStat, setXpStat]   = useState('focus');
   const [showDebrief, setShowDebrief] = useState(false);
   const [intent, setIntent] = useState('');
   const [parked, setParked] = useState(0);
@@ -113,8 +108,8 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete, onP
   const saveSession = (debrief) => {
     if (savedRef.current) return null;
     savedRef.current = true;
-    const session = makeFocusSession({ startedAt: sessionStartedAt, durationSecs: totalSeconds, stat: xpStat, xpAmount, intent, parked, debrief });
-    onUpdateStat(xpStat, xpAmount, { source: 'pomodoro', label: `${Math.floor(totalSeconds / 60)}m focus session` });
+    const session = makeFocusSession({ startedAt: sessionStartedAt, durationSecs: totalSeconds, xpAmount, intent, parked, debrief });
+    onAwardXp(xpAmount, { source: 'pomodoro', label: `${Math.floor(totalSeconds / 60)}m focus session` });
     onSessionComplete?.(session);
     return session;
   };
@@ -234,28 +229,6 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete, onP
               <span className="timer-xp-earned-note">earned · 1 XP per focused minute</span>
             </div>
           </div>
-
-          <div className="timer-section">
-            <span className="timer-section-label">Attribute</span>
-            <div className="timer-stat-pills">
-              {STAT_ATTRIBUTES.map((attr) => {
-                const meta = STAT_META[attr];
-                const { Icon } = meta;
-                const isActive = xpStat === attr;
-                return (
-                  <button
-                    key={attr}
-                    className={`timer-stat-pill ${isActive ? 'active' : ''}`}
-                    style={isActive ? { background: `${meta.color}22`, borderColor: meta.color, color: meta.color } : {}}
-                    onClick={() => setXpStat(attr)}
-                  >
-                    <Icon size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                    {meta.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -283,17 +256,14 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete, onP
         {pomodoroSessions.filter(s => s.date === todayKey).length > 0 && (
           <div className="timer-sessions-list">
             <span className="timer-sessions-header">Today's Sessions</span>
-            {pomodoroSessions.filter(s => s.date === todayKey).slice(0, 5).map(s => {
-              const meta = STAT_META[s.stat] || { label: s.stat, color: 'var(--text-secondary)' };
-              return (
-                <div key={s.id} className="timer-session-item">
-                  <span className="timer-session-dur">{formatMins(Math.floor(s.durationSecs / 60))}</span>
-                  <span className="timer-session-stat" style={{ color: meta.color }}>{meta.label}</span>
-                  <span className="timer-session-xp">+{s.xpAmount} XP</span>
-                  <span className="timer-session-time">{relativeTime(s.completedAt)}</span>
-                </div>
-              );
-            })}
+            {pomodoroSessions.filter(s => s.date === todayKey).slice(0, 5).map(s => (
+              <div key={s.id} className="timer-session-item">
+                <span className="timer-session-dur">{formatMins(Math.floor(s.durationSecs / 60))}</span>
+                <span className="timer-session-intent">{s.intent || 'Focus'}</span>
+                <span className="timer-session-xp">+{s.xpAmount} XP</span>
+                <span className="timer-session-time">{relativeTime(s.completedAt)}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -303,7 +273,7 @@ const TimerPage = ({ onUpdateStat, pomodoroSessions = [], onSessionComplete, onP
           <div className="modal-content timer-debrief-modal" onClick={(e) => e.stopPropagation()}>
             <FocusDebrief
               intent={intent.trim()}
-              xpLine={`+${xpAmount} XP → ${STAT_LABELS[xpStat] || xpStat}`}
+              xpLine={`+${xpAmount} XP`}
               onSave={saveSession}
               onComment={onComment}
               onCommentSaved={onCommentSaved}

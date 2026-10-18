@@ -76,9 +76,6 @@ const normalizeRecurrenceDays = (value, recurrence) => {
   return [...new Set(days)].sort((a, b) => a - b);
 };
 
-const filterStats = (value, validStats) =>
-  (Array.isArray(value) ? value : []).filter((stat) => validStats.includes(stat));
-
 // Calendar times snap to the app's 15-minute grid; end must land after start.
 const normalizeTimeRange = (startArg, endArg) => {
   const start = parseTimeLike(startArg);
@@ -201,7 +198,6 @@ const ARR = (items, description) => ({ type: 'ARRAY', items, description });
 const OBJ = (properties = {}, required = []) => (Object.keys(properties).length
   ? { type: 'OBJECT', properties, ...(required.length ? { required } : {}) }
   : undefined);
-const STAT_LIST = ARR({ type: 'STRING' }, 'Stat keys this relates to (see VALID STAT KEYS in your instructions).');
 const DATE_RANGE = {
   from: S('Start date YYYY-MM-DD (inclusive).'),
   to: S('End date YYYY-MM-DD (inclusive). Max 31 days per call.'),
@@ -212,7 +208,7 @@ const WEEKDAYS = ARR({ type: 'INTEGER' }, "For weekly recurrence: weekdays 0-6 (
 const READ_TOOLS = [
   {
     name: 'get_tasks',
-    description: 'List tasks with their ids, timeframe, stats and notes. Use before editing or deleting a task.',
+    description: 'List tasks with their ids, timeframe and notes. Use before editing or deleting a task.',
     parameters: OBJ({ include_completed: B('Also include completed tasks (default false).') }),
     run: (args, { state }) => ({
       tasks: (state.todos || [])
@@ -221,7 +217,6 @@ const READ_TOOLS = [
           id: String(t.id),
           text: t.text,
           timeFrame: t.timeFrame,
-          categories: t.categories || (t.category ? [t.category] : []),
           completed: !!t.completed,
           ...(t.scheduledDate ? { scheduledDate: t.scheduledDate } : {}),
           ...(t.dueDate ? { dueDate: t.dueDate } : {}),
@@ -249,7 +244,6 @@ const READ_TOOLS = [
         recurrence: ev.recurrence || 'none',
         done: !!isInstanceCompleted(ev),
         ...(checkInOf(ev) ? { checkIn: checkInOf(ev) } : {}),
-        ...(ev.attributes?.length ? { attributes: ev.attributes } : {}),
         ...(ev.notes ? { notes: ev.notes } : {}),
       }));
       const noPhone = expandEventsForDates(state.noPhoneBlocks || [], keys).sort(byStart).map((b) => ({
@@ -391,18 +385,16 @@ const READ_TOOLS = [
   },
   {
     name: 'get_xp_breakdown',
-    description: 'Where XP came from over the last N days: totals by stat and by source (task, habit, calendar, focus, commitment…).',
+    description: 'Where XP came from over the last N days: totals by source (task, habit, calendar, focus, commitment…).',
     parameters: OBJ({ days: I('Days back including today (default 7, max 60).') }),
     run: (args, { state }) => {
       const n = clamp(Math.round(toNumber(args?.days, 7)), 1, 60);
       const since = shiftDateKey(getLocalDateKey(0), -(n - 1));
-      const byStat = {};
       const bySource = {};
       (state.xpLog || []).filter((e) => e.date >= since).forEach((e) => {
-        byStat[e.stat] = (byStat[e.stat] || 0) + e.amount;
         bySource[e.source] = (bySource[e.source] || 0) + e.amount;
       });
-      return { since, byStat, bySource };
+      return { since, bySource };
     },
   },
   {
@@ -484,26 +476,21 @@ const AUTO_TOOLS = [
     parameters: OBJ({
       text: S('The task, phrased as a concrete action.'),
       timeFrame: E(VALID_TIMEFRAMES, 'When it is due (default today).'),
-      categories: STAT_LIST,
       notes: S('Optional extra detail.'),
       goalId: S('Optional id of the goal this task moves forward.'),
     }, ['text']),
-    prepare: (args, { state, validStats }) => {
+    prepare: (args, { state }) => {
       const text = toTrimmedString(args?.text);
       if (!text) throw new Error('Task text is required.');
       const asked = VALID_TIMEFRAMES.includes(args?.timeFrame) ? args.timeFrame : 'today';
       // "Tomorrow" is a today-task scheduled for tomorrow (how the Tasks page stores it).
       const timeFrame = asked === 'tomorrow' ? 'today' : asked;
-      const categories = filterStats(args?.categories, validStats);
-      const finalCategories = categories.length ? categories : ['discipline'];
       const goal = has(args, 'goalId') && toTrimmedString(String(args.goalId)) ? findGoal(state, args.goalId) : null;
       const item = {
         id: makeNumericId(),
         text,
         timeFrame,
         xp: TASK_TIMEFRAME_XP[timeFrame],
-        categories: finalCategories,
-        category: finalCategories[0],
         completed: false,
         notes: toTrimmedString(args?.notes),
         subtasks: [],
@@ -527,12 +514,11 @@ const AUTO_TOOLS = [
       date: S('YYYY-MM-DD (the first occurrence if recurring).'),
       startTime: S('HH:MM 24h, on a 15-minute boundary.'),
       endTime: S('HH:MM 24h, after startTime.'),
-      attributes: STAT_LIST,
       recurrence: E(VALID_RECURRENCE, 'Default none.'),
       recurrenceDays: WEEKDAYS,
       notes: S('Optional notes shown on hover.'),
     }, ['title', 'date', 'startTime', 'endTime']),
-    prepare: (args, { validStats }) => {
+    prepare: (args) => {
       const title = toTrimmedString(args?.title);
       if (!title) throw new Error('Block title is required.');
       const date = normalizeDateKey(args?.date);
@@ -546,7 +532,6 @@ const AUTO_TOOLS = [
         ...times,
         // XP for blocks is duration-based at completion time; this is just the stored default.
         xpAmount: 20,
-        attributes: filterStats(args?.attributes, validStats),
         recurrence,
         recurrenceDays: normalizeRecurrenceDays(args?.recurrenceDays, recurrence),
         notes: toTrimmedString(args?.notes),
@@ -570,12 +555,11 @@ const AUTO_TOOLS = [
     parameters: OBJ({
       title: S('Template title.'),
       duration: I('Minutes, 15-720 (default 60).'),
-      attributes: STAT_LIST,
       recurrence: E(VALID_RECURRENCE, 'Default none.'),
       recurrenceDays: WEEKDAYS,
       color: S('Optional hex color like #818cf8.'),
     }, ['title']),
-    prepare: (args, { validStats }) => {
+    prepare: (args) => {
       const title = toTrimmedString(args?.title);
       if (!title) throw new Error('Template title is required.');
       const recurrence = VALID_RECURRENCE.includes(args?.recurrence) ? args.recurrence : 'none';
@@ -583,7 +567,6 @@ const AUTO_TOOLS = [
         id: makeId('tmpl'),
         title,
         duration: clamp(Math.round(toNumber(args?.duration, 60)), 15, 720),
-        attributes: filterStats(args?.attributes, validStats),
         xpAmount: 20,
         recurrence,
         recurrenceDays: normalizeRecurrenceDays(args?.recurrenceDays, recurrence),
@@ -678,15 +661,14 @@ const AUTO_TOOLS = [
 const CONFIRM_TOOLS = [
   {
     name: 'update_task',
-    description: 'Edit a task (text, timeframe, stats, notes). Needs the user\'s approval.',
+    description: 'Edit a task (text, timeframe, notes). Needs the user\'s approval.',
     parameters: OBJ({
       taskId: S('Task id from get_tasks.'),
       text: S('New text.'),
       timeFrame: E(VALID_TIMEFRAMES, 'New timeframe.'),
-      categories: STAT_LIST,
       notes: S('New notes.'),
     }, ['taskId']),
-    prepare: (args, { state, validStats }) => {
+    prepare: (args, { state }) => {
       const task = findTask(state, args?.taskId);
       if (task.completed) throw new Error('That task is already completed.');
       const fields = {};
@@ -705,14 +687,6 @@ const CONFIRM_TOOLS = [
         fields.timeFrame = args.timeFrame;
         fields.xp = TASK_TIMEFRAME_XP[args.timeFrame];
         changes.push(`${task.timeFrame} → ${args.timeFrame}`);
-      }
-      if (has(args, 'categories')) {
-        const categories = filterStats(args.categories, validStats);
-        if (categories.length) {
-          fields.categories = categories;
-          fields.category = categories[0];
-          changes.push(`stats: ${categories.join(', ')}`);
-        }
       }
       if (has(args, 'notes') && toTrimmedString(args.notes) !== (task.notes || '')) {
         fields.notes = toTrimmedString(args.notes);

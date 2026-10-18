@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Plus, Star, CalendarDays, ArrowUp } from 'lucide-react';
-import STAT_META from '../statMeta';
 import { dayLabel } from '../../utils/taskUtils';
 
 const WHEN_CHIPS = [
@@ -12,14 +11,6 @@ const WHEN_CHIPS = [
   { value: 'this-year', label: 'This year' },
 ];
 
-const LAST_STAT_KEY = 'gameOfLife_tasksLastStat';
-const readLastStat = () => {
-  try {
-    const v = localStorage.getItem(LAST_STAT_KEY);
-    return v && STAT_META[v] ? v : 'discipline';
-  } catch { return 'discipline'; }
-};
-
 // Type, press Enter, done. Everything else is optional and remembered between
 // adds (so a run of "today" tasks is just typing), except the star.
 const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
@@ -27,7 +18,6 @@ const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
   const [when, setWhen] = useState(defaultWhen);
   const [pickedDay, setPickedDay] = useState('');
   const [top, setTop] = useState(false);
-  const [stat, setStat] = useState(readLastStat);
   const [lastDefault, setLastDefault] = useState(defaultWhen);
 
   // Switching tabs re-aims the default (Upcoming → Tomorrow, Later → This week).
@@ -44,14 +34,9 @@ const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
-    onAdd({ text: trimmed, when: resolvedWhen, categories: [stat], top: top && canStar });
+    onAdd({ text: trimmed, when: resolvedWhen, top: top && canStar });
     setText('');
     setTop(false);
-  };
-
-  const chooseStat = (value) => {
-    setStat(value);
-    try { localStorage.setItem(LAST_STAT_KEY, value); } catch { /* private mode */ }
   };
 
   // The chip only switches to "pick" once a day is actually chosen. Desktop
@@ -59,8 +44,6 @@ const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
   const openPicker = (e) => {
     try { e.currentTarget.showPicker(); } catch { /* opens natively (iOS) */ }
   };
-
-  const StatIcon = STAT_META[stat]?.Icon;
 
   return (
     <form className="tk-add" onSubmit={submit}>
@@ -119,13 +102,6 @@ const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
         >
           <Star size={12} fill={top && canStar ? 'currentColor' : 'none'} /> Top 3
         </button>
-
-        <label className="tk-when tk-when--stat" style={{ color: STAT_META[stat]?.color }}>
-          {StatIcon && <StatIcon size={12} strokeWidth={2.4} />}
-          <select value={stat} onChange={(e) => chooseStat(e.target.value)} aria-label="Stat this task trains">
-            {Object.entries(STAT_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
-          </select>
-        </label>
       </div>
     </form>
   );

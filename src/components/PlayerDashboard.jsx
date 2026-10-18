@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './PlayerDashboard.css';
-import STAT_META from './statMeta';
-import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip as RechartTooltip
-} from 'recharts';
 import { REQUIRED_STREAK_DAYS } from '../utils/scoreUtils';
 import { getWeekVerdict, getScoreLeaks, getWeekDeltas } from '../utils/statsInsights';
 import RANK_TIERS, { TIER_ICONS } from '../utils/rankMeta';
@@ -101,28 +97,6 @@ const ProductivityHeatmap = ({ xpLog }) => {
   );
 };
 
-// ─── Attribute Radar ──────────────────────────────────────────────────────────
-const AttributeRadar = ({ stats }) => {
-  const data = Object.entries(stats).map(([key, val]) => ({
-    stat: STAT_META[key]?.label?.slice(0, 6) || key,
-    value: Math.floor(val / 100) + 1,
-  }));
-
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <RadarChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
-        <PolarGrid stroke="#3a3a3c" />
-        <PolarAngleAxis dataKey="stat" tick={{ fill: '#8e8e93', fontSize: 11 }} />
-        <RechartTooltip
-          contentStyle={{ background: '#1c1c1e', border: '1px solid #3a3a3c', borderRadius: 8, color: '#fff', fontSize: 12 }}
-          formatter={(v) => [`LV ${v}`, 'Level']}
-        />
-        <Radar dataKey="value" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.18} strokeWidth={2} dot={{ fill: '#38bdf8', r: 3 }} />
-      </RadarChart>
-    </ResponsiveContainer>
-  );
-};
-
 // ─── Activity Feed ────────────────────────────────────────────────────────────
 const ActivityFeed = ({ xpLog }) => {
   const recent = xpLog.slice(0, 25);
@@ -130,7 +104,6 @@ const ActivityFeed = ({ xpLog }) => {
     <div className="activity-feed-list">
       {recent.length === 0 && <p className="activity-feed-empty">No activity yet. Complete tasks to see your log.</p>}
       {recent.map(e => {
-        const meta  = e.stat !== 'xp' ? STAT_META[e.stat] : null;
         const Icon  = SOURCE_ICONS[e.source] || Zap;
         const isPos = e.amount >= 0;
         return (
@@ -138,9 +111,7 @@ const ActivityFeed = ({ xpLog }) => {
             <span className="activity-feed-icon"><Icon size={16} /></span>
             <div className="activity-feed-body">
               {e.label && <span className="activity-feed-label">{e.label}</span>}
-              <span className="activity-feed-stat" style={{ color: meta?.color || '#fbbf24' }}>
-                {meta ? meta.label : 'XP'}
-              </span>
+              <span className="activity-feed-stat">XP</span>
             </div>
             <div className="activity-feed-right">
               <span className={`activity-feed-xp ${isPos ? 'pos' : 'neg'}`}>{isPos ? '+' : ''}{e.amount}</span>
@@ -315,8 +286,6 @@ const PlayerDashboard = ({
   const handleSaveClick = () => { onUpdateName(nameInput); setIsEditing(false); };
   const handleKeyDown   = (e) => { if (e.key === 'Enter') handleSaveClick(); };
 
-  const attributes = user.stats ? Object.entries(user.stats) : [];
-
   const data = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions, todos, goals };
   /* eslint-disable react-hooks/exhaustive-deps */
   const deps = [habits, xpLog.length, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions.length, todos.length, goals];
@@ -352,7 +321,7 @@ const PlayerDashboard = ({
         onClick={() => setMoreOpen((o) => !o)}
         aria-expanded={moreOpen}
       >
-        More <span className="stats-more-hint">character, features, attributes, activity, heatmap</span>
+        More <span className="stats-more-hint">character, features, activity, heatmap</span>
         <ChevronDown size={16} />
       </button>
 
@@ -382,38 +351,9 @@ const PlayerDashboard = ({
             onNavigate={onNavigate}
           />
 
-          <div className="dashboard-secondary-row">
-            {user.stats && (
-              <div className="dashboard-card attributes-card">
-                <h3 className="section-title">Attributes</h3>
-                <AttributeRadar stats={user.stats} />
-                <div className="attributes-list">
-                  {attributes.map(([key, value]) => {
-                    const meta = STAT_META[key] || { label: key, Icon: null, color: '#a3a3a3' };
-                    const { Icon } = meta;
-                    return (
-                      <div key={key} className="attribute-item">
-                        <div className="attribute-header">
-                          <span className="attribute-name">
-                            {Icon && <Icon size={14} color={meta.color} className="attribute-icon" strokeWidth={2.5} />}
-                            {meta.label}
-                          </span>
-                          <span className="attribute-level" style={{ color: meta.color }}>LVL {Math.floor(value / 100) + 1}</span>
-                        </div>
-                        <div className="attribute-bar-container">
-                          <div className="attribute-bar-fill" style={{ width: `${Math.max(5, value % 100)}%`, background: meta.color }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="dashboard-card feed-card">
-              <h3 className="section-title">Activity</h3>
-              <ActivityFeed xpLog={xpLog} />
-            </div>
+          <div className="dashboard-card feed-card">
+            <h3 className="section-title">Activity</h3>
+            <ActivityFeed xpLog={xpLog} />
           </div>
 
           <div className="dashboard-card heatmap-card">

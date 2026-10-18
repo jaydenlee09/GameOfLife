@@ -6,10 +6,6 @@ export const habitDateStr = (date) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-// Old habits may carry a single `attribute`; normalise to an array (default Discipline).
-export const getHabitAttrs = (habit) =>
-  habit.attributes?.length ? habit.attributes : habit.attribute ? [habit.attribute] : ['discipline'];
-
 // Consecutive-day streak ending at dateStr → XP = max(10, round(10 × streak/2)).
 export const calcStreakXp = (history, dateStr) => {
   const [y, m, d] = dateStr.split('-').map(Number);

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Star, Trash2, X, Play, Check, CalendarDays, Target, Plus } from 'lucide-react';
-import STAT_META from '../statMeta';
 import {
   dayLabel, whenOf, XP_BY_TIMEFRAME, TIMEFRAME_LABELS, isDayTask, createdAtOf, dateKeyOf,
 } from '../../utils/taskUtils';
@@ -24,13 +23,12 @@ const WHEN_CHIPS = [
 // parent mounts it with key={task.id}, so drafts reset when the task changes.
 const TaskDetail = ({
   task, today, goals, topFull, pending, onPatch, onMove, onComplete, onDelete, onToggleTop, onStartFocus, onClose,
-  onUpdateStat, onToast,
+  onAwardXp, onToast,
 }) => {
   const [title, setTitle] = useState(task.text);
   const [newSubtask, setNewSubtask] = useState('');
 
   const goal = task.goalId != null ? (goals || []).find((g) => String(g.id) === String(task.goalId)) : null;
-  const cats = task.categories || (task.category ? [task.category] : []);
   const subtasks = task.subtasks || [];
   const top = task.topDate === today;
   const done = task.completed || pending;
@@ -44,11 +42,6 @@ const TaskDetail = ({
     if (trimmed !== task.text) onPatch({ text: trimmed });
   };
 
-  const toggleCat = (c) => {
-    const next = cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c];
-    if (next.length) onPatch({ categories: next, category: next[0] });
-  };
-
   const addSubtask = (e) => {
     e.preventDefault();
     const text = newSubtask.trim();
@@ -60,19 +53,17 @@ const TaskDetail = ({
   // A sub-task pays once, the first time it's ticked (unticking and re-ticking doesn't farm XP).
   const toggleSubtask = (sub) => {
     const completing = !sub.completed;
-    const award = completing && !sub.awarded && cats.length > 0;
+    const award = completing && !sub.awarded;
     onPatch({ subtasks: subtasks.map((s) => (s.id === sub.id ? { ...s, completed: completing, ...(award ? { awarded: true } : {}) } : s)) });
     if (award) {
-      cats.forEach((c) => onUpdateStat(c, SUBTASK_XP, { source: 'subtask', label: sub.text }));
-      onToast({ text: `+${SUBTASK_XP * cats.length} XP`, sub: `"${sub.text}" done` });
+      onAwardXp(SUBTASK_XP, { source: 'subtask', label: sub.text });
+      onToast({ text: `+${SUBTASK_XP} XP`, sub: `"${sub.text}" done` });
     }
   };
 
   const openPicker = (e) => {
     try { e.currentTarget.showPicker(); } catch { /* opens natively (iOS) */ }
   };
-
-  const xpEach = cats.length ? Math.floor((task.xp || 0) / cats.length) : 0;
 
   return (
     <div className="tk-detail">
@@ -212,28 +203,6 @@ const TaskDetail = ({
       </section>
 
       <section className="tk-field">
-        <h4 className="tk-field-label">Trains</h4>
-        <div className="tk-chips">
-          {Object.entries(STAT_META).map(([key, meta]) => {
-            const on = cats.includes(key);
-            const { Icon } = meta;
-            return (
-              <button
-                key={key}
-                type="button"
-                className={`tk-stat-chip${on ? ' tk-stat-chip--on' : ''}`}
-                style={on ? { color: meta.color, borderColor: `${meta.color}88`, background: `${meta.color}1f` } : undefined}
-                aria-pressed={on}
-                onClick={() => toggleCat(key)}
-              >
-                <Icon size={12} strokeWidth={2.4} /> {meta.label}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="tk-field">
         <h4 className="tk-field-label">Notes</h4>
         <textarea
           className="tk-input tk-notes"
@@ -246,7 +215,7 @@ const TaskDetail = ({
       </section>
 
       <p className="tk-detail-foot">
-        +{task.xp || 0} XP{cats.length > 1 ? ` (${xpEach} each to ${cats.map((c) => STAT_META[c]?.label || c).join(', ')})` : cats[0] ? ` to ${STAT_META[cats[0]]?.label || cats[0]}` : ''}
+        +{task.xp || 0} XP
         {created ? ` · Added ${addedLabel(dateKeyOf(created), today)}` : ''}
       </p>
     </div>

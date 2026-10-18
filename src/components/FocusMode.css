@@ -177,22 +177,6 @@
   font-size: 0.72rem;
   color: var(--text-secondary);
 }
-.focus-stat-row { max-width: 380px; }
-.focus-stat-pill {
-  background: var(--bg-elevated-1);
-  border: 1px solid var(--separator);
-  color: var(--text-secondary);
-  padding: 0.22rem 0.5rem;
-  border-radius: 7px;
-  font-size: 0.65rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  transition: all var(--duration) var(--ease);
-}
-.focus-stat-pill:hover { border-color: var(--separator-strong); color: var(--text-primary); }
 
 /* Stats */
 .focus-today-stats { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-tertiary); }

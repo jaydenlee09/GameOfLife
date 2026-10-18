@@ -1,5 +1,4 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import STAT_META from './statMeta';
 import './CalendarPage.css';
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
@@ -9,6 +8,7 @@ import {
   normalizeEvent, expandEventsForDates, isInstanceCompleted,
   cloneSubEvents, cloneBonusTasks, normalizeBonusTask,
   getBlockStatus, getBlockOutcome, PLAN_KEPT_START,
+  blockKind, blockColor, BLOCK_KIND_COLORS, BLOCK_KIND_LABELS,
 } from '../utils/calendarUtils';
 import { computeFreeGaps } from '../utils/dayPlanner';
 import TodayStrip from './calendar/TodayStrip';
@@ -118,10 +118,6 @@ const isBonusTaskCompleted = (task, ev) => {
   if (ev.recurrence === 'none' || !ev.recurrence) return Boolean(task.completed);
   return task.completedDates?.includes(ev._instanceDate);
 };
-const primaryColor = (ev) => {
-  if (!ev.attributes?.length) return '#38bdf8';
-  return STAT_META[ev.attributes[0]]?.color || '#38bdf8';
-};
 // The check-in saved for this instance (not one derived from `completed`).
 const storedOutcome = (ev) => ((ev.recurrence === 'none' || !ev.recurrence) ? ev.outcome : ev.outcomes?.[ev._instanceDate]) || null;
 // A task from the tray, as a block. `plan.kind: 'task'` links it, so marking the
@@ -136,7 +132,6 @@ const taskToBlock = (task, dateKey, startMins) => {
     startHour: Math.floor(start / 60), startMin: start % 60,
     endHour: Math.floor(end / 60), endMin: end % 60,
     xpAmount: 20,
-    attributes: task.categories || (task.category ? [task.category] : []),
     recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [],
     completed: false, completedDates: [],
     plan: { kind: 'task', taskId: task.id, intent: '' },
@@ -155,7 +150,6 @@ const buildDetachedInstanceEvent = (ev, overrides = {}) => {
     endHour: overrides.endHour ?? normalizedEvent.endHour,
     endMin: overrides.endMin ?? normalizedEvent.endMin,
     xpAmount: overrides.xpAmount ?? normalizedEvent.xpAmount,
-    attributes: overrides.attributes ? [...overrides.attributes] : [...normalizedEvent.attributes],
     recurrence: 'none',
     notes: overrides.notes ?? normalizedEvent.notes ?? '',
     subEvents: overrides.subEvents ? cloneSubEvents(overrides.subEvents) : cloneSubEvents(normalizedEvent.subEvents),
@@ -192,14 +186,14 @@ const buildDetachedNoPhoneInstance = (block, overrides = {}) => {
 const defaultForm = (o = {}) => ({
   title: '', date: toDateKey(new Date()),
   startHour: 9, startMin: 0, endHour: 10, endMin: 0,
-  xpAmount: 20, attributes: [], recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [], ...o,
+  xpAmount: 20, recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [], ...o,
 });
-const defaultTmplForm = () => ({ title: '', duration: 60, attributes: [], xpAmount: 20, recurrence: 'none', recurrenceDays: [], color: '#38bdf8' });
+const defaultTmplForm = () => ({ title: '', duration: 60, xpAmount: 20, recurrence: 'none', recurrenceDays: [], color: '#38bdf8' });
 const defaultNoPhoneForm = (o = {}) => ({
   date: toDateKey(new Date()), startHour: 8, startMin: 0, endHour: 9, endMin: 0,
   label: 'No Phone', recurrence: 'none', recurrenceDays: [], ...o,
 });
-const defaultBonusTaskForm = () => ({ title: '', xpAmount: 10, attributes: [] });
+const defaultBonusTaskForm = () => ({ title: '', xpAmount: 10 });
 const toTimeInput = (h, m) => `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 const parseTimeInput = (val) => { const [h,m] = val.split(':'); return { h: parseInt(h,10), m: parseInt(m,10) }; };
 
@@ -213,7 +207,7 @@ export default function CalendarPage({
   setCalendarDayEvents,
   quickEvents,
   setQuickEvents,
-  onUpdateStat,
+  onAwardXp,
   todos = [],
   logs = {},
   onPlanDay,
@@ -271,10 +265,6 @@ export default function CalendarPage({
     if (todo.dueDate) return todo.dueDate;
     if (todo.timeFrame === 'today' || !todo.timeFrame) return todayKey;
     return null;
-  };
-  const taskPrimaryColor = (task) => {
-    const cats = task.categories || (task.category ? [task.category] : []);
-    return (cats.length && STAT_META[cats[0]]?.color) || '#64748b';
   };
 
   useEffect(() => {
@@ -346,7 +336,7 @@ export default function CalendarPage({
       date,
       startHour: Math.floor(startMins/60), startMin: startMins%60,
       endHour: Math.floor(clampEnd/60), endMin: clampEnd%60,
-      ...(fromTemplate ? { title: fromTemplate.title, attributes: [...fromTemplate.attributes], xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence, recurrenceDays: [...(fromTemplate.recurrenceDays || [])] } : {}),
+      ...(fromTemplate ? { title: fromTemplate.title, xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence, recurrenceDays: [...(fromTemplate.recurrenceDays || [])] } : {}),
     }));
     setEditingId(null);
     setNewBonusTask(defaultBonusTaskForm());
@@ -356,7 +346,7 @@ export default function CalendarPage({
   const openEdit = (ev) => {
     if (ev.recurrence !== 'none' && ev._isVirtual) { setEditScope({ show: true, ev }); return; }
     const normalizedEvent = normalizeEvent(ev);
-    setForm({ title: normalizedEvent.title, date: normalizedEvent.date, startHour: normalizedEvent.startHour, startMin: normalizedEvent.startMin, endHour: normalizedEvent.endHour, endMin: normalizedEvent.endMin, xpAmount: normalizedEvent.xpAmount, attributes: [...normalizedEvent.attributes], recurrence: normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes: normalizedEvent.notes || '', subEvents: cloneSubEvents(normalizedEvent.subEvents), bonusTasks: cloneBonusTasks(normalizedEvent.bonusTasks) });
+    setForm({ title: normalizedEvent.title, date: normalizedEvent.date, startHour: normalizedEvent.startHour, startMin: normalizedEvent.startMin, endHour: normalizedEvent.endHour, endMin: normalizedEvent.endMin, xpAmount: normalizedEvent.xpAmount, recurrence: normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes: normalizedEvent.notes || '', subEvents: cloneSubEvents(normalizedEvent.subEvents), bonusTasks: cloneBonusTasks(normalizedEvent.bonusTasks) });
     setEditingId(ev.id);
     setNewBonusTask(defaultBonusTaskForm());
     setModal('edit');
@@ -428,7 +418,7 @@ export default function CalendarPage({
   const buildEventFromForm = (id) => ({
     id: id || Date.now(), title: form.title.trim(), date: form.date,
     startHour: form.startHour, startMin: form.startMin, endHour: form.endHour, endMin: form.endMin,
-    xpAmount: Number(form.xpAmount)||20, attributes: form.attributes, recurrence: form.recurrence, recurrenceDays: form.recurrenceDays||[],
+    xpAmount: Number(form.xpAmount)||20, recurrence: form.recurrence, recurrenceDays: form.recurrenceDays||[],
     notes: form.notes||'', subEvents: cloneSubEvents(form.subEvents||[]), bonusTasks: cloneBonusTasks(form.bonusTasks||[]), completed: false, completedDates: [],
   });
 
@@ -442,7 +432,7 @@ export default function CalendarPage({
       setCalendarEvents(prev=>prev.map(ev=>ev.id!==editingId?ev:{
         ...ev, title:form.title.trim(), startHour:form.startHour, startMin:form.startMin,
         endHour:form.endHour, endMin:form.endMin, xpAmount:Number(form.xpAmount)||20,
-        attributes:form.attributes, recurrence:form.recurrence, recurrenceDays:form.recurrenceDays||[], notes:form.notes||'', subEvents:cloneSubEvents(form.subEvents||[]), bonusTasks:cloneBonusTasks(form.bonusTasks||[]),
+        recurrence:form.recurrence, recurrenceDays:form.recurrenceDays||[], notes:form.notes||'', subEvents:cloneSubEvents(form.subEvents||[]), bonusTasks:cloneBonusTasks(form.bonusTasks||[]),
       }));
     } else {
       setCalendarEvents(prev=>[
@@ -462,7 +452,7 @@ export default function CalendarPage({
         ? { ...normalizedTask, completed: isBonusTaskCompleted(normalizedTask, ev), completedDates: [] }
         : normalizedTask;
     });
-    setForm({ title:normalizedEvent.title, date:ev._instanceDate, startHour:normalizedEvent.startHour, startMin:normalizedEvent.startMin, endHour:normalizedEvent.endHour, endMin:normalizedEvent.endMin, xpAmount:normalizedEvent.xpAmount, attributes:[...normalizedEvent.attributes], recurrence:normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes:normalizedEvent.notes||'', subEvents:cloneSubEvents(normalizedEvent.subEvents), bonusTasks:instanceBonusTasks });
+    setForm({ title:normalizedEvent.title, date:ev._instanceDate, startHour:normalizedEvent.startHour, startMin:normalizedEvent.startMin, endHour:normalizedEvent.endHour, endMin:normalizedEvent.endMin, xpAmount:normalizedEvent.xpAmount, recurrence:normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes:normalizedEvent.notes||'', subEvents:cloneSubEvents(normalizedEvent.subEvents), bonusTasks:instanceBonusTasks });
     setEditingId(ev.id);
     setEditScope(null);
     setNewBonusTask(defaultBonusTaskForm());
@@ -578,10 +568,9 @@ export default function CalendarPage({
   const honorNoPhoneBlock = (block, e) => {
     e.stopPropagation();
     if (isNoPhoneHonored(block)) return;
-    // Staying off your phone builds Discipline + Focus — earned from the block's length.
-    const each = Math.max(1, Math.floor(xpForBlockMinutes(minsEndFromEvent(block) - minsFromEvent(block)) / 2));
-    onUpdateStat('discipline', each, { source: 'nophone', label: block.label || 'No-phone time honored' });
-    onUpdateStat('focus',      each, { source: 'nophone', label: block.label || 'No-phone time honored' });
+    // Earned from the block's length, like any other block.
+    const xp = Math.max(1, xpForBlockMinutes(minsEndFromEvent(block) - minsFromEvent(block)));
+    onAwardXp(xp, { source: 'nophone', label: block.label || 'No-phone time honored' });
     if (block.recurrence==='none'||!block.recurrence) {
       setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,honored:true}:b));
     } else {
@@ -649,7 +638,7 @@ export default function CalendarPage({
     if (currentlyCompleted === shouldBeCompleted) return;
 
     const xpDelta = shouldBeCompleted ? normalizedTask.xpAmount : -normalizedTask.xpAmount;
-    normalizedTask.attributes.forEach((attr) => onUpdateStat(attr, xpDelta));
+    onAwardXp(xpDelta, { source: 'calendar', label: normalizedTask.title });
 
     if (!isRecurring) {
       setCalendarEvents((prev) => prev.map((calendarEvent) => {
@@ -940,15 +929,9 @@ export default function CalendarPage({
     setNewSubEvent('');
   };
   const removeSubEvent = (id) => setForm(f => ({ ...f, subEvents: f.subEvents.filter(s => s.id !== id) }));
-  const toggleNewBonusTaskAttr = (key) => setNewBonusTask((current) => ({
-    ...current,
-    attributes: current.attributes.includes(key)
-      ? current.attributes.filter((attr) => attr !== key)
-      : [...current.attributes, key],
-  }));
   const addBonusTask = () => {
     const trimmedTitle = newBonusTask.title.trim();
-    if (!trimmedTitle || !newBonusTask.attributes.length) return;
+    if (!trimmedTitle) return;
     setForm((currentForm) => ({
       ...currentForm,
       bonusTasks: [
@@ -957,7 +940,6 @@ export default function CalendarPage({
           id: Date.now(),
           title: trimmedTitle,
           xpAmount: Number(newBonusTask.xpAmount) || 10,
-          attributes: newBonusTask.attributes,
           completed: false,
           completedDates: [],
         }),
@@ -977,8 +959,6 @@ export default function CalendarPage({
   const saveTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>[...prev,{...tmplForm,id:Date.now(),title:tmplForm.title.trim()}]); closeTmplModal(); };
   const updateTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>prev.map(t=>t.id===tmplModal.id?{...tmplForm,id:tmplModal.id,title:tmplForm.title.trim()}:t)); closeTmplModal(); };
   const deleteTmpl = (id) => setQuickEvents(prev=>prev.filter(t=>t.id!==id));
-  const toggleTmplAttr = (key) => setTmplForm(f=>({...f,attributes:f.attributes.includes(key)?f.attributes.filter(a=>a!==key):[...f.attributes,key]}));
-  const toggleAttr = (key) => setForm(f=>({...f,attributes:f.attributes.includes(key)?f.attributes.filter(a=>a!==key):[...f.attributes,key]}));
 
   // ─── Expand events ───────────────────────────────────────────────────────────
   const expandedEvents = expandEventsForDates(calendarEvents, activeDateKeys);
@@ -1129,7 +1109,7 @@ export default function CalendarPage({
                   <div
                     key={task.id}
                     className="cal-month-chip cal-month-chip--task"
-                    style={{ '--chip-color': taskPrimaryColor(task) }}
+                    style={{ '--chip-color': BLOCK_KIND_COLORS.task }}
                     onClick={(e) => e.stopPropagation()}
                     title={task.text}
                   >
@@ -1226,7 +1206,7 @@ export default function CalendarPage({
                   const height=Math.max(((endMin-startMin)/(24*60))*TOTAL_HEIGHT,18);
                   const left=`calc(${(ev.colIndex/ev.totalCols)*100}% + 2px)`;
                   const width=`calc(${(1/ev.totalCols)*100}% - 4px)`;
-                  const color=primaryColor(ev);
+                  const color=blockColor(ev);
                   const done=isInstanceCompleted(ev);
                   // Missed/partly/skipped only from the day check-ins began; older blocks look as they did.
                   const rawStatus=getBlockStatus(ev, nowMs);
@@ -1258,11 +1238,6 @@ export default function CalendarPage({
                         {height>30&&<div className="cal-event-time">{fmtTime(dispStartH,dispStartM)} – {fmtTime(dispEndH,dispEndM)}</div>}
                         {status==='missed'&&height>=48&&(
                           <button type="button" className="cal-event-checkin" onClick={(e)=>openCheckIn(ev,e)} onMouseDown={(e)=>e.stopPropagation()}>Check in</button>
-                        )}
-                        {height>48&&ev.attributes.length>0&&(
-                          <div className="cal-event-attrs">
-                            {ev.attributes.map(a=><span key={a} className="cal-event-attr-dot" style={{background:STAT_META[a]?.color}} title={STAT_META[a]?.label}/>)}
-                          </div>
                         )}
                         {height>60&&ev.subEvents?.length>0&&(
                           <div className="cal-event-subevents">
@@ -1391,7 +1366,7 @@ export default function CalendarPage({
                     const done=isInstanceCompleted(ev);
                     return (
                       <div key={`${ev.id}-${ei}`} className={`cal-month-chip ${done?'cal-month-chip--done':''}`}
-                        style={{'--chip-color':primaryColor(ev)}}
+                        style={{'--chip-color':blockColor(ev)}}
                         onClick={(e)=>{e.stopPropagation();openEdit(ev);}}>
                         {ev.title}
                       </div>
@@ -1403,7 +1378,7 @@ export default function CalendarPage({
                     return dayTasks.slice(0, slotsLeft).map((task) => (
                       <div key={`t-${task.id}`}
                         className="cal-month-chip cal-month-chip--task"
-                        style={{ '--chip-color': taskPrimaryColor(task) }}
+                        style={{ '--chip-color': BLOCK_KIND_COLORS.task }}
                         onClick={(e) => e.stopPropagation()}>
                         {task.text}
                       </div>
@@ -1467,11 +1442,6 @@ export default function CalendarPage({
                     {tmpl.duration}min
                     {tmpl.recurrence!=='none'&&<span className="cal-tmpl-recur">{tmpl.recurrence==='weekly'&&tmpl.recurrenceDays?.length?tmpl.recurrenceDays.map(d=>WEEKDAY_LABELS[d]).join(' '):tmpl.recurrence}</span>}
                   </div>
-                  {tmpl.attributes.length>0&&(
-                    <div className="cal-tmpl-attrs">
-                      {tmpl.attributes.map(a=><span key={a} className="cal-tmpl-attr-dot" style={{background:STAT_META[a]?.color}} title={STAT_META[a]?.label}/>)}
-                    </div>
-                  )}
                 </div>
                 <div className="cal-tmpl-actions">
                   <button className="cal-tmpl-btn" onClick={()=>openTmplEdit(tmpl)} title="Edit" aria-label="Edit template">
@@ -1546,7 +1516,7 @@ export default function CalendarPage({
           {!tasksMinimized && (
             <div className="cal-sidebar-list cal-sidebar-list--tasks">
               {upcomingTodos.map((task) => {
-                const color = taskPrimaryColor(task);
+                const color = BLOCK_KIND_COLORS.task;
                 const dk = task._dateKey;
                 const d = daysUntil(buildDayEventTargetMs(dk, null), nowMs);
                 const meta = d === 0 ? 'Today' : `${d}d`;
@@ -1582,8 +1552,7 @@ export default function CalendarPage({
     const startMin = minsFromEvent(ev), endMin = minsEndFromEvent(ev);
     const durMin = Math.max(0, endMin - startMin);
     const totalXp = durMin > 0 ? xpForBlockMinutes(durMin) : 0;
-    const attrs = ev.attributes || [];
-    const perAttrXp = attrs.length ? Math.max(1, Math.floor(totalXp / attrs.length)) : 0;
+    const kind = blockKind(ev);
     const outcome = getBlockOutcome(ev);
     const missed = !outcome && ev._instanceDate >= PLAN_KEPT_START && getBlockStatus(ev, nowMs) === 'missed';
     const subEvents = ev.subEvents || [];
@@ -1595,14 +1564,14 @@ export default function CalendarPage({
       : ev.recurrence === 'weekly'
         ? recurDays.map(d => WEEKDAY_LABELS[d]).join(' ')
         : null;
-    const hasDetail = attrs.length > 0 || subEvents.length > 0 || bonusTasks.length > 0 || Boolean(notes);
+    const hasDetail = subEvents.length > 0 || bonusTasks.length > 0 || Boolean(notes);
 
     return (
       <div
         key={`${ev.id}-${ev._instanceDate}`}
         ref={hoverCardRef}
         className="cal-hovercard"
-        style={{ '--ev-color': primaryColor(ev) }}
+        style={{ '--ev-color': blockColor(ev) }}
         role="tooltip"
       >
         <div className="cal-hovercard-head">
@@ -1619,29 +1588,12 @@ export default function CalendarPage({
         </div>
 
         <div className="cal-hovercard-chips">
+          <span className="cal-hovercard-chip cal-hovercard-chip--kind">{BLOCK_KIND_LABELS[kind]}</span>
           <span className="cal-hovercard-chip cal-hovercard-chip--xp">+{totalXp} XP</span>
           {recurLabel && (
             <span className="cal-hovercard-chip"><Repeat size={9} strokeWidth={3} />{recurLabel}</span>
           )}
         </div>
-
-        {attrs.length > 0 && (
-          <div className="cal-hovercard-section">
-            <span className="cal-hovercard-label">Attributes · +{perAttrXp} XP each</span>
-            <div className="cal-hovercard-attrs">
-              {attrs.map(a => {
-                const meta = STAT_META[a];
-                if (!meta) return null;
-                const Icon = meta.Icon;
-                return (
-                  <span key={a} className="cal-hovercard-attr" style={{ '--attr-color': meta.color }}>
-                    <Icon size={10} />{meta.label}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {subEvents.length > 0 && (
           <div className="cal-hovercard-section">
@@ -1688,19 +1640,6 @@ export default function CalendarPage({
   };
 
   // ─── Shared Modal Fields ─────────────────────────────────────────────────────
-  const renderAttrPills = (attrs, toggle) => (
-    <div className="cal-attr-pills">
-      {Object.entries(STAT_META).map(([key,meta])=>{
-        const sel=attrs.includes(key); const Icon=meta.Icon;
-        return (
-          <button key={key} type="button" className={`cal-attr-pill ${sel?'cal-attr-pill--selected':''}`} style={sel?{'--pill-color':meta.color}:{}} onClick={()=>toggle(key)}>
-            <Icon size={13}/>{meta.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
   const renderRecurBtns = (val, set) => (
     <div className="cal-recur-row">
       {['none','daily','weekly'].map(r=>(
@@ -1855,22 +1794,14 @@ export default function CalendarPage({
                 <label className="cal-label">Reward</label>
                 {(() => {
                   const dur = (form.endHour*60+form.endMin) - (form.startHour*60+form.startMin);
-                  const n = (form.attributes||[]).length;
                   const total = dur > 0 ? xpForBlockMinutes(dur) : 0;
-                  const each = n > 0 ? Math.max(1, Math.floor(total / n)) : 0;
                   return (
                     <div className="cal-xp-earned">
-                      {n > 0
-                        ? <span><strong>+{each} XP</strong> to each of {n} attribute{n!==1?'s':''} · {total} total</span>
-                        : <span>Pick an attribute below to earn its {total} XP</span>}
+                      <span><strong>+{total} XP</strong></span>
                       <span className="cal-xp-earned-note">earned from the block's length · 1 XP/min</span>
                     </div>
                   );
                 })()}
-              </div>
-              <div className="cal-field">
-                <label className="cal-label">Attributes (XP split across them)</label>
-                {renderAttrPills(form.attributes, toggleAttr)}
               </div>
               <div className="cal-field">
                 <label className="cal-label">Repeat</label>
@@ -1926,7 +1857,7 @@ export default function CalendarPage({
                       )}
                       <div className="cal-bonus-main">
                         <span className="cal-bonus-name">{normalizedTask.title}</span>
-                        <span className="cal-bonus-meta">+{normalizedTask.xpAmount} XP to {normalizedTask.attributes.map((attr)=>STAT_META[attr]?.label || attr).join(', ')}</span>
+                        <span className="cal-bonus-meta">+{normalizedTask.xpAmount} XP</span>
                       </div>
                       <button type="button" className="cal-subevent-del" onClick={()=>removeBonusTask(normalizedTask.id)}><X size={12} /></button>
                     </div>
@@ -1948,11 +1879,7 @@ export default function CalendarPage({
                       <Plus size={14} strokeWidth={3} />
                     </span>
                   </div>
-                  <div className="cal-field">
-                    <label className="cal-label">Reward Attributes</label>
-                    {renderAttrPills(newBonusTask.attributes, toggleNewBonusTaskAttr)}
-                  </div>
-                  <button type="button" className="cal-btn cal-btn--ghost cal-bonus-add-btn" disabled={!newBonusTask.title.trim() || !newBonusTask.attributes.length} onClick={addBonusTask}>Add Bonus Task</button>
+                  <button type="button" className="cal-btn cal-btn--ghost cal-bonus-add-btn" disabled={!newBonusTask.title.trim()} onClick={addBonusTask}>Add Bonus Task</button>
                 </div>
               </div>
               <div className="cal-field">
@@ -2034,13 +1961,9 @@ export default function CalendarPage({
                   <label className="cal-label">Reward</label>
                   <div className="cal-xp-earned cal-xp-earned--sm">
                     <span><strong>+{xpForBlockMinutes(tmplForm.duration || 0)} XP</strong></span>
-                    <span className="cal-xp-earned-note">from duration · split across attributes</span>
+                    <span className="cal-xp-earned-note">from duration</span>
                   </div>
                 </div>
-              </div>
-              <div className="cal-field">
-                <label className="cal-label">Attributes (XP split across them)</label>
-                {renderAttrPills(tmplForm.attributes, toggleTmplAttr)}
               </div>
               <div className="cal-field">
                 <label className="cal-label">Repeat</label>

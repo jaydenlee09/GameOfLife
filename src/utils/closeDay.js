@@ -215,28 +215,22 @@ export const HEALTH_AWARDS = [
   {
     key: 'sleep',
     earned: (h) => h.sleepHours >= 8 && h.sleepHours <= 10,
-    awards: [{ stat: 'health', amount: 20, label: 'Good sleep logged' }],
+    award: { amount: 20, label: 'Good sleep logged' },
   },
   {
     key: 'workout',
     earned: (h) => (h.workouts?.length || 0) > 0,
-    awards: [
-      { stat: 'strength', amount: 15, label: 'Workout logged' },
-      { stat: 'health', amount: 15, label: 'Workout logged' },
-    ],
+    award: { amount: 30, label: 'Workout logged' },
   },
   {
     key: 'energy',
     earned: (h) => h.energyLevel >= 4,
-    awards: [{ stat: 'mentalHealth', amount: 10, label: 'High energy day' }],
+    award: { amount: 10, label: 'High energy day' },
   },
   {
     key: 'food',
     earned: (h, foodNet) => foodNet > 0,
-    awards: [
-      { stat: 'health', amount: 10, label: 'Ate well' },
-      { stat: 'discipline', amount: 5, label: 'Stayed on food budget' },
-    ],
+    award: { amount: 15, label: 'Ate well' },
   },
 ];
 
@@ -249,7 +243,7 @@ export const getPendingHealthAwards = (healthEntry = {}, foodEntries = []) => {
   const paid = new Set(healthEntry.xpAwardedFor || []);
   const foodNet = foodEntries.reduce((sum, e) => sum + (e.points || 0), 0);
   const due = HEALTH_AWARDS.filter((r) => !paid.has(r.key) && r.earned(healthEntry, foodNet));
-  return { keys: due.map((r) => r.key), awards: due.flatMap((r) => r.awards) };
+  return { keys: due.map((r) => r.key), awards: due.map((r) => r.award) };
 };
 
 /** Sleep length from bed/wake "HH:MM" times, wrapping past midnight; null if either is missing. */

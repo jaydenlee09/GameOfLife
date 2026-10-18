@@ -8,12 +8,12 @@ import {
   toggleMilestone,
   toggleGoalCompleted,
   cloneGoalForward,
-  GOAL_XP_BY_PERIOD,
+  goalCompletionXp,
   MILESTONE_XP,
 } from '../utils/goalUtils';
 import { computeWeekStats, getMondayKey, formatWeekRange, getWeekDays } from '../utils/weekStatsUtils';
 
-const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, setGoals, onUpdateStat }) => {
+const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, setGoals, onAwardXp }) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const mondayKey = getMondayKey(weekOffset);
   const isCurrentWeek = weekOffset === 0;
@@ -31,17 +31,12 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
   }, [goals, mondayKey]);
 
   const awardGoalXp = (goal) => {
-    if (!onUpdateStat) return;
-    const attrs = goal.attributes?.length ? goal.attributes : ['discipline'];
-    const xpTotal = GOAL_XP_BY_PERIOD[goal.period] || GOAL_XP_BY_PERIOD.weekly;
-    const xpEach = Math.floor(xpTotal / attrs.length);
-    attrs.forEach(attr => onUpdateStat(attr, xpEach, { source: 'goal', label: goal.title }));
+    const xp = goalCompletionXp(goal);
+    if (onAwardXp && xp > 0) onAwardXp(xp, { source: 'goal', label: goal.title });
   };
 
   const awardMilestoneXp = (goal, milestoneText) => {
-    if (!onUpdateStat) return;
-    const attrs = goal.attributes?.length ? goal.attributes : ['discipline'];
-    attrs.forEach(attr => onUpdateStat(attr, MILESTONE_XP, { source: 'milestone', label: milestoneText }));
+    onAwardXp?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
   };
 
   const handleToggleGoalComplete = (goal) => {

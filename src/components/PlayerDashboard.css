@@ -247,64 +247,6 @@ body {
   color: var(--accent);
 }
 
-/* ─── Secondary row: Attributes + Activity/Trophies ─────────────────────── */
-.dashboard-secondary-row {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
-  gap: 1.25rem;
-  align-items: stretch;
-}
-
-.attributes-card { padding: 1.25rem 1.5rem; gap: 1rem; }
-
-.attributes-list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.9rem 1.25rem;
-}
-
-.attribute-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.attribute-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.attribute-name {
-  font-size: 0.76rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.attribute-level {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.attribute-bar-container {
-  height: 5px;
-  background: var(--bg-elevated-2);
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-top: 1px;
-}
-
-.attribute-bar-fill {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width var(--duration) var(--ease);
-}
-
 /* ─── Activity Feed ───────────────────────────────────────────────────────── */
 .feed-card { padding: 1.25rem 1.5rem !important; overflow: hidden; min-height: 320px; }
 
@@ -327,7 +269,7 @@ body {
 .activity-feed-icon { font-size: 0.85rem; margin-top: 1px; }
 .activity-feed-body { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .activity-feed-label { font-size: 0.75rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.activity-feed-stat  { font-size: 0.68rem; font-weight: 500; }
+.activity-feed-stat  { font-size: 0.68rem; font-weight: 500; color: #fbbf24; }
 .activity-feed-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .activity-feed-xp    { font-size: 0.8rem; font-weight: 600; }
 .activity-feed-xp.pos { color: var(--success); }
@@ -620,10 +562,6 @@ body {
   .stats-delta-row:first-child { padding-top: 0.55rem; }
 }
 
-@media (max-width: 900px) {
-  .dashboard-secondary-row { grid-template-columns: 1fr; }
-}
-
 @media (max-width: 768px) {
   .heatmap-grid { grid-template-columns: repeat(16, 1fr); }
   .heatmap-card { padding: 1rem; }
@@ -633,7 +571,6 @@ body {
 @media (max-width: 480px) {
   .player-dashboard { padding: 0.75rem 0.75rem calc(0.75rem + 72px); gap: 0.75rem; }
   .heatmap-grid { grid-template-columns: repeat(12, 1fr); }
-  .attributes-list { grid-template-columns: 1fr; }
   .dashboard-card { padding: 14px 16px; }
   .stats-deltas { padding: 14px 16px; }
   .stats-week-dot { width: 30px; height: 30px; }

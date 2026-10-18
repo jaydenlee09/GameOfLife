@@ -58,7 +58,7 @@ export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
   const habitsDone  = habits.filter(h => h.history?.[dateKey]).length;
   const habitScore  = habitsTotal > 0 ? (habitsDone / habitsTotal) * 10 : 0;
 
-  // Tasks: tasks completed on this day, once each however many stats they train (3 = full score)
+  // Tasks: tasks completed on this day, once each (3 = full score)
   const tasksDone   = countTaskCompletions(xpLog, dateKey);
   const taskScore   = Math.min(tasksDone / 3, 1) * 10;
 

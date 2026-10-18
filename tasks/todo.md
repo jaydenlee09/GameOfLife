@@ -1211,3 +1211,18 @@ User pain points (all four + "mobile version is hard to use and unpleasant"): ad
 - [x] Verify: lint, build, unit checks of taskUtils, harness screenshots at 375/390/768/1280/1600, interaction tests
 
 **Verified:** eslint clean (App warnings pre-existing), `npm run build` ok, 11 node unit groups for taskUtils/completeTask/Daily Score/morning push pass, harness checks: one-tap complete + Undo + payout after 5s, flush on leaving page, 2-stat task counts once on Daily Score and lifetime counter, Top 3 cap, carried triage, quick add → Tomorrow toast, legacy 'tomorrow' migration, Start focus pins the task, Home tile Top 3 first. No horizontal overflow at 320/390/768/1024/1100/1920 in all three views + sheet. Found and fixed during testing: overdue task moved to Tomorrow stayed on Today (explicit reschedule now beats the deadline pull). Uncommitted.
+
+---
+
+## 2026-10-17: Remove attributes (stats) everywhere
+
+User never looks at them and they add friction (calendar blocks with no attribute paid 0 XP; bonus tasks needed one). Decisions: remove every picker; XP is paid once, in full, to the global total (no per-stat split or N× multiplier); dashboard Attributes card + radar and the Assistant's weakest/strongest stat line go; old saved fields left untouched (ignored). Calendar blocks are colored by type (event / task / habit / goal) — user chose this.
+
+- [x] App: `updateStat(stat, amt)` → `awardXp(amt, meta)`; logs stat `'xp'`, no `user.stats` writes; prop `onUpdateStat` → `onAwardXp`
+- [x] Payouts once: block check-in, task, subtask, habit, goal + milestone, bonus task, no-phone, commitment, close-the-day health, focus sessions
+- [x] Remove pickers/badges: calendar event/template/bonus forms + dots + hover card, Tasks quick add/detail/row, Goals editor/badges, Daily Log habit editor/badges, Timer/Focus stat picker
+- [x] Calendar: `blockColor(ev)` by `plan.kind`, task chips use the task color
+- [x] Dashboard: drop Attributes card + radar; Assistant: drop stat analysis, VALID STAT KEYS, stat params on tools, planner attributes
+- [x] Verify: lint (before/after), build, unit checks for payouts, browser walk of every touched screen
+
+**Verified:** eslint unchanged (same 40 pre-existing messages, only line numbers shift), `npm run build` ok, 14 node unit checks (block/task/goal/health payouts, block kind colors, normalizers keep old event attributes, planner + Assistant tools emit no stats, system prompt has no stat lines). Harness walk with old-style data: block check-in +60 once (stats untouched, level-up fires), bonus task +10 once (was 20), subtask +10 (was 20), task +20 with ref + lifetime count +1, milestone 15 + goal 35 = 50, habit +10 / untick -10 (was ±20), close-the-day "+10 XP · High energy day", calendar colors task/habit/goal/event, hover card kind chip, block/template/goal/habit forms have no attribute fields, Statistics More has no Attributes card, Timer + Focus Mode have no stat picker, no console errors. `src/components/statMeta.js` deleted. Uncommitted.

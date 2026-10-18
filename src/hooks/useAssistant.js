@@ -11,7 +11,6 @@ import { generateLessonInsight } from '../utils/lessonInsight';
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 const ACTIVITY_LIMIT = 100;
 const pad = (n) => String(n).padStart(2, '0');
-const statKeys = (state) => Object.keys(state.user?.stats || {});
 const dateLabel = (dateKey) => {
   const [y, m, d] = dateKey.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -91,7 +90,6 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
         history: snapshot.chatHistory,
         userMessage: trimmed,
         state: snapshot,
-        validStats: statKeys(snapshot),
       });
 
       const at = Date.now();
@@ -140,7 +138,7 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     try {
       const { tool, args } = proposalToolAndArgs(action);
       if (!tool || tool.tier === 'read') throw new Error('This proposal is no longer supported. Ask the assistant again.');
-      const prepared = tool.prepare(args, { state: current, validStats: statKeys(current) });
+      const prepared = tool.prepare(args, { state: current });
       commitOp(prepared.op);
       const entry = { id: makeId('act'), at: Date.now(), tool: tool.name, label: prepared.label, inverse: prepared.inverse, undone: false };
       recordActivity([entry]);

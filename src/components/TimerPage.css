@@ -359,37 +359,6 @@
   color: var(--text-secondary);
 }
 
-/* ─── Stat Pills ─────────────────────────────────────────────────────────── */
-.timer-stat-pills {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.timer-stat-pill {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--separator);
-  border-radius: 20px;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 500;
-  padding: 0.3rem 0.75rem;
-  cursor: pointer;
-  transition: all var(--duration) var(--ease);
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.timer-stat-pill:hover {
-  background: var(--bg-elevated-3);
-  color: var(--text-primary);
-}
-
-.timer-stat-pill.active {
-  font-weight: 600;
-}
-
 /* ─── Modals (reuse tasks-page pattern) ──────────────────────────────────── */
 .modal-overlay {
   position: fixed;
@@ -599,7 +568,7 @@
 }
 .timer-session-item:last-child { border-bottom: none; }
 .timer-session-dur  { font-weight: 500; color: var(--text-primary); min-width: 36px; }
-.timer-session-stat { font-weight: 500; flex: 1; }
+.timer-session-intent { flex: 1; min-width: 0; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .timer-session-xp   { color: var(--accent); font-weight: 600; min-width: 50px; }
 .timer-session-time { color: var(--text-tertiary); min-width: 55px; text-align: right; }
 

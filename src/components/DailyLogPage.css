@@ -1394,19 +1394,6 @@
   color: var(--text-primary);
 }
 
-.hdm-attrs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-
-.hdm-attr-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid;
-  font-size: 0.65rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .hdm-close-btn {
   display: inline-flex;
   align-items: center;
@@ -1555,26 +1542,6 @@
 }
 
 .hfm-input:focus { outline: none; border-color: var(--accent); }
-
-.hfm-attr-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.hfm-attr-pill {
-  padding: 0.3rem 0.75rem;
-  border-radius: 20px;
-  border: 1px solid var(--separator-strong);
-  background: var(--bg-elevated-2);
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--duration) var(--ease);
-}
-
-.hfm-attr-pill:hover { background: var(--bg-elevated-3); color: var(--text-primary); }
 
 .hfm-form-actions {
   display: flex;

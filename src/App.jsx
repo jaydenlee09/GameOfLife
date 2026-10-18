@@ -15,7 +15,7 @@ import RANK_TIERS from './utils/rankMeta'
 import { computeRankStatus, computeDailyScore } from './utils/scoreUtils'
 import { hasEnoughForPatterns } from './utils/logPatterns'
 import RankChangeModal from './components/RankChangeModal'
-import { calcStreakXp, getHabitAttrs } from './utils/habitUtils'
+import { calcStreakXp } from './utils/habitUtils'
 import CalendarPage from './components/CalendarPage'
 import AssistantDrawer from './components/AssistantDrawer'
 import { refreshPushToken, listenForegroundPushes, subscribePushState } from './services/pushService'
@@ -124,9 +124,9 @@ function App() {
   });
 
   const DEFAULT_QUICK_EVENTS = [
-    { id: 't1', title: 'Morning Routine', duration: 30, attributes: ['discipline','health'], xpAmount: 20, recurrence: 'daily', color: '#fbbf24' },
-    { id: 't2', title: 'Deep Work', duration: 90, attributes: ['focus','productivity'], xpAmount: 50, recurrence: 'none', color: '#38bdf8' },
-    { id: 't3', title: 'Workout', duration: 60, attributes: ['strength','health'], xpAmount: 40, recurrence: 'daily', color: '#f87171' },
+    { id: 't1', title: 'Morning Routine', duration: 30, xpAmount: 20, recurrence: 'daily', color: '#fbbf24' },
+    { id: 't2', title: 'Deep Work', duration: 90, xpAmount: 50, recurrence: 'none', color: '#38bdf8' },
+    { id: 't3', title: 'Workout', duration: 60, xpAmount: 40, recurrence: 'daily', color: '#f87171' },
   ];
 
   const [quickEvents, setQuickEvents] = useState(() => {
@@ -156,7 +156,6 @@ function App() {
       name: 'Player 1',
       level: 1,
       xp: 0,
-      stats: { strength: 0, intelligence: 0, charisma: 0, discipline: 0, mentalHealth: 0, health: 0, focus: 0, creativity: 0, productivity: 0 }
     };
     // Backfill monotonic lifetime counters from the (possibly truncated) xpLog once.
     // After this they only ever grow, so they no longer decay as the 500-entry log rotates.
@@ -613,15 +612,16 @@ function App() {
   }, [firebaseUser, cloudSyncReady]);
 
   // ─── XP Logging ───────────────────────────────────────────────────────────────
-  // `ref` ties the per-stat events of one completion together (a task logs one per
-  // stat it trains); `repeat` marks the extra ones so counters tally it once.
-  const logXpEvent = useCallback((stat, amount, source = 'manual', label = '', { ref, repeat } = {}) => {
+  // `ref` ties an event to the thing it paid for (a task's id). Before attributes were
+  // removed a task logged one event per stat, so older entries may repeat a `ref`.
+  // New events carry stat 'xp'; older ones keep the stat they were paid to.
+  const logXpEvent = useCallback((amount, source = 'manual', label = '', { ref } = {}) => {
     const today = getLocalDateKey(0);
     const event = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       ts: Date.now(),
       date: today,
-      stat,
+      stat: 'xp',
       amount,
       source,
       label,
@@ -637,7 +637,7 @@ function App() {
       setUser(prev => ({
         ...prev,
         lifetimeXp: (prev.lifetimeXp || 0) + amount,
-        lifetimeTaskCount: (prev.lifetimeTaskCount || 0) + (source === 'task' && !repeat ? 1 : 0),
+        lifetimeTaskCount: (prev.lifetimeTaskCount || 0) + (source === 'task' ? 1 : 0),
       }));
     }
   }, []);
@@ -645,11 +645,10 @@ function App() {
   // ─── User / XP Functions ───────────────────────────────────────────────────────
   const updateName = (newName) => setUser(prev => ({ ...prev, name: newName }));
 
-  // updateStat is the single XP mutator: it credits a stat AND global XP together,
-  // handles level up/down, and logs the event. (A second global-only `addXp` used to
-  // exist for commitments — it was removed so every reward flows through one path.)
-  const updateStat = useCallback((statName, amount, meta = {}) => {
-    logXpEvent(statName, amount, meta.source || 'manual', meta.label || '', meta);
+  // awardXp is the single XP mutator: it credits global XP, handles level up/down,
+  // and logs the event. Every reward flows through this one path.
+  const awardXp = useCallback((amount, meta = {}) => {
+    logXpEvent(amount, meta.source || 'manual', meta.label || '', meta);
     setUser(prev => {
       let currentXp = prev.xp + amount;
       let currentLevel = prev.level;
@@ -671,7 +670,6 @@ function App() {
         ...prev,
         level: currentLevel,
         xp: currentXp,
-        stats: { ...prev.stats, [statName]: (prev.stats[statName] || 0) + amount }
       };
     });
   }, [logXpEvent]);
@@ -681,19 +679,17 @@ function App() {
   const handleToggleHabitDay = useCallback((habitId, dateStr) => {
     const habit = habits.find(h => h.id === habitId);
     if (!habit) return;
-    const attrs = getHabitAttrs(habit);
     const history = { ...(habit.history || {}) };
     if (history[dateStr]) {
       const xp = calcStreakXp(history, dateStr); // streak still includes this day
       delete history[dateStr];
-      attrs.forEach(attr => updateStat(attr, -xp, { source: 'habit', label: habit.name || habit.text }));
+      awardXp(-xp, { source: 'habit', label: habit.name || habit.text });
     } else {
       history[dateStr] = true;
-      const xp = calcStreakXp(history, dateStr);
-      attrs.forEach(attr => updateStat(attr, xp, { source: 'habit', label: habit.name || habit.text }));
+      awardXp(calcStreakXp(history, dateStr), { source: 'habit', label: habit.name || habit.text });
     }
     setHabits(prev => prev.map(h => h.id === habitId ? { ...h, history } : h));
-  }, [habits, updateStat]);
+  }, [habits, awardXp]);
 
   // ─── Pomodoro Session Callback ─────────────────────────────────────────────────
   const handleSessionComplete = useCallback((session) => {
@@ -758,10 +754,8 @@ function App() {
 
   const handleArchiveCommitmentResolve = (date, text, denied) => {
     if (!date) return;
-    // Keeping your word builds Discipline — route it through the one mutator so it
-    // shows up in stats/feed consistently (previously addXp granted global-only XP).
     if (!denied) {
-      updateStat('discipline', 10, { source: 'commitment', label: 'Commitment kept' });
+      awardXp(10, { source: 'commitment', label: 'Commitment kept' });
       setCommitmentToast(true);
       setTimeout(() => setCommitmentToast(false), 3200);
     }
@@ -906,7 +900,7 @@ function App() {
   const checkInBlockInstance = (ev, status, reason = null) => {
     const res = checkInBlock(ev, status, { reason });
     if (!res) return null;
-    res.awards.forEach(a => updateStat(a.stat, a.amount, { source: a.source, label: a.label }));
+    if (res.award) awardXp(res.award.amount, res.award);
     setCalendarEvents(res.update);
     if (res.taskId != null) completeTaskById(res.taskId);
     return res.xp;
@@ -916,7 +910,7 @@ function App() {
   const completeTaskById = (taskId) => {
     const done = completeTask(todos.find(t => String(t.id) === String(taskId)));
     if (!done) return null;
-    done.awards.forEach(a => updateStat(a.stat, a.amount, a));
+    if (done.award) awardXp(done.award.amount, done.award);
     setTodos(done.update);
     return done.xp;
   };
@@ -1066,7 +1060,7 @@ function App() {
             todos={todos}
             habits={habits}
             logs={logs}
-            onUpdateStat={updateStat}
+            onAwardXp={awardXp}
             setTodos={setTodos}
             setHabits={setHabits}
             xpCap={xpCapForLevel(user.level)}
@@ -1084,7 +1078,7 @@ function App() {
       case 'tasks':
         return (
           <TasksPage
-            onUpdateStat={updateStat}
+            onAwardXp={awardXp}
             todos={todos}
             setTodos={setTodos}
             xpLog={xpLog}
@@ -1114,7 +1108,7 @@ function App() {
             setFoodLog={setFoodLog}
             foodPoints={foodPoints}
             setFoodPoints={setFoodPoints}
-            onUpdateStat={updateStat}
+            onAwardXp={awardXp}
             logReviews={logReviews}
             onSubmitLog={assistant.reviewLog}
             reviewingDate={assistant.reviewingDate}
@@ -1127,7 +1121,7 @@ function App() {
       case 'timer':
         return (
           <TimerPage
-            onUpdateStat={updateStat}
+            onAwardXp={awardXp}
             pomodoroSessions={pomodoroSessions}
             onSessionComplete={handleSessionComplete}
             onPark={parkThought}
@@ -1146,7 +1140,7 @@ function App() {
             setCalendarDayEvents={setCalendarDayEvents}
             quickEvents={quickEvents}
             setQuickEvents={setQuickEvents}
-            onUpdateStat={updateStat}
+            onAwardXp={awardXp}
             todos={todos}
             logs={logs}
             onPlanDay={openPlanner}
@@ -1163,7 +1157,7 @@ function App() {
             goals={goals}
             setGoals={setGoals}
             setTodos={setTodos}
-            onUpdateStat={updateStat}
+            onAwardXp={awardXp}
             habits={habits}
             setHabits={setHabits}
           />
@@ -1181,7 +1175,7 @@ function App() {
             goals={goals}
             healthLog={healthLog}
             setGoals={setGoals}
-            onUpdateStat={updateStat}
+            onAwardXp={awardXp}
           />
         );
       case 'shop':
@@ -1269,7 +1263,7 @@ function App() {
         <FocusMode
           key={focusLaunch ? `${focusLaunch.blockId ?? `task${focusLaunch.taskId}`}_${focusLaunch.blockDate}` : 'free'}
           todos={todos}
-          onUpdateStat={updateStat}
+          onAwardXp={awardXp}
           pomodoroSessions={pomodoroSessions}
           onSessionComplete={handleSessionComplete}
           onClose={closeFocusMode}

@@ -8,6 +8,16 @@
 export const GOAL_XP_BY_PERIOD = { weekly: 50, monthly: 150, yearly: 400 };
 export const MILESTONE_XP = 15;
 
+/**
+ * XP for completing a goal. Milestones already paid MILESTONE_XP each as they were
+ * checked off, and a milestone goal only completes once all are done, so those are
+ * discounted here — otherwise the work would be paid for twice.
+ */
+export const goalCompletionXp = (goal) => {
+  const total = GOAL_XP_BY_PERIOD[goal.period] || GOAL_XP_BY_PERIOD.weekly;
+  return Math.max(0, total - (goal.milestones || []).length * MILESTONE_XP);
+};
+
 const pad2 = (n) => String(n).padStart(2, '0');
 
 /** The periodKey a goal of this period would have right now (weeks start Monday). */

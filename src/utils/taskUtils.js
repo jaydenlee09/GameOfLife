@@ -178,9 +178,9 @@ export const pruneDoneTasks = (todos, today = getLocalDateKey(0)) => {
 };
 
 /**
- * Tasks completed, counted once per task. A task trains several stats and so logs
- * one xpLog event per stat; those share a `ref` (the task id). Events from before
- * `ref` existed are grouped by day + label instead.
+ * Tasks completed, counted once per task. Before attributes were removed a task
+ * logged one xpLog event per stat, sharing a `ref` (the task id); events from
+ * before `ref` existed are grouped by day + label instead.
  */
 export const countTaskCompletions = (xpLog, dateKeys) => {
   const days = dateKeys == null ? null : new Set([].concat(dateKeys));
@@ -274,7 +274,7 @@ export const whenOf = (t, today = getLocalDateKey(0)) => {
 };
 
 /** A new task. `when` as in whenFields. */
-export const makeTask = ({ text, when = 'today', categories = ['discipline'], top = false, now = Date.now() }, today = getLocalDateKey(0)) => {
+export const makeTask = ({ text, when = 'today', top = false, now = Date.now() }, today = getLocalDateKey(0)) => {
   const placed = whenFields(when, today);
   // A star means "today": a task for a later day can't take one yet.
   const starred = top && !(placed.timeFrame === 'today' && placed.scheduledDate !== today);
@@ -285,7 +285,6 @@ export const makeTask = ({ text, when = 'today', categories = ['discipline'], to
     ...placed,
     // A plain "today" task needs no date: it belongs to the day it was added.
     scheduledDate: placed.scheduledDate === today ? null : placed.scheduledDate,
-    categories,
     completed: false,
     notes: '',
     subtasks: [],

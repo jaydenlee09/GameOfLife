@@ -17,7 +17,6 @@ import { getFocusGoal } from '../../utils/goalUtils';
 import { getPendingCheckIns } from '../../utils/calendarUtils';
 import { computeDailyScore, computeStreak, scoreColor, shiftDateKey, STREAK_THRESHOLD } from '../../utils/scoreUtils';
 import { entryHasContent, entryFingerprint } from '../../utils/logReview';
-import STAT_META from '../statMeta';
 import HealthQuick from './HealthQuick';
 import HabitChecklist from './HabitChecklist';
 import LogReviewSection from './LogReview';
@@ -561,7 +560,7 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
       {pendingAwards.length > 0 && (
         <p className="cd-awards cd-a-awards">
           {pendingAwards.map((a, i) => (
-            <span key={i} style={{ color: STAT_META[a.stat]?.color }}>+{a.amount} {STAT_META[a.stat]?.label || a.stat} · {a.label}</span>
+            <span key={i}>+{a.amount} XP · {a.label}</span>
           ))}
         </p>
       )}
@@ -634,7 +633,7 @@ const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, revi
 const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
-  healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints, onUpdateStat,
+  healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints, onAwardXp,
   goals, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
 }) => {
   const reduceMotion = useReducedMotion();
@@ -711,7 +710,7 @@ const CloseDayFlow = ({
   };
 
   const closeTheDay = async () => {
-    pending.awards.forEach(a => onUpdateStat?.(a.stat, a.amount, { source: 'manual', label: a.label }));
+    pending.awards.forEach(a => onAwardXp?.(a.amount, { source: 'manual', label: a.label }));
     if (pending.keys.length) {
       setHealthLog(prev => {
         const day = prev[todayKey] || {};

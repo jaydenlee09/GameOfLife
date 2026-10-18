@@ -128,7 +128,7 @@ const Glance = ({ view, buckets, today, onSelect, onView }) => {
 };
 
 // ─── Tasks Page ───────────────────────────────────────────────────────────────
-const TasksPage = ({ todos, setTodos, onUpdateStat, xpLog = [], goals = [], onStartFocus }) => {
+const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStartFocus }) => {
   const today = todayKey();
   const wide = useMediaQuery(WIDE_QUERY);
   const [view, setView] = useState('today');
@@ -164,10 +164,10 @@ const TasksPage = ({ todos, setTodos, onUpdateStat, xpLog = [], goals = [], onSt
     if (!p) return;
     clearTimeout(p.timer);
     pendingRef.current = null;
-    p.done.awards.forEach((a) => onUpdateStat(a.stat, a.amount, a));
+    if (p.done.award) onAwardXp(p.done.award.amount, p.done.award);
     setTodos(p.done.update);
     setPendingId(null);
-  }, [onUpdateStat, setTodos]);
+  }, [onAwardXp, setTodos]);
 
   // Leaving the page or backgrounding the app pays out immediately, never drops it.
   useEffect(() => () => commitPending(), [commitPending]);
@@ -199,8 +199,8 @@ const TasksPage = ({ todos, setTodos, onUpdateStat, xpLog = [], goals = [], onSt
   // ── Edits ──
   const patch = (id, fields) => setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
 
-  const add = ({ text, when, categories, top }) => {
-    const task = makeTask({ text, when, categories, top: top && !topFull }, today);
+  const add = ({ text, when, top }) => {
+    const task = makeTask({ text, when, top: top && !topFull }, today);
     setTodos((prev) => [...prev, task]);
     if (viewOf(task, today) !== view) {
       const where = task.timeFrame === 'today' ? (task.scheduledDate ? dayLabel(task.scheduledDate, today) : 'Today') : TIMEFRAME_LABELS[task.timeFrame];
@@ -387,7 +387,7 @@ const TasksPage = ({ todos, setTodos, onUpdateStat, xpLog = [], goals = [], onSt
       onToggleTop={toggleTop}
       onStartFocus={onStartFocus}
       onClose={() => setSelectedId(null)}
-      onUpdateStat={onUpdateStat}
+      onAwardXp={onAwardXp}
       onToast={showToast}
     />
   );

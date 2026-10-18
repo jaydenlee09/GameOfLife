@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import './GoalsPage.css';
 import { X, Pin, Pencil, Flame } from 'lucide-react';
-import STAT_META from './statMeta';
 import NorthStarCard from './NorthStarCard';
 import {
   normalizeGoal,
   getGoalProgress,
   toggleMilestone,
   toggleGoalCompleted,
-  GOAL_XP_BY_PERIOD,
+  goalCompletionXp,
   MILESTONE_XP,
 } from '../utils/goalUtils';
 
@@ -240,7 +239,6 @@ const getHabitStreak = (habit) => {
 const GoalModal = ({ mode, periodLabel, initial, onClose, onSubmit, showPeriodPicker = true, defaultPeriod = 'weekly', getPinnedCount }) => {
   const [title, setTitle] = useState(initial?.title || '');
   const [notes, setNotes] = useState(initial?.notes || '');
-  const [attributes, setAttributes] = useState(initial?.attributes || []);
   const [goalPeriod, setGoalPeriod] = useState(initial?.period || defaultPeriod);
   const [milestones, setMilestones] = useState(initial?.milestones || []);
   const [newMilestoneText, setNewMilestoneText] = useState('');
@@ -251,13 +249,6 @@ const GoalModal = ({ mode, periodLabel, initial, onClose, onSubmit, showPeriodPi
   const [trackNumeric, setTrackNumeric] = useState(initial?.targetValue != null);
   const [targetValue, setTargetValue] = useState(initial?.targetValue ?? '');
   const [unit, setUnit] = useState(initial?.unit || '');
-  const statKeys = Object.keys(STAT_META);
-
-  const toggleAttribute = (attr) => {
-    setAttributes(prev => (
-      prev.includes(attr) ? prev.filter(a => a !== attr) : [...prev, attr]
-    ));
-  };
 
   const addMilestone = (e) => {
     e.preventDefault();
@@ -276,7 +267,6 @@ const GoalModal = ({ mode, periodLabel, initial, onClose, onSubmit, showPeriodPi
     onSubmit({
       title: title.trim(),
       notes,
-      attributes,
       period: goalPeriod,
       milestones,
       obstacle: obstacle.trim(),
@@ -338,29 +328,6 @@ const GoalModal = ({ mode, periodLabel, initial, onClose, onSubmit, showPeriodPi
               </div>
             </div>
           )}
-
-          <div className="gp-field-group">
-            <label className="gp-label">Attributes <span className="gp-label-hint">(optional)</span></label>
-            <div className="gp-attr-grid">
-              {statKeys.map((attr) => {
-                const meta = STAT_META[attr];
-                const { Icon } = meta;
-                const active = attributes.includes(attr);
-                return (
-                  <button
-                    key={attr}
-                    type="button"
-                    className={`gp-attr-pill ${active ? 'gp-attr-pill--active' : ''}`}
-                    style={active ? { background: `${meta.color}22`, borderColor: meta.color, color: meta.color } : {}}
-                    onClick={() => toggleAttribute(attr)}
-                  >
-                    {Icon && <Icon size={12} strokeWidth={2.5} />}
-                    {meta.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           <div className="gp-field-group">
             <label className="gp-label">Milestones <span className="gp-label-hint">(optional — breaks the goal into measurable steps)</span></label>
@@ -475,7 +442,7 @@ const GoalModal = ({ mode, periodLabel, initial, onClose, onSubmit, showPeriodPi
   );
 };
 
-const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos, onUpdateStat, habits = [], setHabits }) => {
+const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos, onAwardXp, habits = [], setHabits }) => {
   const [period, setPeriod] = useState('all');
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [modal, setModal] = useState(null); // { type: 'add-goal'|'edit-goal', goalId? }
@@ -565,24 +532,12 @@ const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos,
   };
 
   const awardGoalXp = (goal) => {
-    if (!onUpdateStat) return;
-    const attrs = goal.attributes?.length ? goal.attributes : ['discipline'];
-    const xpTotal = GOAL_XP_BY_PERIOD[goal.period] || GOAL_XP_BY_PERIOD.weekly;
-    // Milestone-driven goals already pay MILESTONE_XP per milestone (to each attribute) as
-    // they're checked off. A goal only auto-completes once every milestone is done, so
-    // discount those from the completion bonus — otherwise the work is paid for twice.
-    const milestoneCount = (goal.milestones || []).length;
-    const alreadyPaid = milestoneCount * MILESTONE_XP * attrs.length;
-    const remaining = Math.max(0, xpTotal - alreadyPaid);
-    if (remaining <= 0) return;
-    const xpEach = Math.max(1, Math.floor(remaining / attrs.length));
-    attrs.forEach(attr => onUpdateStat(attr, xpEach, { source: 'goal', label: goal.title }));
+    const xp = goalCompletionXp(goal);
+    if (onAwardXp && xp > 0) onAwardXp(xp, { source: 'goal', label: goal.title });
   };
 
   const awardMilestoneXp = (goal, milestoneText) => {
-    if (!onUpdateStat) return;
-    const attrs = goal.attributes?.length ? goal.attributes : ['discipline'];
-    attrs.forEach(attr => onUpdateStat(attr, MILESTONE_XP, { source: 'milestone', label: milestoneText }));
+    onAwardXp?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
   };
 
   const handleToggleGoalComplete = (goal) => {
@@ -628,7 +583,6 @@ const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos,
       text: text.trim(),
       timeFrame: TIMEFRAME_BY_PERIOD[goal.period] || 'this-week',
       xp: GOAL_TASK_XP_BY_PERIOD[goal.period] || GOAL_TASK_XP_BY_PERIOD.weekly,
-      categories: goal.attributes?.length ? goal.attributes : ['discipline'],
       completed: false,
       notes: '',
       subtasks: [],
@@ -652,28 +606,6 @@ const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos,
     const candidateKey = candidatePeriod === activeGoal.period ? activeGoal.periodKey : getPeriodKey(new Date(), candidatePeriod);
     return goals.filter(g => g.pinned && g.period === candidatePeriod && g.periodKey === candidateKey && g.id !== activeGoal.id).length;
   } : undefined;
-
-  const renderAttrBadges = (attributes = []) => {
-    if (!attributes || attributes.length === 0) return null;
-    return (
-      <div className="gp-badges">
-        {attributes.map((attr) => {
-          const meta = STAT_META[attr] || { label: attr, Icon: null, color: '#8e8e93' };
-          const { Icon } = meta;
-          return (
-            <span
-              key={attr}
-              className="gp-badge"
-              style={{ color: meta.color, background: `${meta.color}18`, borderColor: `${meta.color}44` }}
-            >
-              {Icon && <Icon size={11} strokeWidth={2.5} />}
-              {meta.label}
-            </span>
-          );
-        })}
-      </div>
-    );
-  };
 
   const renderProgressBar = (goal) => {
     const progress = getGoalProgress(goal);
@@ -701,7 +633,6 @@ const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos,
     return (
       <div key={goal.id} className={`gp-card ${isComplete ? 'gp-card--complete' : ''} ${isOverdue ? 'gp-card--overdue' : ''}`}>
         <div className="gp-card-top">
-          {renderAttrBadges(goal.attributes)}
           <div className="gp-card-actions">
             <button className="gp-icon-btn" onClick={() => setModal({ type: 'edit-goal', goalId: goal.id })} title="Edit"><Pencil size={14} /></button>
             <button className="gp-icon-btn gp-icon-btn--danger" onClick={() => deleteGoal(goal.id)} title="Delete"><X size={14} /></button>
@@ -930,7 +861,7 @@ const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos,
         <GoalModal
           mode="add"
           periodLabel={period === 'all' ? 'All Goals' : periodLabel}
-          initial={{ title: '', notes: '', attributes: [] }}
+          initial={{ title: '', notes: '' }}
           onClose={closeModal}
           showPeriodPicker={true}
           defaultPeriod={period === 'all' ? 'weekly' : period}

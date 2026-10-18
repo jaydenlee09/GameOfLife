@@ -247,8 +247,6 @@
 .cal-tmpl-title { font-size: 0.75rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; }
 .cal-tmpl-meta { font-size: 0.65rem; font-weight: 400; color: var(--text-tertiary); margin-top: 2px; display: flex; gap: 5px; align-items: center; }
 .cal-tmpl-recur { background: var(--accent-wash); color: var(--accent); border-radius: 4px; padding: 1px 5px; font-size: 0.62rem; letter-spacing: 0; }
-.cal-tmpl-attrs { display: flex; gap: 4px; margin-top: 4px; }
-.cal-tmpl-attr-dot { width: 6px; height: 6px; border-radius: 50%; }
 
 .cal-tmpl-actions { display: flex; flex-direction: column; gap: 3px; }
 .cal-tmpl-btn {
@@ -489,8 +487,6 @@
 .cal-event-inner { padding: 2px 5px 1px; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
 .cal-event-title { font-size: 0.7rem; font-weight: 500; color: var(--text-primary); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; }
 .cal-event-time { font-size: 0.62rem; font-weight: 400; color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-event-attrs { display: flex; gap: 3px; margin-top: 2px; }
-.cal-event-attr-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .cal-event-subevents { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
 .cal-event-subevent {
   font-size: 0.62rem; font-weight: 500; color: var(--text-secondary);
@@ -563,6 +559,7 @@
   border-radius: 5px; padding: 2px 7px;
 }
 .cal-hovercard-chip--xp { color: var(--accent); background: var(--accent-wash); }
+.cal-hovercard-chip--kind { color: var(--ev-color); background: color-mix(in srgb, var(--ev-color) 14%, transparent); }
 
 .cal-hovercard-section { display: flex; flex-direction: column; gap: 5px; }
 .cal-hovercard-section + .cal-hovercard-section { border-top: 1px solid var(--separator); padding-top: 8px; }
@@ -570,15 +567,6 @@
   display: flex; align-items: center; gap: 4px;
   font-size: 0.58rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-tertiary);
-}
-
-.cal-hovercard-attrs { display: flex; flex-wrap: wrap; gap: 4px; }
-.cal-hovercard-attr {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 0.63rem; font-weight: 500; letter-spacing: 0;
-  color: var(--attr-color, var(--text-secondary));
-  background: color-mix(in srgb, var(--attr-color, #fff) 12%, transparent);
-  border-radius: 5px; padding: 2px 7px;
 }
 
 .cal-hovercard-list { display: flex; flex-direction: column; gap: 3px; }
@@ -792,12 +780,6 @@
 .cal-xp-earned strong { color: var(--accent); }
 .cal-xp-earned-note { font-size: 0.72rem; color: var(--text-secondary); }
 .cal-textarea { resize: vertical; min-height: 70px; font-size: 0.82rem; line-height: 1.5; }
-
-/* ─── Attribute Pills ────────────────────────────────────────────────────────── */
-.cal-attr-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-.cal-attr-pill { display: flex; align-items: center; gap: 5px; padding: 5px 11px 5px 8px; border-radius: 20px; border: 1px solid var(--separator); background: var(--bg-elevated-2); color: var(--text-secondary); font-size: 0.72rem; font-weight: 500; letter-spacing: 0; cursor: pointer; transition: all 0.14s; white-space: nowrap; }
-.cal-attr-pill:hover { border-color: var(--separator-strong); color: var(--text-primary); background: var(--bg-elevated-3); }
-.cal-attr-pill--selected { background: color-mix(in srgb, var(--pill-color) 15%, var(--bg-elevated-1)); border-color: var(--pill-color); color: var(--pill-color); }
 
 /* ─── Recurrence ─────────────────────────────────────────────────────────────── */
 .cal-recur-row { display: flex; gap: 7px; }

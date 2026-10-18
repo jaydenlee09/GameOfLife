@@ -131,7 +131,6 @@ const planTasks = (todos, dateKey, plannedTaskIds) => {
       text: t.text,
       timeFrame: t.timeFrame,
       ...(t.dueDate ? { dueDate: t.dueDate, overdue: t.dueDate < dateKey } : {}),
-      ...(t.categories?.length ? { stats: t.categories } : {}),
       ...(t.goalId != null ? { goalId: String(t.goalId) } : {}),
       ...(t.notes ? { notes: text(t.notes, 160) } : {}),
       ...(t.subtasks?.length ? { subtasksLeft: t.subtasks.filter((st) => !st.completed).length } : {}),
@@ -194,7 +193,6 @@ export const buildPlanContext = (state, { dateKey, settings, endTime, now = new 
     northStar: state.user?.northStar?.vision || null,
     weekPriority: latestReview ? reviews[latestReview]?.priority?.trim() || null : null,
     memory: (state.assistantMemory || []).filter((m) => m.kind === 'preference' || m.kind === 'pattern').map((m) => m.text).slice(0, 15),
-    validStats: Object.keys(state.user?.stats || {}),
   };
 };
 
@@ -220,10 +218,9 @@ export const PLAN_SCHEMA = {
           habitId: STR('For kind=habit: the habit id. Omit otherwise.'),
           intent: STR('What "done" looks like at the end of this block, as one concrete sentence they can check. Empty for breaks.'),
           reason: STR('Why this slot, under 15 words.'),
-          attributes: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Stat keys this block trains, from validStats.' },
         },
         required: ['kind', 'title', 'start', 'end'],
-        propertyOrdering: ['kind', 'title', 'start', 'end', 'taskId', 'goalId', 'habitId', 'intent', 'reason', 'attributes'],
+        propertyOrdering: ['kind', 'title', 'start', 'end', 'taskId', 'goalId', 'habitId', 'intent', 'reason'],
       },
     },
     unscheduled: {
@@ -261,10 +258,10 @@ export const canPlace = (block, others, gaps) =>
 
 /**
  * Turns the model's JSON into a safe plan: times snapped to the grid and clipped to
- * the free gap they start in, overlaps dropped, unknown ids removed, attributes
- * limited to real stats. Returns { summary, blocks, unscheduled, dropped }.
+ * the free gap they start in, overlaps dropped, unknown ids removed.
+ * Returns { summary, blocks, unscheduled, dropped }.
  */
-export const normalizePlan = (raw, { gaps, tasks = [], goals = [], habits = [], validStats = [], todos = [] }) => {
+export const normalizePlan = (raw, { gaps, tasks = [], goals = [], habits = [] }) => {
   const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const accepted = [];
   let dropped = 0;
@@ -296,15 +293,6 @@ export const normalizePlan = (raw, { gaps, tasks = [], goals = [], habits = [], 
     const task = kind === 'task' ? tasks.find((t) => sameId(t.id, b.taskId)) : null;
     const goal = kind === 'goal' ? goals.find((g) => sameId(g.id, b.goalId)) : null;
     const habit = kind === 'habit' ? habits.find((h) => sameId(h.id, b.habitId)) : null;
-    const sourceTask = task ? todos.find((t) => sameId(t.id, task.id)) : null;
-
-    let attributes = kind === 'habit' || kind === 'break'
-      ? []
-      : (Array.isArray(b.attributes) ? b.attributes : []).filter((a) => validStats.includes(a));
-    if (!attributes.length && (kind === 'task' || kind === 'goal')) {
-      attributes = (sourceTask?.categories || []).filter((a) => validStats.includes(a));
-      if (!attributes.length) attributes = validStats.includes('focus') ? ['focus'] : validStats.slice(0, 1);
-    }
 
     accepted.push({
       id: `pb_${i}_${start}`,
@@ -317,7 +305,6 @@ export const normalizePlan = (raw, { gaps, tasks = [], goals = [], habits = [], 
       ...(habit ? { habitId: habit.id } : {}),
       intent: kind === 'break' ? '' : text(b.intent, 200),
       reason: text(b.reason, 120),
-      attributes,
     });
   });
 
@@ -366,7 +353,6 @@ export const planToEvents = (blocks, { dateKey, planId, makeId = () => Date.now(
       startHour: Math.floor(b.start / 60), startMin: b.start % 60,
       endHour: Math.floor(b.end / 60), endMin: b.end % 60,
       xpAmount: 20,
-      attributes: b.attributes,
       recurrence: 'none',
       recurrenceDays: [],
       notes: [b.intent && `Goal: ${b.intent}`, b.reason].filter(Boolean).join('\n'),
@@ -401,7 +387,7 @@ export const generateDayPlan = async ({ state, dateKey, settings, endTime, gener
     schema: PLAN_SCHEMA,
   });
   const plan = normalizePlan(response.text, {
-    gaps, tasks: context.tasks, goals: context.goals, habits: context.habits, validStats: context.validStats, todos: state.todos,
+    gaps, tasks: context.tasks, goals: context.goals, habits: context.habits,
   });
   return {
     ...plan,

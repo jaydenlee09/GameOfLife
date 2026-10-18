@@ -408,7 +408,7 @@
 .gp-card-top {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
 }
 
@@ -512,29 +512,6 @@
   font-size: 0.75rem;
   font-weight: 500;
   margin-top: -6px;
-}
-
-.gp-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.gp-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  padding: 3px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--separator);
-  line-height: 1;
-}
-
-.gp-badge svg {
-  display: block;
 }
 
 .gp-notes {
@@ -940,38 +917,6 @@
 
 .gp-textarea:focus {
   border-color: var(--accent);
-}
-
-.gp-attr-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.gp-attr-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--separator-strong);
-  background: var(--bg-elevated-2);
-  color: var(--text-secondary);
-  border-radius: var(--radius-md);
-  padding: 10px 10px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.75rem;
-  transition: transform 0.08s, border-color var(--duration) var(--ease);
-  font-family: inherit;
-  text-align: left;
-}
-
-.gp-attr-pill svg {
-  display: block;
-}
-
-.gp-attr-pill:hover {
-  transform: translateY(-1px);
-  border-color: rgba(56, 189, 248, 0.3);
 }
 
 /* ── Milestone editor (inside modal) ────────────────────────────────────── */

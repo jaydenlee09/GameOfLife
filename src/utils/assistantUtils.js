@@ -6,49 +6,11 @@ import { getGoalProgress } from './goalUtils';
 import { carriedDays, isTop, todayQueue } from './taskUtils';
 import { TOOL_DECLARATIONS, getTool, applyOpToState } from './assistantTools';
 
-const STAT_LABELS = {
-  strength:     'Strength',
-  intelligence: 'Intelligence',
-  charisma:     'Charisma',
-  discipline:   'Discipline',
-  mentalHealth: 'Mental Health',
-  health:       'Health',
-  focus:        'Focus',
-  creativity:   'Creativity',
-  productivity: 'Productivity',
-};
-
 export const MODEL = 'gemini-2.5-flash';
 // Tool rounds per user message before the model is forced to answer in text.
 export const MAX_TOOL_ROUNDS = 6;
 // Prior chat messages resent each turn.
 const HISTORY_LIMIT = 20;
-
-/** Returns the "level" of a raw stat XP value (same formula as the app) */
-const statLevel = (rawXp) => {
-  if (!rawXp || rawXp <= 0) return 0;
-  let lvl = 0;
-  let accumulated = 0;
-  while (accumulated + xpCapForLevel(lvl + 1) <= rawXp) {
-    accumulated += xpCapForLevel(lvl + 1);
-    lvl++;
-  }
-  return lvl;
-};
-
-/** Identify the 3 weakest and 3 strongest stats */
-const analyzeStats = (stats) => {
-  const entries = Object.entries(stats).map(([key, xp]) => ({
-    key,
-    label: STAT_LABELS[key] || key,
-    level: statLevel(xp),
-    xp: xp || 0,
-  }));
-  entries.sort((a, b) => a.xp - b.xp);
-  const weakest = entries.slice(0, 3);
-  const strongest = entries.slice(-3).reverse();
-  return { weakest, strongest, all: entries };
-};
 
 const fmtTime = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
@@ -192,7 +154,6 @@ const summarizeWeekPriority = (weeklyReviews) => {
 export const buildSystemPrompt = (state) => {
   const { user } = state;
   const now = new Date();
-  const { weakest, strongest, all } = analyzeStats(user.stats || {});
   const nowLine = `${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, ${fmtTime(now.getHours(), now.getMinutes())} local time (today is ${getLocalDateKey(0)})`;
 
   return `You are ${user.name}'s personal coach and assistant inside their self-improvement app "APEX". You are an agent: you can look things up and take real actions in the app with your tools. Your one job is to help ${user.name} become the person described in their North Star — every suggestion, plan and nudge should move them toward it.
@@ -202,7 +163,7 @@ YOUR PERSONA — DIRECT COACH:
 - Genuinely in their corner: name real wins and momentum when they happen.
 - Never generic. Every piece of advice cites their actual numbers, tasks, goals, journal or memory.
 - Concise by default (a few short lines). Go deeper only when asked or when planning.
-- Light RPG flavor is fine (stats, levels, XP) but don't overdo it. Call calendar items "time blocks".
+- Light RPG flavor is fine (levels, XP) but don't overdo it. Call calendar items "time blocks".
 - End every reply with ONE clear next action.
 - Formatting: plain text with line breaks; **bold** is supported; "- " bullets are fine. No headings, tables or code blocks.
 
@@ -218,8 +179,6 @@ TODAY:
 ${summarizeToday(state)}
 
 CHARACTER: Level ${user.level} (${user.xp}/${xpCapForLevel(user.level)} XP)
-Weakest stats: ${weakest.map((s) => `${s.label} Lv ${s.level}`).join(', ')}
-Strongest stats: ${strongest.map((s) => `${s.label} Lv ${s.level}`).join(', ')}
 
 OPEN TASKS (ids in brackets):
 ${summarizeTasks(state.todos)}
@@ -238,8 +197,6 @@ ${summarizeRecentJournal(state.logs, state.commitmentArchive)}
 
 THIS WEEK'S #1 PRIORITY: ${summarizeWeekPriority(state.weeklyReviews)}
 
-VALID STAT KEYS: ${all.map((s) => s.key).join(', ')}
-
 HOW YOU WORK:
 - Look before you speak: if the snapshot above doesn't cover something (past days, health, journal history, score trend, focus time, brain dump, wishlist), call a read tool instead of guessing or saying you lack data. An empty CALENDAR day means nothing is scheduled.
 - Act when it helps: when they ask you to plan, schedule, capture or organize something, do it with tools rather than describing what they could do. Check get_calendar before scheduling so blocks don't collide.
@@ -248,7 +205,7 @@ HOW YOU WORK:
 - XP is earned, never handed out: you cannot complete tasks, tick habits, complete time blocks or resolve commitments. Remind them to do it themselves.
 - Memory: when you learn something durable (a recurring pattern, how they like to work, life context, a notable win), call remember. Keep memory accurate — forget entries that are outdated or wrong. Don't store one-off details.
 - North Star: if it's not set, help them articulate it in their own words through a short conversation, then propose it with set_north_star. Measure plans and advice against it.
-- Weakest stats, a broken streak, a missed commitment or stress in the journal are things to address directly, with one concrete fix.`;
+- A broken streak, a missed commitment or stress in the journal are things to address directly, with one concrete fix.`;
 };
 
 // ─── Chat history → Gemini contents ───────────────────────────────────────────
@@ -349,7 +306,7 @@ export const geminiGenerateJson = async ({ contents, systemPrompt, schema }) => 
  * Returns { text, applied: [{tool, label, op, inverse}], proposed: [{tool, args, label}] }
  */
 export const runAssistantTurn = async ({
-  history, userMessage, state, validStats, generate = geminiGenerate, maxRounds = MAX_TOOL_ROUNDS,
+  history, userMessage, state, generate = geminiGenerate, maxRounds = MAX_TOOL_ROUNDS,
 }) => {
   const systemPrompt = buildSystemPrompt(state);
   const contents = toGeminiContents(history, userMessage);
@@ -362,8 +319,8 @@ export const runAssistantTurn = async ({
     if (!tool) return { error: `Unknown tool "${call.name}".` };
     const args = call.args || {};
     try {
-      if (tool.tier === 'read') return tool.run(args, { state: working, validStats });
-      const prepared = tool.prepare(args, { state: working, validStats });
+      if (tool.tier === 'read') return tool.run(args, { state: working });
+      const prepared = tool.prepare(args, { state: working });
       if (tool.tier === 'auto') {
         working = applyOpToState(working, prepared.op);
         applied.push({ tool: tool.name, label: prepared.label, op: prepared.op, inverse: prepared.inverse });

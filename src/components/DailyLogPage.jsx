@@ -6,10 +6,8 @@ import {
 import './DailyLogPage.css';
 import EMOTIONS from '../utils/logMeta';
 import flameIcon from '../assets/flame_icon.png';
-import STAT_META from './statMeta';
 import {
   habitDateStr,
-  getHabitAttrs,
   getHabitStreak,
   getHabitBestStreak,
   getHabitTotalCompletions,
@@ -132,7 +130,6 @@ const HabitDetailModal = ({ habit, onToggleDay, onClose }) => {
   );
   const monthLabel = viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
-  const attrs = getHabitAttrs(habit);
   const doneToday = !!habit.history?.[todayKey];
   const stats = [
     { icon: <img src={flameIcon} alt="" className="hdm-stat-flame" />, value: getHabitStreak(habit), label: 'Streak' },
@@ -149,19 +146,6 @@ const HabitDetailModal = ({ habit, onToggleDay, onClose }) => {
         <div className="hdm-header">
           <div className="hdm-header-text">
             <h3 className="hdm-title">{habit.name}</h3>
-            <div className="hdm-attrs">
-              {attrs.map(a => (
-                <span
-                  key={a}
-                  className="hdm-attr-badge"
-                  style={{
-                    color: STAT_META[a]?.color ?? '#555',
-                    borderColor: `${STAT_META[a]?.color ?? '#555'}55`,
-                    background: `${STAT_META[a]?.color ?? '#555'}18`,
-                  }}
-                >{STAT_META[a]?.label ?? a}</span>
-              ))}
-            </div>
           </div>
           <button className="hdm-close-btn" onClick={onClose} aria-label="Close habit details">
             <X size={18} />
@@ -223,16 +207,6 @@ const HabitDetailModal = ({ habit, onToggleDay, onClose }) => {
 const HabitFormModal = ({ habit, initialName = '', onSave, onClose }) => {
   const isEdit = !!habit;
   const [name, setName] = useState(habit?.name || initialName);
-  const [selectedAttrs, setSelectedAttrs] = useState(habit ? getHabitAttrs(habit) : ['discipline']);
-  const allAttrs = Object.keys(STAT_META);
-
-  const toggleAttr = (attr) => {
-    setSelectedAttrs(prev =>
-      prev.includes(attr)
-        ? prev.length > 1 ? prev.filter(a => a !== attr) : prev
-        : [...prev, attr]
-    );
-  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -240,7 +214,6 @@ const HabitFormModal = ({ habit, initialName = '', onSave, onClose }) => {
     onSave({
       ...(habit || { id: Date.now(), history: {} }),
       name: name.trim(),
-      attributes: selectedAttrs,
     });
     onClose();
   };
@@ -263,23 +236,6 @@ const HabitFormModal = ({ habit, initialName = '', onSave, onClose }) => {
             onChange={e => setName(e.target.value)}
             autoFocus
           />
-          <div className="hfm-attr-row">
-            {allAttrs.map(attr => (
-              <button
-                key={attr}
-                type="button"
-                className={`hfm-attr-pill${selectedAttrs.includes(attr) ? ' selected' : ''}`}
-                onClick={() => toggleAttr(attr)}
-                style={selectedAttrs.includes(attr) ? {
-                  borderColor: STAT_META[attr].color,
-                  color: STAT_META[attr].color,
-                  background: `${STAT_META[attr].color}18`,
-                } : {}}
-              >
-                {STAT_META[attr].label}
-              </button>
-            ))}
-          </div>
           <div className="hfm-form-actions">
             <button type="button" className="hfm-cancel-btn" onClick={onClose}>Cancel</button>
             <button type="submit" className="hfm-save-btn" disabled={!name.trim()}>Save</button>
@@ -331,7 +287,7 @@ const LOOP_LABELS = { yes: 'Yes', partly: 'A little', no: 'Not that day' };
 const DailyLogPage = ({
   logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], northStar, logPatterns,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
-  setFoodPoints, onUpdateStat, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
+  setFoodPoints, onAwardXp, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
   onExpandLesson, onAskAssistant, onNavigate, calendarEvents = [],
 }) => {
   const todayKey = getTodayKey();
@@ -524,7 +480,7 @@ const DailyLogPage = ({
             setFoodLog={setFoodLog}
             foodPoints={foodPoints}
             setFoodPoints={setFoodPoints}
-            onUpdateStat={onUpdateStat}
+            onAwardXp={onAwardXp}
             goals={goals}
             northStar={northStar}
             logPatterns={logPatterns}
