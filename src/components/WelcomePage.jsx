@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
   Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Pin, Star, CalendarCheck,
@@ -13,6 +12,7 @@ import {
   getDayMode, getNextUp, getYesterdayCommitment, getNextMove, getCloseDaySteps,
 } from '../utils/homeUtils';
 import { todayQueue } from '../utils/taskUtils';
+import { useNow } from '../hooks/useNow';
 
 const getGreeting = (hour) => {
   if (hour < 5) return 'Good night';
@@ -26,16 +26,6 @@ const KIND_ICON = { event: Clock, block: PhoneOff, reminder: Bell };
 
 const fmtClock = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 const fmtSpan = (item) => (item.startMs === item.endMs ? fmtClock(item.startMs) : `${fmtClock(item.startMs)} – ${fmtClock(item.endMs)}`);
-
-// Re-renders every `ms` so countdowns and the time-of-day mode stay current.
-function useNow(ms) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), ms);
-    return () => clearInterval(id);
-  }, [ms]);
-  return now;
-}
 
 // ── Top bar ──────────────────────────────────────────────────────────────────
 function TopBar({ name, now }) {

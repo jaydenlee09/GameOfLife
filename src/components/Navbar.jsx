@@ -1,23 +1,44 @@
-import React, { useState, useLayoutEffect } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useLayoutEffect, useMemo } from 'react';
+import { X, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { TIER_ICONS } from '../utils/rankMeta';
 import { scoreColor } from '../utils/scoreUtils';
+import { getNextMove } from '../utils/homeUtils';
+import { getNavHints, MOD_KEY_LABEL } from '../utils/navUtils';
+import { useNow } from '../hooks/useNow';
+import CommandPalette from './CommandPalette';
 import './Navbar.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 
-const NAV_LINKS = [
-  { id: 'welcome',    label: 'Home',        icon: <HomeIcon /> },
-  { id: 'statistics', label: 'Statistics',  icon: <StatIcon /> },
-  { id: 'tasks',      label: 'Tasks',       icon: <TaskIcon /> },
-  { id: 'daily-log',  label: 'Daily Log',   icon: <LogIcon /> },
-  { id: 'timer',      label: 'Timer',       icon: <TimerIcon /> },
-  { id: 'calendar',   label: 'Calendar',    icon: <CalIcon /> },
-  { id: 'goals',      label: 'Goals',       icon: <TargetIcon /> },
-  { id: 'review',     label: 'Review',      icon: <ReviewIcon /> },
-  { id: 'shop',       label: 'Shop',        icon: <ShopIcon /> },
-  { id: 'brain-dump', label: 'Brain Dump',  icon: <BrainDumpIcon /> },
+// Desktop sidebar groups: what you use today, what tracks your progress, the rest.
+const NAV_GROUPS = [
+  {
+    label: 'Today',
+    links: [
+      { id: 'welcome',    label: 'Home',       icon: <HomeIcon /> },
+      { id: 'tasks',      label: 'Tasks',      icon: <TaskIcon /> },
+      { id: 'calendar',   label: 'Calendar',   icon: <CalIcon /> },
+      { id: 'daily-log',  label: 'Daily Log',  icon: <LogIcon /> },
+      { id: 'timer',      label: 'Timer',      icon: <TimerIcon /> },
+    ],
+  },
+  {
+    label: 'Grow',
+    links: [
+      { id: 'goals',      label: 'Goals',      icon: <TargetIcon /> },
+      { id: 'statistics', label: 'Statistics', icon: <StatIcon /> },
+      { id: 'review',     label: 'Review',     icon: <ReviewIcon /> },
+    ],
+  },
+  {
+    label: 'Extras',
+    links: [
+      { id: 'shop',       label: 'Shop',       icon: <ShopIcon /> },
+      { id: 'brain-dump', label: 'Brain Dump', icon: <BrainDumpIcon /> },
+    ],
+  },
 ];
+const NAV_LINKS = NAV_GROUPS.flatMap(group => group.links);
 
 // Phone tab bar: the daily-use pages. Everything else lives in the More sheet.
 const TAB_LINKS = [
@@ -158,88 +179,64 @@ function GearIcon() {
   );
 }
 
-// Today's Daily Score, footer-sized. The number sits INSIDE the ring so a collapsed
+// Today's Daily Score ring. The number sits INSIDE the ring so a collapsed
 // sidebar still shows the real value rather than just a colored arc.
-function ScoreChip({ score, onNavigate }) {
+function ScoreRing({ score }) {
   const value = Number.isFinite(score) ? Math.max(0, Math.min(score, 10)) : 0;
   const color = scoreColor(value);
   const R = 13;
   const C = 2 * Math.PI * R;
 
   return (
-    <button
-      className="sidebar-score-chip"
-      onClick={() => onNavigate('statistics')}
-      title={`Today's Daily Score — ${value.toFixed(1)} / 10`}
-    >
-      <span className="sidebar-score-ring">
-        <svg width="32" height="32" viewBox="0 0 32 32">
-          <circle cx="16" cy="16" r={R} fill="none" stroke="var(--bg-elevated-2)" strokeWidth="2.5" />
-          <circle
-            cx="16" cy="16" r={R} fill="none"
-            stroke={color} strokeWidth="2.5" strokeLinecap="round"
-            strokeDasharray={C} strokeDashoffset={C * (1 - value / 10)}
-            transform="rotate(-90 16 16)"
-            style={{ transition: 'stroke-dashoffset 0.5s var(--ease)' }}
-          />
-        </svg>
-        <span className="sidebar-score-number" style={{ color }}>{value.toFixed(1)}</span>
-      </span>
-      <span className="sidebar-score-text">
-        <span className="sidebar-score-label">Daily Score</span>
-        <span className="sidebar-score-outof">out of 10 today</span>
-      </span>
-    </button>
+    <span className="sidebar-score-ring">
+      <svg width="32" height="32" viewBox="0 0 32 32">
+        <circle cx="16" cy="16" r={R} fill="none" stroke="var(--bg-elevated-2)" strokeWidth="2.5" />
+        <circle
+          cx="16" cy="16" r={R} fill="none"
+          stroke={color} strokeWidth="2.5" strokeLinecap="round"
+          strokeDasharray={C} strokeDashoffset={C * (1 - value / 10)}
+          transform="rotate(-90 16 16)"
+          style={{ transition: 'stroke-dashoffset 0.5s var(--ease)' }}
+        />
+      </svg>
+      <span className="sidebar-score-number" style={{ color }}>{value.toFixed(1)}</span>
+    </span>
   );
 }
 
-const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, dailyScore, onOpenDataModal, isMobileMenuOpen, onMobileMenuToggle, onMobileMenuClose, firebaseUser, onSignOut }) => {
-  const pct = userXpCap ? Math.min((userXp / userXpCap) * 100, 100) : 0;
-  const RankIcon = rankStatus ? TIER_ICONS[rankStatus.tier.icon] : null;
-  const moreActive = isMobileMenuOpen || MORE_LINKS.some(link => link.id === activePage);
+// Score, rank and level on one row, the XP bar under it, then you.
+function SidebarFooter({ dailyScore, rankStatus, userLevel, userXp, userXpCap, userEmail, firebaseUser, onNavigate, onOpenDataModal, onSignOut }) {
+  const level = userLevel ?? 1;
+  const xp = userXp ?? 0;
+  const cap = userXpCap ?? 100;
+  const pct = cap ? Math.min((xp / cap) * 100, 100) : 0;
+  const score = Number.isFinite(dailyScore) ? dailyScore : 0;
+  const tier = rankStatus?.tier;
+  const RankIcon = tier ? TIER_ICONS[tier.icon] : null;
+  const statusTitle = [
+    `Daily Score ${score.toFixed(1)} / 10`,
+    tier && `${tier.name} (${rankStatus.streakDays}-day streak)`,
+    `Level ${level}`,
+  ].filter(Boolean).join(' · ');
 
-  // Tapping the tab you're already on goes back to the top, like native tab bars.
-  const handleTab = (id) => {
-    if (id === activePage && !isMobileMenuOpen) window.scrollTo({ top: 0, behavior: 'smooth' });
-    else onNavigate(id);
-  };
-
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true');
-
-  useLayoutEffect(() => {
-    document.documentElement.style.setProperty(
-      '--sidebar-w',
-      collapsed ? 'var(--sidebar-w-collapsed)' : '220px'
-    );
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
-  }, [collapsed]);
-
-  const SidebarFooter = () => (
+  return (
     <div className="sidebar-footer">
-      <ScoreChip score={dailyScore} onNavigate={onNavigate} />
-      {rankStatus && (
-        <button
-          className="sidebar-rank-chip"
-          onClick={() => onNavigate('statistics')}
-          title={`${rankStatus.tier.name} — ${rankStatus.streakDays}-day streak`}
-        >
-          <span className="sidebar-rank-icon-ring" style={{ '--tier-color': rankStatus.tier.color }}>
-            {RankIcon && <RankIcon size={14} color={rankStatus.tier.color} />}
+      <button className="sidebar-status" onClick={() => onNavigate('statistics')} title={statusTitle} aria-label={statusTitle}>
+        <ScoreRing score={score} />
+        {tier && (
+          <span className="sidebar-rank" style={{ '--tier-color': tier.color }}>
+            <span className="sidebar-rank-icon">{RankIcon && <RankIcon size={12} color={tier.color} />}</span>
+            <span className="sidebar-rank-name">{tier.name}</span>
           </span>
-          <span className="sidebar-rank-name" style={{ color: rankStatus.tier.color }}>{rankStatus.tier.name}</span>
-        </button>
-      )}
-      <div className="sidebar-xp-section">
-        <div className="sidebar-xp-header">
-          <span className="sidebar-xp-level">LVL {userLevel ?? 1}</span>
-          <span className="sidebar-xp-count">{userXp ?? 0} / {userXpCap ?? 100}</span>
-        </div>
+        )}
+        <span className="sidebar-level">LVL {level}</span>
+      </button>
+
+      <div className="sidebar-xp" title={`${xp} / ${cap} XP to level ${level + 1}`}>
         <div className="sidebar-xp-track">
-          <div
-            className="sidebar-xp-fill"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="sidebar-xp-fill" style={{ width: `${pct}%` }} />
         </div>
+        <span className="sidebar-xp-count">{xp}/{cap}</span>
       </div>
 
       <div className="sidebar-user">
@@ -278,6 +275,53 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
       </div>
     </div>
   );
+}
+
+const Navbar = ({
+  activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, dailyScore,
+  scoreInputs, todos, logReviews, weeklyReviews,
+  paletteOpen, onOpenPalette, onClosePalette, commands,
+  onOpenDataModal, isMobileMenuOpen, onMobileMenuToggle, onMobileMenuClose, firebaseUser, onSignOut,
+}) => {
+  const moreActive = isMobileMenuOpen || MORE_LINKS.some(link => link.id === activePage);
+  const now = useNow(60000);
+
+  // Tapping the tab you're already on goes back to the top, like native tab bars.
+  const handleTab = (id) => {
+    if (id === activePage && !isMobileMenuOpen) window.scrollTo({ top: 0, behavior: 'smooth' });
+    else onNavigate(id);
+  };
+
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true');
+
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty(
+      '--sidebar-w',
+      collapsed ? 'var(--sidebar-w-collapsed)' : '220px'
+    );
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+  }, [collapsed]);
+
+  const hints = useMemo(
+    () => getNavHints({ todos, calendarEvents: scoreInputs.calendarEvents, logs: scoreInputs.logs, logReviews, weeklyReviews }, now),
+    [todos, scoreInputs, logReviews, weeklyReviews, now]
+  );
+  const { move } = useMemo(() => getNextMove(scoreInputs, now), [scoreInputs, now]);
+
+  const footer = (
+    <SidebarFooter
+      dailyScore={dailyScore}
+      rankStatus={rankStatus}
+      userLevel={userLevel}
+      userXp={userXp}
+      userXpCap={userXpCap}
+      userEmail={userEmail}
+      firebaseUser={firebaseUser}
+      onNavigate={onNavigate}
+      onOpenDataModal={onOpenDataModal}
+      onSignOut={onSignOut}
+    />
+  );
 
   return (
     <>
@@ -293,25 +337,74 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
           {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
 
-        <div className="sidebar-brand" />
+        <div className="sidebar-top">
+          <button
+            className="sidebar-ask"
+            onClick={onOpenPalette}
+            title={collapsed ? `Search or ask (${MOD_KEY_LABEL}K)` : undefined}
+            aria-label="Search pages or ask My Assistant"
+          >
+            <Search size={14} className="sidebar-ask-icon" />
+            <span className="sidebar-ask-text">Search or ask…</span>
+            <kbd className="sidebar-kbd">{MOD_KEY_LABEL}K</kbd>
+          </button>
+
+          {move && (
+            <button
+              className="sidebar-next"
+              onClick={() => onNavigate(move.page || 'welcome')}
+              title={`${move.text} (+${move.gain.toFixed(1)} to today's score)`}
+            >
+              <span className="sidebar-next-label">Next</span>
+              <span className="sidebar-next-row">
+                <span className="sidebar-next-text">{move.text}</span>
+                <span className="sidebar-next-gain">+{move.gain.toFixed(1)}</span>
+              </span>
+            </button>
+          )}
+        </div>
 
         <nav className="sidebar-nav">
-          {NAV_LINKS.map(({ id, label, icon }) => (
-            <button
-              key={id}
-              className={`sidebar-link ${activePage === id ? 'active' : ''}`}
-              onClick={() => onNavigate(id)}
-              title={collapsed ? label : undefined}
-            >
-              <span className="sidebar-link-icon">{icon}</span>
-              <span className="sidebar-link-label">{label}</span>
-              {activePage === id && <span className="sidebar-link-active-bar" />}
-            </button>
+          {NAV_GROUPS.map(group => (
+            <div key={group.label} className="sidebar-group">
+              <span className="sidebar-group-label">{group.label}</span>
+              {group.links.map(({ id, label, icon }) => {
+                const hint = hints[id];
+                const tone = hint?.tone ? ` is-${hint.tone}` : '';
+                return (
+                  <button
+                    key={id}
+                    className={`sidebar-link ${activePage === id ? 'active' : ''}`}
+                    onClick={() => onNavigate(id)}
+                    title={collapsed ? (hint?.text ? `${label} · ${hint.text}` : label) : undefined}
+                    aria-current={activePage === id ? 'page' : undefined}
+                  >
+                    <span className="sidebar-link-icon">
+                      {icon}
+                      {hint && <span className={`sidebar-link-badge${tone}`} />}
+                    </span>
+                    <span className="sidebar-link-label">{label}</span>
+                    {hint?.text && <span className={`sidebar-link-hint${tone}`}>{hint.text}</span>}
+                    {hint?.dot && <span className="sidebar-link-pip" aria-label="Needs you" />}
+                    {activePage === id && <span className="sidebar-link-active-bar" />}
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </nav>
 
-        <SidebarFooter />
+        {footer}
       </aside>
+
+      {paletteOpen && (
+        <CommandPalette
+          links={NAV_LINKS}
+          onClose={onClosePalette}
+          onNavigate={onNavigate}
+          commands={commands}
+        />
+      )}
 
       {/* Mobile More sheet — only rendered when open to avoid event interception */}
       {isMobileMenuOpen && (
@@ -337,7 +430,7 @@ const Navbar = ({ activePage, onNavigate, userEmail, userLevel, userXp, userXpCa
               ))}
             </nav>
 
-            <SidebarFooter />
+            {footer}
           </div>
         </>
       )}

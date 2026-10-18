@@ -33,6 +33,7 @@ import DayPlanner from './components/DayPlanner'
 import { getTool, applySliceOp } from './utils/assistantTools'
 import { checkInBlock, completeTask, findBlockInstance } from './utils/completionUtils'
 import { pruneDoneTasks } from './utils/taskUtils'
+import { ALT_PAGE_KEYS, IS_MAC, shortcutKeyOf } from './utils/navUtils'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
 import { normalizeGoal } from './utils/goalUtils'
 
@@ -68,6 +69,7 @@ function App() {
   const [assistantOpen, setAssistantOpen] = useState(() => launchPage === 'assistant');
   const [assistantDraft, setAssistantDraft] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
@@ -359,10 +361,11 @@ function App() {
   // read one value. Deps are the full state references, not `.length`: ticking a
   // habit writes `habits[i].history[dateKey]` and leaves the array length alone, so
   // a length-keyed memo would leave a stale score on screen until the next reload.
-  const dailyScore = useMemo(
-    () => computeDailyScore({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
+  const scoreInputs = useMemo(
+    () => ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
     [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents]
   );
+  const dailyScore = useMemo(() => computeDailyScore(scoreInputs), [scoreInputs]);
 
   // ─── Rank ──────────────────────────────────────────────────────────────────────
   // Rank is a "maintain" system: it holds a tier only while the Daily Score keeps
@@ -824,13 +827,19 @@ function App() {
   // ─── Keyboard Shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
+      const key = shortcutKeyOf(e);
+      // ⌘K / Ctrl+K works even while typing, like every other app's command palette.
+      if (key === 'k' && (IS_MAC ? e.metaKey : e.ctrlKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        setPaletteOpen(o => !o);
+        return;
+      }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-      if (e.altKey) {
-        const pageMap = { '1': 'statistics', '2': 'tasks', '3': 'daily-log', '4': 'timer', '5': 'calendar', '6': 'goals', '7': 'review' };
-        if (pageMap[e.key]) { e.preventDefault(); setCurrentPage(pageMap[e.key]); return; }
-        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleAssistant(); return; }
-        if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFocusModeOpen(true); return; }
-        if (e.key === 's' || e.key === 'S') { e.preventDefault(); setCurrentPage('shop'); return; }
+      // By physical key: Option+1 on a Mac types "¡", so e.key never matched there.
+      if (e.altKey && !e.metaKey && !e.ctrlKey) {
+        if (ALT_PAGE_KEYS[key]) { e.preventDefault(); setCurrentPage(ALT_PAGE_KEYS[key]); return; }
+        if (key === 'm') { e.preventDefault(); toggleAssistant(); return; }
+        if (key === 'f') { e.preventDefault(); setFocusModeOpen(true); return; }
       }
     };
     window.addEventListener('keydown', handler);
@@ -1207,6 +1216,19 @@ function App() {
         userXpCap={xpCapForLevel(user.level)}
         rankStatus={rankStatus}
         dailyScore={dailyScore.score}
+        scoreInputs={scoreInputs}
+        todos={todos}
+        logReviews={logReviews}
+        weeklyReviews={weeklyReviews}
+        paletteOpen={paletteOpen}
+        onOpenPalette={() => setPaletteOpen(true)}
+        onClosePalette={() => setPaletteOpen(false)}
+        commands={{
+          planDay: () => openPlanner(),
+          startFocus: () => setFocusModeOpen(true),
+          openAssistant,
+          ask: askAssistant,
+        }}
         onOpenDataModal={() => setDataModalOpen(true)}
         isMobileMenuOpen={mobileMenuOpen}
         onMobileMenuToggle={() => setMobileMenuOpen(o => !o)}

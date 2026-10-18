@@ -1,0 +1,174 @@
+/* ═══════════════════════════════════════════════════════════════
+   ⌘K PALETTE — jump to a page, run an action, or ask My Assistant
+   z-index: above the mobile bottom nav (9000) and Plan My Day / Focus (9500),
+   below the My Assistant drawer (9999).
+   ═══════════════════════════════════════════════════════════════ */
+
+.cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9600;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 14vh 16px 16px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: cmdkFade 0.14s var(--ease);
+}
+
+.cmdk {
+  width: min(560px, 100%);
+  max-height: min(480px, 76vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg), rgba(28, 28, 30, 0.92);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  animation: cmdkIn 0.16s var(--ease);
+}
+
+@keyframes cmdkFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes cmdkIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Input ─────────────────────────────────────────────────────── */
+.cmdk-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--separator);
+}
+
+.cmdk-input-icon {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.cmdk-input,
+.cmdk-input:focus {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.cmdk-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.cmdk-kbd {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--separator-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-tertiary);
+  font-family: inherit;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+}
+
+/* ── Results ───────────────────────────────────────────────────── */
+.cmdk-list {
+  overflow-y: auto;
+  padding: 0.4rem;
+  scrollbar-width: thin;
+}
+
+.cmdk-section-title {
+  padding: 0.6rem 0.65rem 0.3rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.cmdk-item,
+.cmdk-item:hover {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cmdk-item[data-active='true'] {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+}
+
+.cmdk-item-icon {
+  flex-shrink: 0;
+  display: flex;
+  width: 16px;
+  color: var(--text-tertiary);
+}
+
+.cmdk-item[data-active='true'] .cmdk-item-icon {
+  color: var(--accent);
+}
+
+.cmdk-item-label {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* What you typed, on the Ask row */
+.cmdk-item-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.cmdk-item-kbd {
+  margin-left: auto;
+}
+
+.cmdk-item-enter {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.cmdk-item-detail + .cmdk-item-enter,
+.cmdk-item-kbd + .cmdk-item-enter {
+  margin-left: 0;
+}
+
+.cmdk-item-label + .cmdk-item-enter {
+  margin-left: auto;
+}

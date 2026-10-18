@@ -1,5 +1,41 @@
 # Todo
 
+## Done, uncommitted (2026-10-17): Desktop sidebar, more helpful but still minimal
+
+User choices: all four additions (grouped links, live status hints, next-move card, ⌘K jump-or-ask);
+floating "Ask anything" bar stays as is (⌘K is a second door into the same assistant, no new AI
+calls); footer squeezed to one compact row + XP bar + user row.
+
+Design:
+- Groups: Today (Home, Tasks, Calendar, Daily Log, Timer) · Grow (Goals, Statistics, Review) ·
+  Extras (Shop, Brain Dump). Quiet labels; collapsed sidebar shows thin dividers instead.
+  The empty `.sidebar-brand` strip goes; the ⌘K button takes its place.
+- Hints (`getNavHints` in new `utils/navUtils.js`, pure, takes `now`), shown only when actionable:
+  Tasks "N left" (todayQueue) · Calendar: "N to check in" (amber) > "now" > next block's start
+  time (getPlanDay) · Daily Log dot in the evening until Close the Day is done (getCloseDaySteps)
+  · Review dot from Sunday noon until this week's review is saved. Collapsed: a dot on the icon.
+- Next-move card: getNextMove (same as Home's "Next:" line), click goes to `move.page || 'welcome'`.
+  Hidden when there's no move and when collapsed.
+- ⌘K / Ctrl+K palette (`CommandPalette.jsx`, rendered by Navbar, open state in App): actions
+  (Plan my day, Start focus, Open My Assistant, Close the day) + every page with its Alt shortcut;
+  typed text with no exact intent falls through to "Ask My Assistant: …" (askAssistant).
+  Alt page keys move to `navUtils` so App's handler and the palette's hints can't drift.
+- `useNow` moves from WelcomePage to `hooks/useNow.js` and is shared.
+
+Steps:
+- [x] navUtils (ALT_PAGE_KEYS, getNavHints) + hooks/useNow; App passes scoreInputs/data + commands
+- [x] Navbar: ⌘K button, next-move card, grouped links with hints, compact footer, collapsed state
+- [x] CommandPalette + ⌘K handler
+- [x] Verify in browser: 1440 wide, collapsed, phone More sheet, palette keyboard flow, ask fallback
+- [x] Lint (before/after, non-empty), build, memory
+
+Verified: browser at 1440/1280 wide, collapsed and phone More sheet (no overflow, toggle clears the
+search box); ⌘K open/type/Enter/arrows/Esc; Plan my day runs; ask fallback reaches Gemini request body;
+Option+2 / Option+S by key code; Ctrl+K ignored on Mac; Calendar hint missed → time after Done;
+navUtils unit checks (evening/Sunday/now cases); lint no new issues (Navbar's 2 old errors gone); build ok.
+Note: More sheet tile order follows the new groups (Timer, Goals, Statistics, Review, Shop, Brain Dump).
+
+
 ## Done, uncommitted (2026-10-17): Calendar that holds you to the plan
 
 Goal: the calendar should hold you to the plan, not just record it. Four parts: a missed-block
