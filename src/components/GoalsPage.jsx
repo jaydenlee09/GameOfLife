@@ -1,906 +1,579 @@
 import React, { useMemo, useState } from 'react';
 import './GoalsPage.css';
-import { X, Pin, Pencil, Flame } from 'lucide-react';
+import {
+  X, Pin, Pencil, Flame, Plus, ArrowUp, CalendarDays, ChevronDown, Check, Play, Trash2,
+  ListChecks, Timer, CalendarCheck, Flag, CircleCheck, CalendarPlus,
+} from 'lucide-react';
 import NorthStarCard from './NorthStarCard';
 import {
-  normalizeGoal,
-  getGoalProgress,
-  toggleMilestone,
-  toggleGoalCompleted,
-  goalCompletionXp,
-  MILESTONE_XP,
+  getGoalProgress, getGoalActivity, getGoalStatus, getFocusGoals, getNextStep, deadlineLabel,
+  lastMovedLabel, deadlinePresets, toggleMilestone, toggleGoalCompleted, goalCompletionXp,
+  setGoalCheckin, pushDeadline, makeGoal, patchGoal, addMilestone, goalDateKey, MILESTONE_XP, FOCUS_GOAL_LIMIT,
 } from '../utils/goalUtils';
+import { makeTask } from '../utils/taskUtils';
+import { getHabitStreak } from '../utils/habitUtils';
 
-const ArrowLeftIcon = ({ size = 18, strokeWidth = 2.5 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={strokeWidth}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path d="M15 18l-6-6 6-6" />
-  </svg>
-);
+const STATUS_LABEL = { 'on-track': 'Moving', quiet: 'Quiet', overdue: 'Overdue', done: 'Done' };
 
-const ArrowRightIcon = ({ size = 18, strokeWidth = 2.5 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={strokeWidth}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path d="M9 6l6 6-6 6" />
-  </svg>
-);
-
-const PERIODS = [
-  { key: 'weekly', label: 'Week' },
-  { key: 'monthly', label: 'Month' },
-  { key: 'yearly', label: 'Year' },
-  { key: 'all', label: 'All' },
-];
-
-const ALL_VIEW_PERIODS = [
-  { key: 'weekly', label: 'Week' },
-  { key: 'monthly', label: 'Month' },
-  { key: 'yearly', label: 'Year' },
-];
-
-const PERIOD_NOUN = { weekly: 'week', monthly: 'month', yearly: 'year' };
-const TIMEFRAME_BY_PERIOD = { weekly: 'this-week', monthly: 'this-month', yearly: 'this-year' };
-// Mirrors TasksPage's XP_BY_TIMEFRAME for week/month/year, so a task created
-// from a goal earns the same XP as one created directly in Tasks.
-const GOAL_TASK_XP_BY_PERIOD = { weekly: 50, monthly: 100, yearly: 500 };
-
-const pad2 = (n) => String(n).padStart(2, '0');
-
-const toLocalDateKey = (date) => {
-  const y = date.getFullYear();
-  const m = pad2(date.getMonth() + 1);
-  const d = pad2(date.getDate());
-  return `${y}-${m}-${d}`;
+const EVENT_META = {
+  task: { Icon: ListChecks, verb: 'Task done' },
+  habit: { Icon: Flame, verb: 'Habit' },
+  focus: { Icon: Timer, verb: 'Focus' },
+  block: { Icon: CalendarCheck, verb: 'Time block' },
+  milestone: { Icon: Flag, verb: 'Milestone' },
+  checkin: { Icon: CircleCheck, verb: 'Checked in' },
 };
 
-const startOfWeekMonday = (date) => {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+const shortDay = (dateKey, todayKey) => {
+  if (dateKey === todayKey) return 'Today';
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const startOfMonth = (date) => {
-  const d = new Date(date.getFullYear(), date.getMonth(), 1);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+// ─── Deadline chips (quick add + edit) ───────────────────────────────────────
 
-const startOfYear = (date) => {
-  const d = new Date(date.getFullYear(), 0, 1);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+function DeadlineChips({ value, onChange, now }) {
+  const presets = deadlinePresets(now);
+  const isPreset = presets.some((p) => p.key === value);
+  const openPicker = (e) => { try { e.currentTarget.showPicker(); } catch { /* opens natively (iOS) */ } };
+  return (
+    <div className="gp-chips" role="group" aria-label="Deadline">
+      {presets.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          className={`gp-chip${value === p.key ? ' gp-chip--on' : ''}`}
+          aria-pressed={value === p.key}
+          onClick={() => onChange(p.key)}
+        >
+          {p.label}
+        </button>
+      ))}
+      <label className={`gp-chip gp-chip--pick${value && !isPreset ? ' gp-chip--on' : ''}`}>
+        <CalendarDays size={12} /> {value && !isPreset ? shortDay(value, '') : 'Pick date'}
+        <input
+          type="date"
+          className="gp-chip-date"
+          min={goalDateKey(now)}
+          value={value && !isPreset ? value : ''}
+          aria-label="Pick a deadline"
+          onClick={openPicker}
+          onChange={(e) => e.target.value && onChange(e.target.value)}
+        />
+      </label>
+    </div>
+  );
+}
 
-const addDays = (date, days) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-};
+// ─── Quick add ───────────────────────────────────────────────────────────────
 
-const addMonths = (date, months) => {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return d;
-};
+function GoalQuickAdd({ onAdd, now, autoFocus }) {
+  const [title, setTitle] = useState('');
+  const [deadline, setDeadline] = useState(() => deadlinePresets(now)[0].key);
 
-const addYears = (date, years) => {
-  const d = new Date(date);
-  d.setFullYear(d.getFullYear() + years);
-  return d;
-};
-
-const getPeriodStart = (anchorDate, period) => {
-  if (period === 'weekly') return startOfWeekMonday(anchorDate);
-  if (period === 'monthly') return startOfMonth(anchorDate);
-  return startOfYear(anchorDate);
-};
-
-const getPeriodKey = (anchorDate, period) => {
-  const start = getPeriodStart(anchorDate, period);
-  if (period === 'weekly') return toLocalDateKey(start);
-  if (period === 'monthly') return `${start.getFullYear()}-${pad2(start.getMonth() + 1)}`;
-  return String(start.getFullYear());
-};
-
-const formatPeriodLabel = (anchorDate, period) => {
-  const start = getPeriodStart(anchorDate, period);
-  if (period === 'weekly') {
-    const end = addDays(start, 6);
-    const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
-    const fmtYear = new Intl.DateTimeFormat(undefined, { year: 'numeric' });
-    return `${fmt.format(start)} – ${fmt.format(end)}, ${fmtYear.format(start)}`;
-  }
-  if (period === 'monthly') {
-    const fmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-    return fmt.format(start);
-  }
-  if (period === 'all') return 'All Goals';
-  return String(start.getFullYear());
-};
-
-const parseLocalDateKey = (key) => {
-  if (!key || typeof key !== 'string') return null;
-  const parts = key.split('-').map(s => Number(s));
-  if (parts.length !== 3) return null;
-  const [y, m, d] = parts;
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-};
-
-const parseMonthKey = (key) => {
-  if (!key || typeof key !== 'string') return null;
-  const parts = key.split('-').map(s => Number(s));
-  if (parts.length !== 2) return null;
-  const [y, m] = parts;
-  if (!y || !m) return null;
-  return new Date(y, m - 1, 1);
-};
-
-const getGoalPeriodEnd = (goal) => {
-  if (!goal) return null;
-  if (goal.period === 'weekly') {
-    const start = parseLocalDateKey(goal.periodKey);
-    if (!start) return null;
-    const end = addDays(start, 6);
-    end.setHours(23, 59, 59, 999);
-    return end;
-  }
-  if (goal.period === 'monthly') {
-    const start = parseMonthKey(goal.periodKey);
-    if (!start) return null;
-    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
-    return end;
-  }
-  if (goal.period === 'yearly') {
-    const year = Number(goal.periodKey);
-    if (!year) return null;
-    return new Date(year, 11, 31, 23, 59, 59, 999);
-  }
-  return null;
-};
-
-// A goal is overdue once its period has fully elapsed and it was never
-// finished — used so it keeps showing up (flagged) instead of quietly
-// vanishing from the current-period column once the week/month/year rolls over.
-const isGoalOverdue = (goal) => {
-  if (!goal || goal.completed) return false;
-  const end = getGoalPeriodEnd(goal);
-  if (!end) return false;
-  return end.getTime() < Date.now();
-};
-
-const formatGoalPeriodLabel = (goal) => {
-  if (!goal) return '';
-  if (goal.period === 'weekly') {
-    const start = parseLocalDateKey(goal.periodKey) || startOfWeekMonday(new Date());
-    const end = addDays(start, 6);
-    const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
-    const fmtYear = new Intl.DateTimeFormat(undefined, { year: 'numeric' });
-    return `${fmt.format(start)} – ${fmt.format(end)}, ${fmtYear.format(start)}`;
-  }
-  if (goal.period === 'monthly') {
-    const start = parseMonthKey(goal.periodKey) || startOfMonth(new Date());
-    const fmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-    return fmt.format(start);
-  }
-  if (goal.period === 'yearly') return String(goal.periodKey || new Date().getFullYear());
-  return '';
-};
-
-// Mirrors TasksPage.jsx's getStreak convention exactly (alive if today or
-// yesterday was checked, undercounts by 1 so "2 days in a row" reads as a
-// streak of 1) so the number shown here matches what the user already sees
-// on the habit row in Tasks.
-const getHabitStreak = (habit) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = toLocalDateKey(today);
-  const yesterdayStr = toLocalDateKey(addDays(today, -1));
-
-  const hasToday = !!habit.history[todayStr];
-  const hasYesterday = !!habit.history[yesterdayStr];
-  if (!hasToday && !hasYesterday) return 0;
-
-  let consecutive = 0;
-  const startOffset = hasToday ? 0 : 1;
-  for (let i = startOffset; i < 365; i++) {
-    const dateStr = toLocalDateKey(addDays(today, -i));
-    if (habit.history[dateStr]) consecutive++;
-    else break;
-  }
-  return Math.max(0, consecutive - 1);
-};
-
-const GoalModal = ({ mode, periodLabel, initial, onClose, onSubmit, showPeriodPicker = true, defaultPeriod = 'weekly', getPinnedCount }) => {
-  const [title, setTitle] = useState(initial?.title || '');
-  const [notes, setNotes] = useState(initial?.notes || '');
-  const [goalPeriod, setGoalPeriod] = useState(initial?.period || defaultPeriod);
-  const [milestones, setMilestones] = useState(initial?.milestones || []);
-  const [newMilestoneText, setNewMilestoneText] = useState('');
-  const [showWoop, setShowWoop] = useState(!!(initial?.obstacle?.trim() || initial?.ifThenPlan?.trim()));
-  const [obstacle, setObstacle] = useState(initial?.obstacle || '');
-  const [ifThenPlan, setIfThenPlan] = useState(initial?.ifThenPlan || '');
-  const [pinned, setPinned] = useState(initial?.pinned || false);
-  const [trackNumeric, setTrackNumeric] = useState(initial?.targetValue != null);
-  const [targetValue, setTargetValue] = useState(initial?.targetValue ?? '');
-  const [unit, setUnit] = useState(initial?.unit || '');
-
-  const addMilestone = (e) => {
-    e.preventDefault();
-    if (!newMilestoneText.trim()) return;
-    setMilestones(prev => [...prev, { id: `m_${Date.now()}`, text: newMilestoneText.trim(), completed: false }]);
-    setNewMilestoneText('');
-  };
-
-  const deleteMilestone = (id) => setMilestones(prev => prev.filter(m => m.id !== id));
-
-  const pinnedCount = getPinnedCount ? getPinnedCount(goalPeriod) : 0;
-
-  const handleSubmit = (e) => {
+  const submit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSubmit({
+    onAdd(title.trim(), deadline);
+    setTitle('');
+  };
+
+  return (
+    <form className="gp-add" onSubmit={submit}>
+      <div className="gp-add-row">
+        <Plus size={18} className="gp-add-plus" aria-hidden="true" />
+        <input
+          className="gp-add-input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="What do you want to achieve?"
+          aria-label="New goal"
+          enterKeyHint="done"
+          maxLength={140}
+          autoFocus={autoFocus}
+        />
+        <button type="submit" className="gp-add-submit" disabled={!title.trim()} aria-label="Add goal">
+          <ArrowUp size={16} strokeWidth={2.6} />
+        </button>
+      </div>
+      <DeadlineChips value={deadline} onChange={setDeadline} now={now} />
+    </form>
+  );
+}
+
+// ─── Edit modal ──────────────────────────────────────────────────────────────
+
+function GoalEditModal({ goal, now, onClose, onSave }) {
+  const [title, setTitle] = useState(goal.title || '');
+  const [deadline, setDeadline] = useState(goal.deadline || null);
+  const [trackNumeric, setTrackNumeric] = useState(goal.targetValue != null);
+  const [targetValue, setTargetValue] = useState(goal.targetValue ?? '');
+  const [unit, setUnit] = useState(goal.unit || '');
+  const [showWoop, setShowWoop] = useState(!!(goal.obstacle?.trim() || goal.ifThenPlan?.trim()));
+  const [obstacle, setObstacle] = useState(goal.obstacle || '');
+  const [ifThenPlan, setIfThenPlan] = useState(goal.ifThenPlan || '');
+  const [notes, setNotes] = useState(goal.notes || '');
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSave({
       title: title.trim(),
-      notes,
-      period: goalPeriod,
-      milestones,
+      deadline,
+      targetValue: trackNumeric && targetValue !== '' && Number(targetValue) > 0 ? Number(targetValue) : null,
+      unit: trackNumeric ? unit.trim() : '',
       obstacle: obstacle.trim(),
       ifThenPlan: ifThenPlan.trim(),
-      pinned,
-      targetValue: trackNumeric && targetValue !== '' ? Number(targetValue) : null,
-      unit: trackNumeric ? unit.trim() : '',
+      notes,
     });
   };
 
   return (
     <div className="gp-modal-overlay" onClick={onClose}>
-      <div className="gp-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="gp-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Edit goal">
         <div className="gp-modal-header">
-          <h2 className="gp-modal-title">{mode === 'edit' ? 'Edit Goal' : 'New Goal'}</h2>
-          <button className="gp-modal-close" onClick={onClose}><X size={16} /></button>
+          <h2 className="gp-modal-title">Edit goal</h2>
+          <button type="button" className="gp-modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
-
-        <div className="gp-modal-subtitle">{periodLabel}</div>
-
-        <form onSubmit={handleSubmit} className="gp-modal-form">
-          <div className="gp-field-group">
-            <label className="gp-label">Goal</label>
-            <input
-              className="gp-text-input"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Describe your goal..."
-              autoFocus
-            />
-          </div>
-
-          {showPeriodPicker && (
-            <div className="gp-field-group">
-              <label className="gp-label">Period</label>
-              <div className="gp-period-pills">
-                <button
-                  type="button"
-                  className={`gp-pill ${goalPeriod === 'weekly' ? 'gp-pill--active' : ''}`}
-                  onClick={() => setGoalPeriod('weekly')}
-                >
-                  Week
-                </button>
-                <button
-                  type="button"
-                  className={`gp-pill ${goalPeriod === 'monthly' ? 'gp-pill--active' : ''}`}
-                  onClick={() => setGoalPeriod('monthly')}
-                >
-                  Month
-                </button>
-                <button
-                  type="button"
-                  className={`gp-pill ${goalPeriod === 'yearly' ? 'gp-pill--active' : ''}`}
-                  onClick={() => setGoalPeriod('yearly')}
-                >
-                  Year
-                </button>
-              </div>
-            </div>
-          )}
+        <form onSubmit={submit} className="gp-modal-form">
+          <label className="gp-field-group">
+            <span className="gp-label">Goal</span>
+            <input className="gp-text-input" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          </label>
 
           <div className="gp-field-group">
-            <label className="gp-label">Milestones <span className="gp-label-hint">(optional — breaks the goal into measurable steps)</span></label>
-            {milestones.length > 0 && (
-              <div className="gp-milestone-edit-list">
-                {milestones.map((m) => (
-                  <div key={m.id} className="gp-milestone-edit-item">
-                    <span className="gp-milestone-edit-text">{m.text}</span>
-                    <button type="button" className="gp-milestone-edit-delete" onClick={() => deleteMilestone(m.id)}><X size={14} /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="gp-milestone-add-row">
-              <input
-                type="text"
-                className="gp-text-input"
-                value={newMilestoneText}
-                onChange={(e) => setNewMilestoneText(e.target.value)}
-                placeholder="Add a milestone..."
-                onKeyDown={(e) => { if (e.key === 'Enter') addMilestone(e); }}
-              />
-              <button type="button" className="gp-milestone-add-btn" onClick={addMilestone}>+</button>
-            </div>
+            <span className="gp-label">Deadline</span>
+            <DeadlineChips value={deadline} onChange={setDeadline} now={now} />
           </div>
 
           <div className="gp-field-group">
             <label className="gp-field-checkbox-label">
               <input type="checkbox" checked={trackNumeric} onChange={(e) => setTrackNumeric(e.target.checked)} />
-              Track a number instead <span className="gp-label-hint">(e.g. "Run 50 miles")</span>
+              Track a number <span className="gp-label-hint">(e.g. run 50 miles)</span>
             </label>
             {trackNumeric && (
               <div className="gp-numeric-inputs">
-                <input
-                  type="number"
-                  min="1"
-                  className="gp-text-input gp-numeric-target-input"
-                  value={targetValue}
-                  onChange={(e) => setTargetValue(e.target.value)}
-                  placeholder="Target"
-                />
-                <input
-                  type="text"
-                  className="gp-text-input gp-numeric-unit-input"
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder="Unit (miles, books...)"
-                />
+                <input type="number" min="1" className="gp-text-input gp-numeric-target-input" value={targetValue}
+                  onChange={(e) => setTargetValue(e.target.value)} placeholder="Target" />
+                <input type="text" className="gp-text-input" value={unit}
+                  onChange={(e) => setUnit(e.target.value)} placeholder="Unit (miles, books…)" />
               </div>
             )}
           </div>
 
           <div className="gp-field-group">
             <button type="button" className="gp-woop-toggle" onClick={() => setShowWoop((v) => !v)}>
-              {showWoop ? '− Hide' : '+ Add'} obstacle plan <span className="gp-label-hint">(optional — if-then plans measurably boost follow-through)</span>
+              {showWoop ? '− Hide' : '+ Add'} obstacle plan <span className="gp-label-hint">(if-then plans boost follow-through)</span>
             </button>
             {showWoop && (
               <>
-                <div className="gp-field-group">
-                  <label className="gp-label">Biggest obstacle</label>
-                  <textarea
-                    className="gp-textarea"
-                    rows={2}
-                    value={obstacle}
-                    onChange={(e) => setObstacle(e.target.value)}
-                    placeholder="What's most likely to get in the way?"
-                  />
-                </div>
-                <div className="gp-field-group">
-                  <label className="gp-label">If that happens, I will…</label>
-                  <textarea
-                    className="gp-textarea"
-                    rows={2}
-                    value={ifThenPlan}
-                    onChange={(e) => setIfThenPlan(e.target.value)}
-                    placeholder="If [obstacle happens], then I will..."
-                  />
-                </div>
+                <label className="gp-field-group">
+                  <span className="gp-label">Biggest obstacle</span>
+                  <textarea className="gp-textarea" rows={2} value={obstacle} onChange={(e) => setObstacle(e.target.value)}
+                    placeholder="What's most likely to get in the way?" />
+                </label>
+                <label className="gp-field-group">
+                  <span className="gp-label">If that happens, I will…</span>
+                  <textarea className="gp-textarea" rows={2} value={ifThenPlan} onChange={(e) => setIfThenPlan(e.target.value)}
+                    placeholder="If [obstacle happens], then I will…" />
+                </label>
               </>
             )}
           </div>
 
-          <div className="gp-field-group">
-            <label className="gp-field-checkbox-label">
-              <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
-              <Pin size={14} /> Pin as a top focus goal this {PERIOD_NOUN[goalPeriod]}
-            </label>
-            {pinned && pinnedCount >= 3 && (
-              <p className="gp-pin-warning">
-                You already have {pinnedCount} pinned goals this {PERIOD_NOUN[goalPeriod]}. More than ~3 tends to make weekly review harder to keep up with — still your call.
-              </p>
-            )}
-          </div>
+          <label className="gp-field-group">
+            <span className="gp-label">Notes <span className="gp-label-hint">(optional)</span></span>
+            <textarea className="gp-textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </label>
 
-          <div className="gp-field-group">
-            <label className="gp-label">Notes <span className="gp-label-hint">(optional)</span></label>
-            <textarea
-              className="gp-textarea"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Anything you want to remember..."
-              rows={3}
-            />
-          </div>
-
-          <button type="submit" className="gp-submit-btn" disabled={!title.trim()}>
-            {mode === 'edit' ? 'Save' : 'Add Goal'}
-          </button>
+          <button type="submit" className="gp-submit-btn" disabled={!title.trim()}>Save</button>
         </form>
       </div>
     </div>
   );
-};
+}
 
-const GoalsPage = ({ northStar, onSaveNorthStar, goals = [], setGoals, setTodos, onAwardXp, habits = [], setHabits }) => {
-  const [period, setPeriod] = useState('all');
-  const [anchorDate, setAnchorDate] = useState(() => new Date());
-  const [modal, setModal] = useState(null); // { type: 'add-goal'|'edit-goal', goalId? }
-  const [addTaskGoalId, setAddTaskGoalId] = useState(null);
-  const [addTaskText, setAddTaskText] = useState('');
+// ─── Card pieces ─────────────────────────────────────────────────────────────
 
-  const periodKey = useMemo(() => (period === 'all' ? null : getPeriodKey(anchorDate, period)), [anchorDate, period]);
-  const periodLabel = useMemo(() => formatPeriodLabel(anchorDate, period), [anchorDate, period]);
+function ActivityStrip({ strip, todayKey }) {
+  return (
+    <div className="gp-strip" aria-label="Last 7 days">
+      {strip.map((d) => (
+        <span
+          key={d.date}
+          className={`gp-strip-day${d.count ? ' gp-strip-day--on' : ''}${d.count > 2 ? ' gp-strip-day--strong' : ''}${d.date === todayKey ? ' gp-strip-day--today' : ''}`}
+          title={`${shortDay(d.date, todayKey)}: ${d.count ? `${d.count} thing${d.count === 1 ? '' : 's'}${d.minutes ? `, ${d.minutes} min focus` : ''}` : 'nothing'}`}
+        />
+      ))}
+    </div>
+  );
+}
 
-  const currentPeriodStart = getPeriodStart(new Date(), period);
-  const canGoNext = useMemo(() => {
-    if (period === 'all') return false;
-    const nextAnchor = period === 'weekly'
-      ? addDays(anchorDate, 7)
-      : period === 'monthly'
-        ? addMonths(anchorDate, 1)
-        : addYears(anchorDate, 1);
-    const nextStart = getPeriodStart(nextAnchor, period);
-    return nextStart.getTime() <= currentPeriodStart.getTime();
-  }, [anchorDate, period, currentPeriodStart]);
+function ProgressBar({ goal }) {
+  const p = getGoalProgress(goal);
+  if (p.kind === 'binary') return null;
+  const pct = Math.round(p.ratio * 100);
+  const label = p.kind === 'numeric'
+    ? `${p.done} / ${p.total}${goal.unit ? ` ${goal.unit}` : ''}`
+    : `${p.done}/${p.total} milestones`;
+  return (
+    <div className="gp-progress">
+      <div className="gp-progress-track"><div className="gp-progress-fill" style={{ width: `${pct}%` }} /></div>
+      <span className="gp-progress-label">{label}</span>
+    </div>
+  );
+}
 
-  const goalsForPeriod = useMemo(() => {
-    const sorted = [...goals].sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
-    if (period === 'all') return sorted;
-    return sorted.filter(g => g.period === period && g.periodKey === periodKey);
-  }, [goals, period, periodKey]);
+function InlineAdd({ placeholder, onAdd, label }) {
+  const [text, setText] = useState('');
+  return (
+    <form className="gp-inline-add" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { onAdd(text.trim()); setText(''); } }}>
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} aria-label={label} maxLength={160} />
+      <button type="submit" disabled={!text.trim()} aria-label={label}><Plus size={14} /></button>
+    </form>
+  );
+}
 
-  const allColumns = useMemo(() => {
-    if (period !== 'all') return [];
-    const now = new Date();
-    return ALL_VIEW_PERIODS.map(({ key, label }) => {
-      const colPeriodKey = getPeriodKey(now, key);
-      // Keep goals whose period already ended around if they're unfinished (flagged
-      // overdue below) instead of letting them silently disappear once the period rolls over.
-      const items = goals
-        .filter(g => g.period === key && (g.periodKey === colPeriodKey || isGoalOverdue(g)))
-        .sort((a, b) => {
-          const overdueDiff = (isGoalOverdue(b) ? 1 : 0) - (isGoalOverdue(a) ? 1 : 0);
-          if (overdueDiff !== 0) return overdueDiff;
-          return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
-        });
-      return { period: key, label, periodLabel: formatPeriodLabel(now, key), items };
-    });
-  }, [goals, period]);
+function GoalCard({ goal, data, now, todayKey, expanded, onToggle, actions }) {
+  const activity = getGoalActivity(goal, data, now);
+  const status = getGoalStatus(goal, activity, now);
+  const next = getNextStep(goal, data.todos);
+  const openTasks = data.todos.filter((t) => String(t.goalId) === String(goal.id) && !t.completed);
+  const linkedHabits = data.habits.filter((h) => String(h.goalId) === String(goal.id));
+  const unlinkedHabits = data.habits.filter((h) => h.goalId == null);
+  const done = !!goal.completed;
 
-  const activeGoal = useMemo(() => {
-    if (!modal?.goalId) return null;
-    return goals.find(g => g.id === modal.goalId) || null;
-  }, [goals, modal]);
-
-  const closeModal = () => setModal(null);
-
-  const handlePrev = () => {
-    if (period === 'all') return;
-    setAnchorDate(prev => (
-      period === 'weekly' ? addDays(prev, -7)
-        : period === 'monthly' ? addMonths(prev, -1)
-          : addYears(prev, -1)
-    ));
-  };
-
-  const handleNext = () => {
-    if (!canGoNext) return;
-    setAnchorDate(prev => (
-      period === 'weekly' ? addDays(prev, 7)
-        : period === 'monthly' ? addMonths(prev, 1)
-          : addYears(prev, 1)
-    ));
-  };
-
-  const upsertGoal = (goalId, patch) => {
-    setGoals(prev => prev.map(g => g.id === goalId ? { ...g, ...patch, updatedAt: Date.now() } : g));
-  };
-
-  const deleteGoal = (goalId) => {
-    setGoals(prev => prev.filter(g => g.id !== goalId));
-    setTodos(prev => prev.filter(t => t.goalId !== goalId));
-    setHabits(prev => prev.map(h => h.goalId === goalId ? { ...h, goalId: null } : h));
-  };
-
-  const linkHabit = (goalId, habitId) => {
-    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, goalId } : h));
-  };
-
-  const unlinkHabit = (habitId) => {
-    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, goalId: null } : h));
-  };
-
-  const awardGoalXp = (goal) => {
-    const xp = goalCompletionXp(goal);
-    if (onAwardXp && xp > 0) onAwardXp(xp, { source: 'goal', label: goal.title });
-  };
-
-  const awardMilestoneXp = (goal, milestoneText) => {
-    onAwardXp?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
-  };
-
-  const handleToggleGoalComplete = (goal) => {
-    const { goal: updated, shouldAwardXp } = toggleGoalCompleted(goal);
-    setGoals(prev => prev.map(g => g.id === goal.id ? updated : g));
-    if (shouldAwardXp) awardGoalXp(goal);
-  };
-
-  const handleToggleMilestone = (goal, milestoneId) => {
-    const { goal: updatedGoal, justCompleted, milestoneText } = toggleMilestone(goal, milestoneId);
-    const allDone = updatedGoal.milestones.length > 0 && updatedGoal.milestones.every(m => m.completed);
-    let finalGoal = updatedGoal;
-    let shouldAwardGoalXp = false;
-    if (allDone && !updatedGoal.completed) {
-      const result = toggleGoalCompleted(updatedGoal);
-      finalGoal = result.goal;
-      shouldAwardGoalXp = result.shouldAwardXp;
-    }
-    setGoals(prev => prev.map(g => g.id === goal.id ? finalGoal : g));
-    if (justCompleted) awardMilestoneXp(goal, milestoneText);
-    if (shouldAwardGoalXp) awardGoalXp(goal);
-  };
-
-  const adjustGoalValue = (goal, delta) => {
-    const nextValue = Math.max(0, Math.min(goal.targetValue, (goal.currentValue || 0) + delta));
-    let nextGoal = { ...goal, currentValue: nextValue };
-    let shouldAward = false;
-    if (nextValue >= goal.targetValue && !goal.completed) {
-      const result = toggleGoalCompleted(nextGoal);
-      nextGoal = result.goal;
-      shouldAward = result.shouldAwardXp;
-    } else {
-      nextGoal.updatedAt = Date.now();
-    }
-    setGoals(prev => prev.map(g => g.id === goal.id ? nextGoal : g));
-    if (shouldAward) awardGoalXp(goal);
-  };
-
-  const handleAddLinkedTask = (goal, text) => {
-    if (!text.trim()) return;
-    const newTask = {
-      id: Date.now(),
-      text: text.trim(),
-      timeFrame: TIMEFRAME_BY_PERIOD[goal.period] || 'this-week',
-      xp: GOAL_TASK_XP_BY_PERIOD[goal.period] || GOAL_TASK_XP_BY_PERIOD.weekly,
-      completed: false,
-      notes: '',
-      subtasks: [],
-      dueDate: null,
-      scheduledDate: null,
-      goalId: goal.id,
-      goalPeriodKey: goal.periodKey,
-    };
-    setTodos(prev => [...prev, newTask]);
-    setAddTaskGoalId(null);
-    setAddTaskText('');
-  };
-
-  const keyAnchorForAdd = period === 'all' ? new Date() : anchorDate;
-  const getPinnedCountForAdd = (candidatePeriod) => {
-    const candidateKey = getPeriodKey(keyAnchorForAdd, candidatePeriod);
-    return goals.filter(g => g.pinned && g.period === candidatePeriod && g.periodKey === candidateKey).length;
-  };
-
-  const getPinnedCountForEdit = activeGoal ? (candidatePeriod) => {
-    const candidateKey = candidatePeriod === activeGoal.period ? activeGoal.periodKey : getPeriodKey(new Date(), candidatePeriod);
-    return goals.filter(g => g.pinned && g.period === candidatePeriod && g.periodKey === candidateKey && g.id !== activeGoal.id).length;
-  } : undefined;
-
-  const renderProgressBar = (goal) => {
-    const progress = getGoalProgress(goal);
-    if (progress.kind === 'binary') return null;
-    const pct = Math.round(progress.ratio * 100);
-    const label = progress.kind === 'numeric'
-      ? `${progress.done}${goal.unit ? ` ${goal.unit}` : ''} / ${progress.total}${goal.unit ? ` ${goal.unit}` : ''}`
-      : `${progress.done}/${progress.total}`;
-    return (
-      <div className="gp-progress">
-        <div className="gp-progress-track">
-          <div className="gp-progress-fill" style={{ width: `${pct}%` }} />
-        </div>
-        <span className="gp-progress-label">{label}</span>
+  return (
+    <article className={`gp-card gp-card--${status}${expanded ? ' gp-card--open' : ''}`}>
+      <div className="gp-card-head">
+        <button type="button" className="gp-card-title-btn" onClick={onToggle} aria-expanded={expanded}>
+          <span className={`gp-dot gp-dot--${status}`} aria-label={STATUS_LABEL[status]} />
+          <span className="gp-card-title">{goal.title}</span>
+          <ChevronDown size={16} className="gp-card-chevron" aria-hidden="true" />
+        </button>
+        {!done && (
+          <button
+            type="button"
+            className={`gp-icon-btn${goal.pinned ? ' gp-icon-btn--on' : ''}`}
+            onClick={() => actions.togglePin(goal)}
+            title={goal.pinned ? 'Unpin from focus' : 'Pin to focus'}
+            aria-pressed={!!goal.pinned}
+          >
+            <Pin size={14} />
+          </button>
+        )}
       </div>
-    );
-  };
 
-  const renderGoalCard = (goal) => {
-    const isComplete = !!goal.completed;
-    const isOverdue = isGoalOverdue(goal);
-    const linkedHabits = habits.filter(h => h.goalId === goal.id);
-    const unlinkedHabits = habits.filter(h => !h.goalId);
+      <p className="gp-card-meta">
+        <span className={status === 'overdue' ? 'gp-meta-alert' : ''}>{deadlineLabel(goal, now)}</span>
+        {!done && <><span aria-hidden="true">·</span><span className={status === 'quiet' ? 'gp-meta-warn' : ''}>{lastMovedLabel(activity)}</span></>}
+      </p>
 
-    return (
-      <div key={goal.id} className={`gp-card ${isComplete ? 'gp-card--complete' : ''} ${isOverdue ? 'gp-card--overdue' : ''}`}>
-        <div className="gp-card-top">
-          <div className="gp-card-actions">
-            <button className="gp-icon-btn" onClick={() => setModal({ type: 'edit-goal', goalId: goal.id })} title="Edit"><Pencil size={14} /></button>
-            <button className="gp-icon-btn gp-icon-btn--danger" onClick={() => deleteGoal(goal.id)} title="Delete"><X size={14} /></button>
-          </div>
+      <ProgressBar goal={goal} />
+
+      {!done && (
+        <div className="gp-week">
+          <ActivityStrip strip={activity.strip} todayKey={todayKey} />
+          <span className="gp-week-text">
+            {activity.weekCount ? `${activity.weekCount} this week` : 'Nothing this week'}
+            {activity.weekMinutes ? ` · ${activity.weekMinutes}m focus` : ''}
+          </span>
         </div>
+      )}
 
-        <div className="gp-card-title-row">
-          <div className="gp-card-title-left">
-            <input
-              className="gp-goal-checkbox"
-              type="checkbox"
-              checked={isComplete}
-              onChange={() => handleToggleGoalComplete(goal)}
-              aria-label={isComplete ? 'Mark goal incomplete' : 'Mark goal complete'}
-            />
-            <h3 className="gp-card-title">{goal.title}</h3>
-          </div>
-          {goal.pinned && <span className="gp-pin-badge" title="Pinned focus goal"><Pin size={14} /></span>}
-          {isComplete && <span className="gp-complete-badge">Complete</span>}
-          {isOverdue && <span className="gp-overdue-badge">Overdue</span>}
-        </div>
-
-        {isOverdue && (
-          <div className="gp-overdue-meta">Was due {formatGoalPeriodLabel(goal)}</div>
-        )}
-
-        {renderProgressBar(goal)}
-
-        {goal.milestones?.length > 0 && (
-          <div className="gp-milestones">
-            {goal.milestones.map((m) => (
-              <label key={m.id} className={`gp-milestone-item ${m.completed ? 'gp-milestone-item--done' : ''}`}>
-                <input
-                  type="checkbox"
-                  className="gp-milestone-checkbox"
-                  checked={m.completed}
-                  onChange={() => handleToggleMilestone(goal, m.id)}
-                />
-                <span className="gp-milestone-text">{m.text}</span>
-              </label>
-            ))}
-          </div>
-        )}
-
-        {goal.targetValue != null && !isComplete && (
-          <div className="gp-numeric-stepper">
-            <button type="button" className="gp-stepper-btn" onClick={() => adjustGoalValue(goal, -1)}>−</button>
-            <span className="gp-stepper-value">
-              {goal.currentValue || 0} / {goal.targetValue}{goal.unit ? ` ${goal.unit}` : ''}
-            </span>
-            <button type="button" className="gp-stepper-btn" onClick={() => adjustGoalValue(goal, 1)}>+</button>
-          </div>
-        )}
-
-        {(linkedHabits.length > 0 || unlinkedHabits.length > 0) && (
-          <div className="gp-habits">
-            {linkedHabits.map((h) => (
-              <div key={h.id} className="gp-habit-chip">
-                <span className="gp-habit-flame"><Flame size={14} /></span>
-                <span className="gp-habit-name">{h.name}</span>
-                <span className="gp-habit-streak">{getHabitStreak(h)}</span>
-                <button
-                  type="button"
-                  className="gp-habit-unlink"
-                  onClick={() => unlinkHabit(h.id)}
-                  title="Unlink habit"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            {unlinkedHabits.length > 0 && (
-              <select
-                className="gp-habit-select"
-                value=""
-                onChange={(e) => { if (e.target.value) linkHabit(goal.id, Number(e.target.value)); }}
-              >
-                <option value="">+ Link a habit…</option>
-                {unlinkedHabits.map((h) => (
-                  <option key={h.id} value={h.id}>{h.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
-
-        {goal.notes?.trim() && (
-          <div className="gp-notes">{goal.notes}</div>
-        )}
-
-        {(goal.obstacle?.trim() || goal.ifThenPlan?.trim()) && (
-          <div className="gp-woop">
-            {goal.obstacle?.trim() && (
-              <div className="gp-woop-row"><span className="gp-woop-label">Obstacle</span>{goal.obstacle}</div>
-            )}
-            {goal.ifThenPlan?.trim() && (
-              <div className="gp-woop-row"><span className="gp-woop-label">If → then</span>{goal.ifThenPlan}</div>
-            )}
-          </div>
-        )}
-
-        <div className="gp-linked-task">
-          {addTaskGoalId === goal.id ? (
-            <form
-              className="gp-linked-task-form"
-              onSubmit={(e) => { e.preventDefault(); handleAddLinkedTask(goal, addTaskText); }}
-            >
-              <input
-                autoFocus
-                className="gp-linked-task-input"
-                type="text"
-                value={addTaskText}
-                onChange={(e) => setAddTaskText(e.target.value)}
-                placeholder="Task for this goal..."
-              />
-              <button type="submit" className="gp-linked-task-submit">Add</button>
+      {!done && (
+        <div className="gp-next">
+          {next ? (
+            <>
               <button
                 type="button"
-                className="gp-linked-task-cancel"
-                onClick={() => { setAddTaskGoalId(null); setAddTaskText(''); }}
-              >
-                <X size={14} />
-              </button>
-            </form>
+                className="gp-check"
+                onClick={() => (next.kind === 'milestone' ? actions.toggleMilestone(goal, next.id) : actions.completeTask(next.id))}
+                aria-label={`Mark "${next.text}" done`}
+              />
+              <span className="gp-next-text"><span className="gp-next-key">Next</span> {next.text}</span>
+            </>
           ) : (
-            <button
-              type="button"
-              className="gp-linked-task-btn"
-              onClick={() => { setAddTaskGoalId(goal.id); setAddTaskText(''); }}
-            >
-              + Add linked task
-            </button>
+            <span className="gp-next-text gp-next-text--empty">No next step yet. Add a milestone or a task.</span>
           )}
+          <button type="button" className="gp-focus-btn" onClick={() => actions.startFocus(goal, next)} title="Start a focus session for this goal">
+            <Play size={13} /> Focus
+          </button>
         </div>
-      </div>
-    );
+      )}
+
+      {expanded && (
+        <div className="gp-detail">
+          {goal.targetValue != null && !done && (
+            <div className="gp-stepper">
+              <button type="button" onClick={() => actions.adjustValue(goal, -1)} aria-label="Minus one">−</button>
+              <span>{goal.currentValue || 0} / {goal.targetValue}{goal.unit ? ` ${goal.unit}` : ''}</span>
+              <button type="button" onClick={() => actions.adjustValue(goal, 1)} aria-label="Plus one">+</button>
+            </div>
+          )}
+
+          <section className="gp-sub">
+            <h4 className="gp-sub-title">Milestones</h4>
+            {(goal.milestones || []).map((m) => (
+              <div key={m.id} className={`gp-item${m.completed ? ' gp-item--done' : ''}`}>
+                <button type="button" className={`gp-check${m.completed ? ' gp-check--on' : ''}`} onClick={() => actions.toggleMilestone(goal, m.id)}
+                  aria-label={m.completed ? `Untick ${m.text}` : `Tick ${m.text}`}>
+                  {m.completed && <Check size={11} strokeWidth={3} />}
+                </button>
+                <span className="gp-item-text">{m.text}</span>
+                {!m.completed && (
+                  <button type="button" className="gp-item-x" onClick={() => actions.deleteMilestone(goal, m.id)} aria-label={`Remove ${m.text}`}><X size={12} /></button>
+                )}
+              </div>
+            ))}
+            {!done && <InlineAdd placeholder="Add a milestone…" label="Add milestone" onAdd={(text) => actions.addMilestone(goal, text)} />}
+          </section>
+
+          <section className="gp-sub">
+            <h4 className="gp-sub-title">Tasks</h4>
+            {openTasks.map((t) => (
+              <div key={t.id} className="gp-item">
+                <button type="button" className="gp-check" onClick={() => actions.completeTask(t.id)} aria-label={`Complete ${t.text}`} />
+                <span className="gp-item-text">{t.text}</span>
+              </div>
+            ))}
+            {!done && <InlineAdd placeholder="Add a task for this week…" label="Add task" onAdd={(text) => actions.addTask(goal, text)} />}
+          </section>
+
+          {(linkedHabits.length > 0 || (unlinkedHabits.length > 0 && !done)) && (
+            <section className="gp-sub">
+              <h4 className="gp-sub-title">Habits</h4>
+              <div className="gp-habits">
+                {linkedHabits.map((h) => (
+                  <span key={h.id} className="gp-habit-chip">
+                    <Flame size={12} /> {h.name || h.text} <strong>{getHabitStreak(h)}</strong>
+                    <button type="button" onClick={() => actions.unlinkHabit(h.id)} aria-label={`Unlink ${h.name}`}><X size={11} /></button>
+                  </span>
+                ))}
+                {unlinkedHabits.length > 0 && !done && (
+                  <select className="gp-habit-select" value="" aria-label="Link a habit"
+                    onChange={(e) => { if (e.target.value) actions.linkHabit(goal.id, e.target.value); }}>
+                    <option value="">+ Link a habit…</option>
+                    {unlinkedHabits.map((h) => <option key={h.id} value={String(h.id)}>{h.name || h.text}</option>)}
+                  </select>
+                )}
+              </div>
+            </section>
+          )}
+
+          {(goal.obstacle?.trim() || goal.ifThenPlan?.trim()) && (
+            <div className="gp-woop">
+              {goal.obstacle?.trim() && <p><span>Obstacle</span>{goal.obstacle}</p>}
+              {goal.ifThenPlan?.trim() && <p><span>If → then</span>{goal.ifThenPlan}</p>}
+            </div>
+          )}
+          {goal.notes?.trim() && <p className="gp-notes">{goal.notes}</p>}
+
+          {activity.events.length > 0 && (
+            <section className="gp-sub">
+              <h4 className="gp-sub-title">Recent progress</h4>
+              <ul className="gp-log">
+                {activity.events.slice(0, 6).map((ev, i) => {
+                  const { Icon, verb } = EVENT_META[ev.kind];
+                  return (
+                    <li key={`${ev.kind}_${ev.at}_${i}`}>
+                      <Icon size={13} aria-hidden="true" />
+                      <span className="gp-log-text">{verb}{ev.kind !== 'checkin' && ev.label ? `: ${ev.label}` : ''}{ev.minutes ? ` · ${ev.minutes}m` : ''}</span>
+                      <span className="gp-log-day">{shortDay(ev.date, todayKey)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          <div className="gp-actions">
+            {!done && !activity.autoMovedToday && (
+              <button type="button" className={`gp-btn${goal.checkins?.[todayKey] ? ' gp-btn--on' : ''}`}
+                onClick={() => actions.setCheckin(goal, !goal.checkins?.[todayKey])}>
+                <CircleCheck size={14} /> {goal.checkins?.[todayKey] ? 'Moved it today' : 'I moved it today'}
+              </button>
+            )}
+            {status === 'overdue' && (
+              <button type="button" className="gp-btn" onClick={() => actions.pushDeadline(goal)}><CalendarPlus size={14} /> +1 week</button>
+            )}
+            <button type="button" className={`gp-btn${done ? '' : ' gp-btn--primary'}`} onClick={() => actions.toggleComplete(goal)}>
+              <Check size={14} /> {done ? 'Reopen' : 'Mark achieved'}
+            </button>
+            <span className="gp-actions-spacer" />
+            <button type="button" className="gp-icon-btn" onClick={() => actions.edit(goal)} title="Edit" aria-label="Edit goal"><Pencil size={14} /></button>
+            <button type="button" className="gp-icon-btn gp-icon-btn--danger" onClick={() => actions.remove(goal)} title="Delete" aria-label="Delete goal"><Trash2 size={14} /></button>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+const GoalsPage = ({
+  northStar, onSaveNorthStar, goals = [], setGoals, todos = [], setTodos, onAwardXp, habits = [], setHabits,
+  pomodoroSessions = [], calendarEvents = [], onCompleteTask, onStartFocus,
+}) => {
+  const [expandedId, setExpandedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [showDone, setShowDone] = useState(false);
+  const now = new Date();
+  const todayKey = goalDateKey(now);
+  const data = useMemo(() => ({ todos, habits, pomodoroSessions, calendarEvents }), [todos, habits, pomodoroSessions, calendarEvents]);
+
+  const focus = getFocusGoals(goals);
+  const focusIds = new Set(focus.map((g) => g.id));
+  const others = goals.filter((g) => !g.completed && !focusIds.has(g.id));
+  const doneGoals = goals.filter((g) => g.completed).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+  const pinnedCount = goals.filter((g) => g.pinned && !g.completed).length;
+
+  const week = goals.filter((g) => !g.completed).reduce((acc, g) => {
+    const a = getGoalActivity(g, data, now);
+    acc.count += a.weekCount;
+    acc.minutes += a.weekMinutes;
+    if (getGoalStatus(g, a, now) === 'quiet') acc.quiet += 1;
+    return acc;
+  }, { count: 0, minutes: 0, quiet: 0 });
+
+  const replace = (goalId, next) => setGoals((prev) => prev.map((g) => (g.id === goalId ? next : g)));
+  const awardGoalXp = (goal) => {
+    const xp = goalCompletionXp(goal);
+    if (xp > 0) onAwardXp?.(xp, { source: 'goal', label: goal.title });
   };
+
+  const actions = {
+    togglePin: (goal) => replace(goal.id, patchGoal(goal, { pinned: !goal.pinned })),
+    toggleComplete: (goal) => {
+      const { goal: updated, shouldAwardXp } = toggleGoalCompleted(goal);
+      replace(goal.id, updated);
+      if (shouldAwardXp) awardGoalXp(goal);
+      if (updated.completed) setExpandedId(null);
+    },
+    toggleMilestone: (goal, milestoneId) => {
+      const { goal: updated, justCompleted, milestoneText } = toggleMilestone(goal, milestoneId);
+      const allDone = updated.milestones.length > 0 && updated.milestones.every((m) => m.completed);
+      let final = updated;
+      let awardGoal = false;
+      if (allDone && !updated.completed) {
+        const result = toggleGoalCompleted(updated);
+        final = result.goal;
+        awardGoal = result.shouldAwardXp;
+      }
+      replace(goal.id, final);
+      if (justCompleted) onAwardXp?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
+      if (awardGoal) awardGoalXp(goal);
+    },
+    addMilestone: (goal, text) => replace(goal.id, addMilestone(goal, text)),
+    deleteMilestone: (goal, id) => replace(goal.id, patchGoal(goal, { milestones: goal.milestones.filter((m) => m.id !== id) })),
+    adjustValue: (goal, delta) => {
+      const value = Math.max(0, Math.min(goal.targetValue, (goal.currentValue || 0) + delta));
+      // Raising the number is progress made today.
+      let next = delta > 0 ? setGoalCheckin({ ...goal, currentValue: value }, todayKey, true) : patchGoal(goal, { currentValue: value });
+      let award = false;
+      if (value >= goal.targetValue && !goal.completed) {
+        const result = toggleGoalCompleted(next);
+        next = result.goal;
+        award = result.shouldAwardXp;
+      }
+      replace(goal.id, next);
+      if (award) awardGoalXp(goal);
+    },
+    setCheckin: (goal, on) => replace(goal.id, setGoalCheckin(goal, todayKey, on)),
+    pushDeadline: (goal) => replace(goal.id, pushDeadline(goal, 7, now)),
+    addTask: (goal, text) => setTodos((prev) => [...prev, { ...makeTask({ text, when: 'this-week' }), goalId: goal.id }]),
+    completeTask: (taskId) => onCompleteTask?.(taskId),
+    linkHabit: (goalId, habitId) => setHabits((prev) => prev.map((h) => (String(h.id) === String(habitId) ? { ...h, goalId } : h))),
+    unlinkHabit: (habitId) => setHabits((prev) => prev.map((h) => (h.id === habitId ? { ...h, goalId: null } : h))),
+    startFocus: (goal, next) => onStartFocus?.(goal, next),
+    edit: (goal) => setEditingId(goal.id),
+    // Deleting a goal unlinks its tasks and habits; their history is theirs to keep.
+    remove: (goal) => {
+      if (!window.confirm(`Delete "${goal.title}"? Its tasks and habits stay, just unlinked.`)) return;
+      setGoals((prev) => prev.filter((g) => g.id !== goal.id));
+      setTodos((prev) => prev.map((t) => (String(t.goalId) === String(goal.id) ? { ...t, goalId: null, goalPeriodKey: null } : t)));
+      setHabits((prev) => prev.map((h) => (String(h.goalId) === String(goal.id) ? { ...h, goalId: null } : h)));
+      setExpandedId(null);
+    },
+  };
+
+  const addGoal = (title, deadline) => {
+    const goal = makeGoal({ title, deadline });
+    setGoals((prev) => [goal, ...prev]);
+  };
+
+  const editing = goals.find((g) => g.id === editingId) || null;
+
+  const renderCard = (goal) => (
+    <GoalCard
+      key={goal.id}
+      goal={goal}
+      data={data}
+      now={now}
+      todayKey={todayKey}
+      expanded={expandedId === goal.id}
+      onToggle={() => setExpandedId((id) => (id === goal.id ? null : goal.id))}
+      actions={actions}
+    />
+  );
+
+  const active = focus.length + others.length;
 
   return (
     <div className="gp-page">
-      <div className="gp-page-header">
-        <div>
-          <h1 className="gp-page-title">Goals</h1>
-          <p className="gp-page-subtitle">Set goals for the week, month, and year.</p>
-        </div>
-        <button className="gp-add-btn" onClick={() => setModal({ type: 'add-goal' })}>
-          + Add Goal
-        </button>
-      </div>
+      <header className="gp-page-header">
+        <h1 className="gp-page-title">Goals</h1>
+        <p className="gp-page-subtitle">
+          {active === 0
+            ? 'Write down what you want. Tasks, habits and focus sessions you link to it count as progress.'
+            : `This week: ${week.count} thing${week.count === 1 ? '' : 's'} moved your goals${week.minutes ? ` · ${week.minutes}m focus` : ''}${week.quiet ? ` · ${week.quiet} gone quiet` : ''}`}
+        </p>
+      </header>
+
+      <GoalQuickAdd onAdd={addGoal} now={now} autoFocus={active === 0} />
+
+      {focus.length > 0 && (
+        <section className="gp-section">
+          <div className="gp-section-header">
+            <h2 className="gp-section-title">Focus</h2>
+            <span className="gp-section-hint">
+              {pinnedCount > FOCUS_GOAL_LIMIT
+                ? `${pinnedCount} pinned, only ${FOCUS_GOAL_LIMIT} fit here`
+                : pinnedCount ? 'Pinned first, then soonest deadline' : 'Soonest deadlines · pin to choose'}
+            </span>
+          </div>
+          <div className="gp-grid">{focus.map(renderCard)}</div>
+        </section>
+      )}
+
+      {others.length > 0 && (
+        <section className="gp-section">
+          <div className="gp-section-header">
+            <h2 className="gp-section-title">Also active</h2>
+            <span className="gp-section-count">{others.length}</span>
+          </div>
+          <div className="gp-grid">{others.map(renderCard)}</div>
+        </section>
+      )}
 
       <NorthStarCard northStar={northStar} onSave={onSaveNorthStar} />
 
-      <div className="gp-controls">
-        <div className="gp-period-pills">
-          {PERIODS.map(p => (
-            <button
-              key={p.key}
-              type="button"
-              className={`gp-pill ${period === p.key ? 'gp-pill--active' : ''}`}
-              onClick={() => {
-                setPeriod(p.key);
-                setAnchorDate(new Date());
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        {period !== 'all' && (
-          <div className="gp-nav">
-            <button className="gp-nav-btn" onClick={handlePrev} aria-label="Previous period">
-              <ArrowLeftIcon size={18} strokeWidth={2.5} />
-            </button>
-            <div className="gp-nav-label">{periodLabel}</div>
-            <button className={`gp-nav-btn ${canGoNext ? '' : 'gp-nav-btn--disabled'}`} onClick={handleNext} disabled={!canGoNext} aria-label="Next period">
-              <ArrowRightIcon size={18} strokeWidth={2.5} />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {period === 'all' ? (
-        <div className="gp-all-columns">
-          {allColumns.map((col) => (
-            <div className="gp-all-column" key={col.period}>
-              <div className="gp-section-header">
-                <h2 className="gp-section-title">{col.label} Goals</h2>
-                <span className="gp-section-count">{col.items.length}</span>
-              </div>
-
-              {col.items.length === 0 ? (
-                <div className="gp-empty gp-empty--compact">
-                  <p className="gp-empty-title">No goals yet.</p>
-                  <p className="gp-empty-subtitle">{col.periodLabel}</p>
-                </div>
-              ) : (
-                <div className="gp-column-list">
-                  {col.items.map(renderGoalCard)}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <>
-          <div className="gp-section-header">
-            <h2 className="gp-section-title">{period.charAt(0).toUpperCase() + period.slice(1)} Goals</h2>
-            <span className="gp-section-count">{goalsForPeriod.length}</span>
-          </div>
-
-          {goalsForPeriod.length === 0 ? (
-            <div className="gp-empty">
-              <p className="gp-empty-title">No goals yet for this period.</p>
-              <p className="gp-empty-subtitle">Click <strong>+ Add Goal</strong> to create one.</p>
-            </div>
-          ) : (
-            <div className="gp-grid">
-              {goalsForPeriod.map(renderGoalCard)}
-            </div>
-          )}
-        </>
+      {doneGoals.length > 0 && (
+        <section className="gp-section">
+          <button type="button" className="gp-done-toggle" onClick={() => setShowDone((v) => !v)} aria-expanded={showDone}>
+            <ChevronDown size={15} className={showDone ? 'gp-rot' : ''} /> Achieved <span className="gp-section-count">{doneGoals.length}</span>
+          </button>
+          {showDone && <div className="gp-grid">{doneGoals.map(renderCard)}</div>}
+        </section>
       )}
 
-      {modal?.type === 'add-goal' && (
-        <GoalModal
-          mode="add"
-          periodLabel={period === 'all' ? 'All Goals' : periodLabel}
-          initial={{ title: '', notes: '' }}
-          onClose={closeModal}
-          showPeriodPicker={true}
-          defaultPeriod={period === 'all' ? 'weekly' : period}
-          getPinnedCount={getPinnedCountForAdd}
-          onSubmit={(draft) => {
-            const goalPeriod = draft.period;
-            const keyAnchor = period === 'all' ? new Date() : anchorDate;
-            const goalPeriodKey = getPeriodKey(keyAnchor, goalPeriod);
-            const newGoal = normalizeGoal({
-              id: `goal_${Date.now()}`,
-              period: goalPeriod,
-              periodKey: goalPeriodKey,
-              ...draft,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            });
-            setGoals(prev => [newGoal, ...prev]);
-            closeModal();
-          }}
-        />
-      )}
-
-      {modal?.type === 'edit-goal' && activeGoal && (
-        <GoalModal
-          mode="edit"
-          periodLabel={formatGoalPeriodLabel(activeGoal)}
-          initial={activeGoal}
-          onClose={closeModal}
-          showPeriodPicker={true}
-          defaultPeriod={activeGoal.period}
-          getPinnedCount={getPinnedCountForEdit}
-          onSubmit={(draft) => {
-            const next = { ...draft };
-            if (draft.period && draft.period !== activeGoal.period) {
-              next.periodKey = getPeriodKey(new Date(), draft.period);
-            }
-            upsertGoal(activeGoal.id, next);
-            closeModal();
-          }}
+      {editing && (
+        <GoalEditModal
+          goal={editing}
+          now={now}
+          onClose={() => setEditingId(null)}
+          onSave={(fields) => { replace(editing.id, patchGoal(editing, fields)); setEditingId(null); }}
         />
       )}
     </div>

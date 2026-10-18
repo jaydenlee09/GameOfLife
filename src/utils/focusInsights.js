@@ -101,7 +101,7 @@ export const describeBestWindows = (insights) => {
  * no focus XP: completing the block pays for those minutes, once.
  */
 export const makeFocusSession = ({
-  startedAt, durationSecs, xpAmount, intent, taskId, blockId, blockDate, parked = 0, debrief = null, now = new Date(),
+  startedAt, durationSecs, xpAmount, intent, taskId, goalId, blockId, blockDate, parked = 0, debrief = null, now = new Date(),
 }) => ({
   id: `${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
   date: toDateKey(now),
@@ -112,6 +112,7 @@ export const makeFocusSession = ({
   completed: true,
   ...(intent?.trim() ? { intent: intent.trim() } : {}),
   ...(taskId != null ? { taskId: String(taskId) } : {}),
+  ...(goalId != null ? { goalId: String(goalId) } : {}),
   ...(blockId != null ? { blockId: String(blockId), blockDate } : {}),
   ...(parked ? { parked } : {}),
   ...(debrief ? { debrief } : {}),

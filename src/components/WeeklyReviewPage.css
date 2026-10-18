@@ -102,6 +102,13 @@
   border-top: 1px solid var(--separator);
 }
 .review-goal-item:first-of-type { border-top: none; padding-top: 0; }
+.review-goal-week {
+  margin: 0.15rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+.review-goal-week--none { color: var(--warning); }
+
 .review-goal-header {
   display: flex;
   align-items: center;

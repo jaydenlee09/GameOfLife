@@ -285,7 +285,8 @@ const LessonsList = ({ logs, onOpen, lessonHandlers }) => {
 const LOOP_LABELS = { yes: 'Yes', partly: 'A little', no: 'Not that day' };
 
 const DailyLogPage = ({
-  logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], northStar, logPatterns,
+  logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], setGoals, todos = [],
+  pomodoroSessions = [], northStar, logPatterns,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
   setFoodPoints, onAwardXp, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
   onExpandLesson, onAskAssistant, onNavigate, calendarEvents = [],
@@ -482,6 +483,9 @@ const DailyLogPage = ({
             setFoodPoints={setFoodPoints}
             onAwardXp={onAwardXp}
             goals={goals}
+            setGoals={setGoals}
+            todos={todos}
+            pomodoroSessions={pomodoroSessions}
             northStar={northStar}
             logPatterns={logPatterns}
             xpLog={xpLog}

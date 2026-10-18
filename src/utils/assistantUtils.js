@@ -2,7 +2,7 @@ import { xpCapForLevel } from './xpUtils';
 import { computeDailyScore, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD } from './scoreUtils';
 import { toDateKey, expandEventsForDates, isInstanceCompleted, getBlockOutcome } from './calendarUtils';
 import { getHabitStreak } from './habitUtils';
-import { getGoalProgress } from './goalUtils';
+import { getActiveGoals, describeGoal } from './goalUtils';
 import { carriedDays, isTop, todayQueue } from './taskUtils';
 import { TOOL_DECLARATIONS, getTool, applyOpToState } from './assistantTools';
 
@@ -102,17 +102,14 @@ const summarizeCalendar = (calendarEvents, noPhoneBlocks, calendarDayEvents) => 
   return `${dayBlock(todayKey, 'Today')}\n${dayBlock(tomorrowKey, 'Tomorrow')}`;
 };
 
-const summarizeGoals = (goals) => {
-  const active = (goals || []).filter((g) => !g.completed);
+// Focus goals (pinned, then soonest deadline) first, each with how it's moving.
+const summarizeGoals = (state) => {
+  const active = getActiveGoals(state.goals);
   if (!active.length) return 'No active goals.';
+  const now = new Date();
   return active
-    .slice()
-    .sort((a, b) => (b.pinned === true) - (a.pinned === true))
     .slice(0, 10)
-    .map((g) => {
-      const p = getGoalProgress(g);
-      return `- [${g.id}] ${g.pinned ? '(pinned) ' : ''}${g.title} [${g.period}] ${p.done}/${p.total}${g.unit ? ` ${g.unit}` : ''}`;
-    })
+    .map((g) => `- [${g.id}] ${describeGoal(g, state, now)}`)
     .join('\n');
 };
 
@@ -190,7 +187,7 @@ CALENDAR:
 ${summarizeCalendar(state.calendarEvents, state.noPhoneBlocks, state.calendarDayEvents)}
 
 ACTIVE GOALS (ids in brackets):
-${summarizeGoals(state.goals)}
+${summarizeGoals(state)}
 
 DAILY LOG & COMMITMENT:
 ${summarizeRecentJournal(state.logs, state.commitmentArchive)}
@@ -200,7 +197,7 @@ THIS WEEK'S #1 PRIORITY: ${summarizeWeekPriority(state.weeklyReviews)}
 HOW YOU WORK:
 - Look before you speak: if the snapshot above doesn't cover something (past days, health, journal history, score trend, focus time, brain dump, wishlist), call a read tool instead of guessing or saying you lack data. An empty CALENDAR day means nothing is scheduled.
 - Act when it helps: when they ask you to plan, schedule, capture or organize something, do it with tools rather than describing what they could do. Check get_calendar before scheduling so blocks don't collide.
-- Safe actions (create task / time block / template, brain dump note, goal milestone, remember/forget) apply immediately and the user can undo them. Edits and deletes (update/delete task, move/delete time block, update goal, set North Star) only become proposals the user approves in the chat — say they're waiting for approval, never claim they're done.
+- Safe actions (create task / time block / template, brain dump note, new goal, goal milestone, remember/forget) apply immediately and the user can undo them. Edits and deletes (update/delete task, move/delete time block, update goal, set North Star) only become proposals the user approves in the chat — say they're waiting for approval, never claim they're done.
 - Never say you did something unless a tool call for it succeeded. If a tool returns an error, fix the arguments or tell them plainly.
 - XP is earned, never handed out: you cannot complete tasks, tick habits, complete time blocks or resolve commitments. Remind them to do it themselves.
 - Memory: when you learn something durable (a recurring pattern, how they like to work, life context, a notable win), call remember. Keep memory accurate — forget entries that are outdated or wrong. Don't store one-off details.

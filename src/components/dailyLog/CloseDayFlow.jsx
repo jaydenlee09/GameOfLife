@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Moon, Plus, X, Trophy, TrendingUp, Lightbulb, PenLine, Target,
   Repeat, HeartPulse, MessageCircle, Sparkles, Shuffle, History, AlertTriangle, LoaderCircle, Lock, Pencil, Flame,
-  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck,
+  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck, Flag,
 } from 'lucide-react';
 import EMOTIONS from '../../utils/logMeta';
 import {
@@ -13,7 +13,7 @@ import {
 } from '../../utils/closeDay';
 import { getHabitLeak } from '../../utils/logPatterns';
 import { getYesterdayCommitment } from '../../utils/homeUtils';
-import { getFocusGoal } from '../../utils/goalUtils';
+import { getFocusGoal, getFocusGoals, getGoalActivity, setGoalCheckin, lastMovedLabel } from '../../utils/goalUtils';
 import { getPendingCheckIns } from '../../utils/calendarUtils';
 import { computeDailyScore, computeStreak, scoreColor, shiftDateKey, STREAK_THRESHOLD } from '../../utils/scoreUtils';
 import { entryHasContent, entryFingerprint } from '../../utils/logReview';
@@ -202,7 +202,43 @@ const LookBackStep = ({ lookBack, entry, todayKey, updateField, onResolveCommitm
   );
 };
 
-const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onToggleHabitDay, health }) => {
+/**
+ * "Did you move a goal today?" — one tap per focus goal. Work already linked to
+ * the goal (a task, focus session, block, habit) ticks it automatically; a tap
+ * records a manual check-in for the rest. No XP: that comes from the work itself.
+ */
+const GoalCheckIn = ({ goals, setGoals, goalData, todayKey, now }) => {
+  const focus = getFocusGoals(goals);
+  if (!focus.length || !setGoals) return null;
+  const toggle = (goal, on) => setGoals(prev => prev.map(g => (g.id === goal.id ? setGoalCheckin(g, todayKey, on) : g)));
+  return (
+    <div className="habit-checkin-list">
+      {focus.map(g => {
+        const activity = getGoalActivity(g, goalData, now);
+        const manual = !!g.checkins?.[todayKey];
+        const done = activity.movedToday;
+        return (
+          <div key={g.id} className={`habit-checkin-row ${done ? 'done' : ''}`}>
+            <button
+              className="habit-checkin-toggle"
+              onClick={() => !activity.autoMovedToday && toggle(g, !manual)}
+              aria-pressed={done}
+              title={activity.autoMovedToday ? 'Counted from work linked to this goal' : undefined}
+            >
+              <span className="habit-checkin-check">{done && <Check size={13} strokeWidth={3} />}</span>
+              <span className="habit-checkin-name">{g.title}</span>
+            </button>
+            <div className="habit-checkin-meta">
+              <span className="cd-goal-meta">{activity.autoMovedToday ? 'Counted' : done ? 'Moved today' : lastMovedLabel(activity)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onToggleHabitDay, health, goalCheckIn }) => {
   const emotions = entry.emotions || [];
   const toggleEmotion = (id) => updateField('emotions', emotions.includes(id) ? emotions.filter(e => e !== id) : [...emotions, id]);
   const habitsDone = habits.filter(h => h.history?.[todayKey]).length;
@@ -252,6 +288,12 @@ const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onTo
       <Block Icon={Repeat} title="Habits" hint={habits.length ? `${habitsDone}/${habits.length} done` : null} area="habits">
         <HabitChecklist habits={habits} todayKey={todayKey} onToggleHabitDay={onToggleHabitDay} {...habitHandlers} />
       </Block>
+
+      {getFocusGoals(goalCheckIn.goals).length > 0 && (
+        <Block Icon={Flag} title="Did you move a goal today?" hint="Tap the ones you did" area="goals">
+          <GoalCheckIn todayKey={todayKey} {...goalCheckIn} />
+        </Block>
+      )}
 
       <Block Icon={HeartPulse} title="Body" area="body">
         <HealthQuick todayKey={todayKey} {...health} />
@@ -634,7 +676,7 @@ const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints, onAwardXp,
-  goals, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
+  goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
 }) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
@@ -789,6 +831,7 @@ const CloseDayFlow = ({
                   habitHandlers={habitHandlers}
                   onToggleHabitDay={onToggleHabitDay}
                   health={{ healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints }}
+                  goalCheckIn={{ goals, setGoals, goalData: { todos, habits, pomodoroSessions, calendarEvents }, now }}
                 />
               )}
               {current === 'reflect' && (

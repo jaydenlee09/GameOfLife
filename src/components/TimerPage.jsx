@@ -5,7 +5,8 @@ import { xpForFocusMinutes } from '../utils/xpUtils';
 import { useCountdownTimer } from '../hooks/useCountdownTimer';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { makeFocusSession } from '../utils/focusInsights';
-import { IntentField, ParkThought, FocusDebrief } from './FocusCoach';
+import { IntentField, GoalField, ParkThought, FocusDebrief } from './FocusCoach';
+import { getActiveGoals } from '../utils/goalUtils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PRESETS = [
@@ -41,12 +42,13 @@ const relativeTime = (ts) => {
 
 
 // ─── Timer Page ───────────────────────────────────────────────────────────────
-const TimerPage = ({ onAwardXp, pomodoroSessions = [], onSessionComplete, onPark, onComment, onCommentSaved }) => {
+const TimerPage = ({ goals = [], onAwardXp, pomodoroSessions = [], onSessionComplete, onPark, onComment, onCommentSaved }) => {
   const [sessionStartedAt, setSessionStartedAt] = useState(null);
   const [customMinutes, setCustomMinutes] = useState('');
   const [customSeconds, setCustomSeconds] = useState('');
   const [showDebrief, setShowDebrief] = useState(false);
   const [intent, setIntent] = useState('');
+  const [goalId, setGoalId] = useState(null);
   const [parked, setParked] = useState(0);
   // Set once the finished session is stored, so it's never recorded twice.
   const savedRef = useRef(false);
@@ -108,7 +110,7 @@ const TimerPage = ({ onAwardXp, pomodoroSessions = [], onSessionComplete, onPark
   const saveSession = (debrief) => {
     if (savedRef.current) return null;
     savedRef.current = true;
-    const session = makeFocusSession({ startedAt: sessionStartedAt, durationSecs: totalSeconds, xpAmount, intent, parked, debrief });
+    const session = makeFocusSession({ startedAt: sessionStartedAt, durationSecs: totalSeconds, xpAmount, intent, goalId, parked, debrief });
     onAwardXp(xpAmount, { source: 'pomodoro', label: `${Math.floor(totalSeconds / 60)}m focus session` });
     onSessionComplete?.(session);
     return session;
@@ -123,6 +125,7 @@ const TimerPage = ({ onAwardXp, pomodoroSessions = [], onSessionComplete, onPark
     setShowDebrief(false);
     setSessionStartedAt(null);
     setIntent('');
+    setGoalId(null);
     setParked(0);
     reset();
   };
@@ -167,6 +170,7 @@ const TimerPage = ({ onAwardXp, pomodoroSessions = [], onSessionComplete, onPark
           </div>
 
           <IntentField value={intent} onChange={setIntent} locked={hasStarted || isRunning} />
+          <GoalField goals={getActiveGoals(goals)} value={goalId} onChange={setGoalId} locked={hasStarted || isRunning} />
 
           <div className="timer-controls">
             {!isRunning ? (

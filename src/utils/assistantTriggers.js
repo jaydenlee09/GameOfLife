@@ -9,14 +9,13 @@
 
 import { computeDailyScore, computeStreak, shiftDateKey, STREAK_THRESHOLD } from './scoreUtils';
 import { getHabitStreak } from './habitUtils';
+import { getFocusGoals, getGoalActivity, QUIET_GOAL_DAYS } from './goalUtils';
 
 export const EMPTY_CHECKINS = { morning: null, evening: null, weekly: null, nudges: {} };
 
 const MORNING_WINDOW = [4, 15];   // [from, to) hours
 const EVENING_FROM = 20;
 const WEEKLY_SUNDAY_FROM = 12;    // Sunday afternoon onward, or any time Monday
-const STALLED_GOAL_DAYS = 7;
-const DAY_MS = 86_400_000;
 
 const dateKey = (date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -118,15 +117,16 @@ export const computeNudges = (now, state, checkins) => {
     });
   }
 
-  (state.goals || []).forEach((g) => {
-    const touched = g.updatedAt || g.createdAt;
-    if (!g.pinned || g.completed || !touched) return;
-    const days = Math.floor((now.getTime() - touched) / DAY_MS);
-    if (days >= STALLED_GOAL_DAYS) {
+  // A focus goal nothing has moved in QUIET_GOAL_DAYS: same "quiet" rule as the Goals page.
+  getFocusGoals(state.goals).forEach((g) => {
+    const { daysQuiet } = getGoalActivity(g, state, now);
+    if (daysQuiet >= QUIET_GOAL_DAYS) {
       nudges.push({
         id: `goal_${g.id}`,
-        text: `No progress on "${g.title}" in ${days} days.`,
-        cta: { type: 'ask', label: 'Get unstuck', prompt: `I haven't touched my goal "${g.title}" in ${days} days. Help me get unstuck: what's the smallest next step, and can you schedule it?` },
+        goalId: g.id,
+        daysQuiet,
+        text: `Nothing has moved "${g.title}" in ${daysQuiet} days.`,
+        cta: { type: 'ask', label: 'Get unstuck', prompt: `Nothing has moved my goal "${g.title}" in ${daysQuiet} days. Help me get unstuck: what's the smallest next step, and can you schedule it?` },
       });
     }
   });

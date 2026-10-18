@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Star, CalendarDays, ArrowUp } from 'lucide-react';
+import { Plus, Star, CalendarDays, ArrowUp, Target } from 'lucide-react';
 import { dayLabel } from '../../utils/taskUtils';
 
 const WHEN_CHIPS = [
@@ -12,13 +12,16 @@ const WHEN_CHIPS = [
 ];
 
 // Type, press Enter, done. Everything else is optional and remembered between
-// adds (so a run of "today" tasks is just typing), except the star.
-const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
+// adds (so a run of "today" tasks is just typing), except the star. The goal
+// chip links the task to a goal, so finishing it counts as progress there.
+const QuickAdd = ({ today, defaultWhen, topFull, goals = [], onAdd, inputRef }) => {
   const [text, setText] = useState('');
   const [when, setWhen] = useState(defaultWhen);
   const [pickedDay, setPickedDay] = useState('');
   const [top, setTop] = useState(false);
   const [lastDefault, setLastDefault] = useState(defaultWhen);
+  const [goalId, setGoalId] = useState('');
+  const goal = goals.find((g) => String(g.id) === goalId) || null;
 
   // Switching tabs re-aims the default (Upcoming → Tomorrow, Later → This week).
   if (defaultWhen !== lastDefault) {
@@ -34,7 +37,7 @@ const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
-    onAdd({ text: trimmed, when: resolvedWhen, top: top && canStar });
+    onAdd({ text: trimmed, when: resolvedWhen, top: top && canStar, goalId: goal ? goal.id : null });
     setText('');
     setTop(false);
   };
@@ -102,6 +105,21 @@ const QuickAdd = ({ today, defaultWhen, topFull, onAdd, inputRef }) => {
         >
           <Star size={12} fill={top && canStar ? 'currentColor' : 'none'} /> Top 3
         </button>
+
+        {goals.length > 0 && (
+          <label className={`tk-when tk-when--goal${goal ? ' tk-when--on' : ''}`} title={goal ? `For ${goal.title}` : 'Link to a goal'}>
+            <Target size={12} /> <span className="tk-chip-clip">{goal ? goal.title : 'Goal'}</span>
+            <select
+              className="tk-when-date"
+              value={goal ? goalId : ''}
+              aria-label="Goal this task moves forward"
+              onChange={(e) => setGoalId(e.target.value)}
+            >
+              <option value="">No goal</option>
+              {goals.map((g) => <option key={g.id} value={String(g.id)}>{g.title}</option>)}
+            </select>
+          </label>
+        )}
       </div>
     </form>
   );

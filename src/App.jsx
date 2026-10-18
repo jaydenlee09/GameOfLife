@@ -874,6 +874,7 @@ function App() {
       blockDate: ev._instanceDate || ev.date,
       blockTitle: ev.title,
       taskId: ev.plan?.taskId ?? null,
+      goalId: ev.plan?.goalId ?? null,
       intent: ev.plan?.intent || '',
       durationSecs: Math.max(5, minutes) * 60,
     });
@@ -882,6 +883,14 @@ function App() {
 
   const startFocusOnTask = useCallback((task) => {
     setFocusLaunch({ taskId: task.id, intent: '' });
+    setFocusModeOpen(true);
+  }, []);
+
+  // A goal's Focus button: works on its next task if that's the next step, else on the goal itself.
+  const startFocusOnGoal = useCallback((goal, next) => {
+    setFocusLaunch(next?.kind === 'task'
+      ? { taskId: next.id, goalId: goal.id, intent: '' }
+      : { goalId: goal.id, intent: next?.text || '' });
     setFocusModeOpen(true);
   }, []);
 
@@ -999,9 +1008,9 @@ function App() {
 
   const nudges = useMemo(
     () => (syncSettled
-      ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals }, assistantCheckins)
+      ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents }, assistantCheckins)
       : []),
-    [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, assistantCheckins]
+    [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, assistantCheckins]
   );
   // A nudge that only sends you to the page you're already on is pointless, and the
   // Daily Log's Look back step already asks about yesterday's commitment.
@@ -1037,6 +1046,7 @@ function App() {
             commitmentArchive={commitmentArchive}
             goals={goals}
             habits={habits}
+            pomodoroSessions={pomodoroSessions}
             xpLog={xpLog}
             healthLog={healthLog}
             brief={user.homeBrief}
@@ -1097,6 +1107,9 @@ function App() {
             xpLog={xpLog}
             calendarEvents={calendarEvents}
             goals={goals}
+            setGoals={setGoals}
+            todos={todos}
+            pomodoroSessions={pomodoroSessions}
             northStar={user.northStar}
             logPatterns={user.logPatterns}
             habits={habits}
@@ -1121,6 +1134,7 @@ function App() {
       case 'timer':
         return (
           <TimerPage
+            goals={goals}
             onAwardXp={awardXp}
             pomodoroSessions={pomodoroSessions}
             onSessionComplete={handleSessionComplete}
@@ -1156,10 +1170,15 @@ function App() {
             onSaveNorthStar={(northStar) => setUser(prev => ({ ...prev, northStar }))}
             goals={goals}
             setGoals={setGoals}
+            todos={todos}
             setTodos={setTodos}
             onAwardXp={awardXp}
             habits={habits}
             setHabits={setHabits}
+            pomodoroSessions={pomodoroSessions}
+            calendarEvents={calendarEvents}
+            onCompleteTask={completeTaskById}
+            onStartFocus={startFocusOnGoal}
           />
         );
       case 'review':
@@ -1174,6 +1193,7 @@ function App() {
             logs={logs}
             goals={goals}
             healthLog={healthLog}
+            calendarEvents={calendarEvents}
             setGoals={setGoals}
             onAwardXp={awardXp}
           />
@@ -1261,8 +1281,9 @@ function App() {
       )}
       {focusModeOpen && (
         <FocusMode
-          key={focusLaunch ? `${focusLaunch.blockId ?? `task${focusLaunch.taskId}`}_${focusLaunch.blockDate}` : 'free'}
+          key={focusLaunch ? `${focusLaunch.blockId ?? `task${focusLaunch.taskId}`}_${focusLaunch.blockDate}_${focusLaunch.goalId}` : 'free'}
           todos={todos}
+          goals={goals}
           onAwardXp={awardXp}
           pomodoroSessions={pomodoroSessions}
           onSessionComplete={handleSessionComplete}

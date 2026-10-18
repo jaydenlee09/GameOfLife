@@ -4,7 +4,8 @@ import { X, ChevronDown, Play, Pause, RotateCcw, Timer, CalendarClock } from 'lu
 import { xpForFocusMinutes } from '../utils/xpUtils';
 import { useCountdownTimer } from '../hooks/useCountdownTimer';
 import { makeFocusSession } from '../utils/focusInsights';
-import { IntentField, ParkThought, FocusDebrief } from './FocusCoach';
+import { IntentField, GoalField, ParkThought, FocusDebrief } from './FocusCoach';
+import { getActiveGoals } from '../utils/goalUtils';
 
 const getLocalDateKey = () => {
   const d = new Date();
@@ -20,7 +21,7 @@ const PRESETS = [5 * 60, 10 * 60, 25 * 60, 45 * 60, 60 * 60, 90 * 60];
  * `linkedBlock` is that block's current instance (null once deleted).
  */
 const FocusMode = ({
-  todos = [], onAwardXp, pomodoroSessions = [], onSessionComplete, onClose,
+  todos = [], goals = [], onAwardXp, pomodoroSessions = [], onSessionComplete, onClose,
   launch = null, linkedBlock = null, onPark, onComment, onCommentSaved, onCompleteBlock, onCompleteTask,
 }) => {
   const launchedTask = launch?.taskId != null ? todos.find(t => String(t.id) === String(launch.taskId) && !t.completed) : null;
@@ -28,12 +29,15 @@ const FocusMode = ({
   const taskOptions = launchedTask && !todayTasks.includes(launchedTask) ? [launchedTask, ...todayTasks] : todayTasks;
   const isLinked = launch?.blockId != null;
 
-  const [pinnedId, setPinnedId]   = useState(launchedTask?.id ?? (isLinked ? null : todayTasks[0]?.id ?? null));
+  // A block or goal launch works on what it says; a free session suggests today's first task.
+  const [pinnedId, setPinnedId]   = useState(launchedTask?.id ?? (isLinked || launch?.goalId != null ? null : todayTasks[0]?.id ?? null));
   const [showDone, setShowDone]   = useState(false);
   const [startedAt, setStartedAt] = useState(null);
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const [intent, setIntent]       = useState(launch?.intent || '');
   const [parked, setParked]       = useState(0);
+  // undefined = follow the task's (or block's) goal; null/id = the user's pick.
+  const [goalChoice, setGoalChoice] = useState(undefined);
   // Set once the finished session is stored, so closing mid-debrief can't lose it.
   const savedRef = useRef(false);
 
@@ -43,13 +47,15 @@ const FocusMode = ({
   // Reward is EARNED from session length, not chosen — 1 XP per focused minute.
   const xpAmount = xpForFocusMinutes(totalSecs / 60);
   const pinnedTask = taskOptions.find(t => t.id === pinnedId) || null;
+  const activeGoals = getActiveGoals(goals);
+  const goalId = goalChoice !== undefined ? goalChoice : (pinnedTask?.goalId ?? launch?.goalId ?? null);
 
   const saveSession = (debrief) => {
     if (savedRef.current) return null;
     savedRef.current = true;
     const session = makeFocusSession({
       startedAt, durationSecs: totalSecs, xpAmount, intent,
-      taskId: pinnedTask?.id, blockId: launch?.blockId, blockDate: launch?.blockDate, parked, debrief,
+      taskId: pinnedTask?.id, goalId, blockId: launch?.blockId, blockDate: launch?.blockDate, parked, debrief,
     });
     if (!isLinked) onAwardXp(xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
     onSessionComplete?.(session);
@@ -127,7 +133,7 @@ const FocusMode = ({
         {showTaskPicker && taskOptions.length > 0 && (
           <div className="focus-task-picker">
             {taskOptions.map(t => (
-              <button key={t.id} className={`focus-task-option ${t.id === pinnedId ? 'active' : ''}`} onClick={() => { setPinnedId(t.id); setShowTaskPicker(false); }}>
+              <button key={t.id} className={`focus-task-option ${t.id === pinnedId ? 'active' : ''}`} onClick={() => { setPinnedId(t.id); setGoalChoice(undefined); setShowTaskPicker(false); }}>
                 {t.text}
               </button>
             ))}
@@ -136,6 +142,7 @@ const FocusMode = ({
       </div>
 
       <IntentField value={intent} onChange={setIntent} locked={hasStarted || isRunning} />
+      <GoalField goals={activeGoals} value={goalId} onChange={setGoalChoice} locked={hasStarted || isRunning} />
 
       {/* Timer ring */}
       <div className="focus-ring-wrap">

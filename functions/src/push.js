@@ -6,6 +6,7 @@
 import { decidePushes, markPushesSent, withPushDefaults, MORNING_PUSH_PROMPT, splitMorningBrief } from '../../src/utils/pushSchedule';
 import { runAssistantTurn } from '../../src/utils/assistantUtils';
 import { TOOL_DECLARATIONS, getTool } from '../../src/utils/assistantTools';
+import { normalizeGoal } from '../../src/utils/goalUtils';
 
 // App data each tick needs, keyed by the state name the shared utils expect.
 // These are the same Firestore docs App.jsx syncs (users/{uid}/data/{key} → { value }).
@@ -58,6 +59,8 @@ const loadState = async (db, uid) => {
   const state = {};
   entries.forEach(([name], i) => { state[name] = readValue(snaps[i], undefined); });
   state.user = { name: 'you', level: 1, xp: 0, stats: {}, ...state.user };
+  // Same load-time migration as App (old week/month/year goals get a deadline).
+  state.goals = (state.goals || []).map(normalizeGoal);
   return state;
 };
 

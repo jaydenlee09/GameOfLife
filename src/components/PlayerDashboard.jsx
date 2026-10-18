@@ -348,7 +348,7 @@ const PlayerDashboard = ({
           <ConnectedFeatureTiles
             habits={habits} goals={goals} healthLog={healthLog} pomodoroSessions={pomodoroSessions}
             todos={todos} noPhoneBlocks={noPhoneBlocks} commitmentArchive={commitmentArchive}
-            onNavigate={onNavigate}
+            calendarEvents={calendarEvents} onNavigate={onNavigate}
           />
 
           <div className="dashboard-card feed-card">

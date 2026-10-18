@@ -6,7 +6,7 @@
 
 import { computeDailyScore, shiftDateKey } from './scoreUtils';
 import { getHabitStreak } from './habitUtils';
-import { getGoalProgress } from './goalUtils';
+import { getActiveGoals, describeGoal } from './goalUtils';
 import { getTool } from './assistantTools';
 import EMOTIONS from './logMeta';
 import { taskLabelsCompletedOn } from './taskUtils';
@@ -76,14 +76,8 @@ export const buildReviewContext = (state, dateKey) => {
     .filter((c) => c.date >= from && c.date < dateKey)
     .map((c) => (c.denied === true ? 'missed' : c.confirmedOn ? 'kept' : 'unresolved'));
 
-  const goals = (state.goals || [])
-    .filter((g) => !g.completed)
-    .sort((a, b) => (b.pinned === true) - (a.pinned === true))
-    .slice(0, 6)
-    .map((g) => {
-      const p = getGoalProgress(g);
-      return `${g.pinned ? '(pinned) ' : ''}${g.title} [${g.period}] ${p.done}/${p.total}${g.unit ? ` ${g.unit}` : ''}`;
-    });
+  const dayEnd = new Date(`${dateKey}T23:59:00`);
+  const goals = getActiveGoals(state.goals).slice(0, 6).map((g) => describeGoal(g, state, dayEnd));
 
   return {
     name: state.user?.name || 'you',

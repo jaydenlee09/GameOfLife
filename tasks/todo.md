@@ -1,5 +1,77 @@
 # Todo
 
+## Done, uncommitted (2026-10-17): Goals you actually use
+
+Problem (user): goals are too hard to create, don't connect to the rest of the site or show
+progress, and get forgotten because nobody opens the Goals page. Would rather use Notes.
+Root causes in code: 7-part GoalModal · goals bucketed into calendar week/month/year (weekly ones
+go Overdue every Monday) · `getGoalProgress` only counts hand-ticked milestones / typed numbers,
+ignoring linked tasks, habits, focus and calendar blocks · goals only surface as one title on Home.
+
+User choices: optional deadline (no buckets) · progress auto from linked work (milestones/number
+still drive the % bar when present) · reminders on Home tiles, Close the Day, push, task/focus
+goal chip · no Notes import.
+
+Design:
+- Data (backward compatible, normalizeGoal migrates on load, no Firestore rewrite needed):
+  `deadline` 'YYYY-MM-DD' | null. Old goals: deadline = their period's last day (from
+  period/periodKey); `period`/`periodKey` kept but ignored. Overdue = deadline passed, not done.
+  Goal XP by horizon (createdAt → deadline): ≤10 days 50, ≤45 150, longer or none 400 (same
+  table as today's weekly/monthly/yearly), milestone discount unchanged, still paid once.
+- `goalUtils.getGoalActivity(goal, { todos, habits, pomodoroSessions, calendarEvents, now })`,
+  pure: per-day list of what moved it (linked task done, linked habit check-in, focus minutes on
+  the goal or a goal-linked task, goal/task block done or partly, milestone ticked, number
+  changed). Gives `lastMovedAt`, `daysQuiet`, this week's count + focus minutes, 7-day strip.
+  Status: on track / quiet (5+ days) / overdue / done. Replaces `updatedAt` as "last progress"
+  everywhere (assistant stalled nudge, dayPlanner daysSinceProgress, stats tile).
+- Focus sessions get optional `goalId` (makeFocusSession); goal-linked task sessions count too.
+- Quick add on Goals page: one text box + deadline chips (End of month / 3 months / End of year /
+  No date / pick date) → Enter saves. Card expands to add milestones, number, obstacle plan,
+  link habit, add task (same fields as today, moved out of the create step). Edit modal kept
+  for full edits, minus the period picker.
+- Goals page: Focus (pinned, up to 3) → Active → Done (collapsed). No period tabs/arrows.
+  Card: title, deadline ("12 days left" / "Overdue"), % bar if milestones/number, this-week
+  strip + "Last moved 2 days ago", next step (first open milestone or open linked task).
+- Home: Why tile's single goal row becomes up to 3 goal rows (focus goals first, else soonest
+  deadline) with status dot + "quiet 6d" / bar; tap opens Goals.
+- Close the Day, Check-in step: "Moved a goal today?" one tap per focus goal (Yes = logs a
+  manual `goal.checkins[date]` that counts as activity; auto-detected activity shows already
+  ticked). No XP (XP stays earned through the linked work).
+- Tasks: QuickAdd gets a goal chip (pick an active goal); TaskDetail can link/unlink a goal.
+  Focus (FocusMode + Timer): "For goal" picker beside the intent; defaults to the task's goal.
+- Push: new `goals` type in pushSchedule (default on): a goal quiet 5+ days (once per goal per
+  3 days, evening) and a Sunday 18:00 "goals check" listing focus goals' week. Settings toggle
+  in NotificationSettings. Ships through the existing GitHub Actions bundle.
+- WeeklyReviewPage Goal Check-In: focus goals + any due this week (not periodKey); "carry
+  forward" becomes "push deadline" (+7 days). Assistant tools: get_goals returns deadline +
+  activity; add a `create_goal` (title, deadline) tool tier auto+undo. Achievements untouched.
+
+Steps:
+- [x] goalUtils: deadline migration, horizon XP, getGoalActivity/status + node checks
+- [x] Focus sessions + task links carry goalId (makeFocusSession, FocusMode, Timer, QuickAdd, TaskDetail)
+- [x] GoalsPage rebuild: quick add, Focus/Active/Done, activity card, expand-to-detail
+- [x] Home goal rows, Close the Day goal tap
+- [x] Weekly Review, dayPlanner, assistant tools/nudges, stats tile → deadline + activity
+- [x] Push `goals` type + settings toggle
+- [x] Verify in browser (1440 + 375, empty + populated, old-format goals), lint before/after, build, memory
+
+Changes from the plan: no-deadline goals pay 150 XP (not 400), so "type a goal, tick it" can't
+farm the top tier · deleting a goal now unlinks its tasks instead of deleting them · in-app
+stalled nudge moved from pinned-7-days to focus-goals-5-days (same rule as the push) · short
+phones hide the week-priority row (not the goals row) and the third goal.
+
+Verified: node checks (migration incl. weekly/monthly/yearly ends, horizon XP, activity from all
+6 sources incl. recurring block outcomes + task-linked focus, quiet/overdue, focus ordering, push
+deadline; push: Sunday recap, quiet on day 5 then every 3rd, window, type off; tools: get_goals
+deadline/momentum, create_goal + dup/date guards, update_goal deadline none, tiers). Real App
+harness (auth/Firestore/push stubbed, seeded) at 1440 + 375x812 + 375x667: milestone +15 and next
+step advances, inline task linked, task complete +50 counts, quick add 3 months, +1 week on
+overdue, Mark achieved pays once, edit modal, delete unlinks tasks + habit, Focus button opens
+Focus Mode with goal + intent, Tasks goal chip + TaskDetail goal select, Close the Day auto
+"Counted" + manual tap on/off with no XP, Weekly Review week counts + push deadline, Statistics
+tile, empty state; Home zero-scroll at 812 and 667; no horizontal overflow; no console errors.
+Lint 40 → 39 (old GoalsPage purity error gone, no new). App + functions build pass.
+
 ## Done, uncommitted (2026-10-17): Desktop sidebar, more helpful but still minimal
 
 User choices: all four additions (grouped links, live status hints, next-move card, ⌘K jump-or-ask);

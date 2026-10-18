@@ -1,11 +1,11 @@
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
-  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Pin, Star, CalendarCheck,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck,
 } from 'lucide-react';
 import './WelcomePage.css';
 import { toDateKey, fmtRemaining, getPendingCheckIns } from '../utils/calendarUtils';
 import BlockCheckIn from './calendar/BlockCheckIn';
-import { getGoalProgress, getFocusGoal } from '../utils/goalUtils';
+import { getGoalProgress, getFocusGoals, getGoalActivity, getGoalStatus, daysLeft } from '../utils/goalUtils';
 import { getHabitStreak } from '../utils/habitUtils';
 import { computeDailyScore, computeStreak, scoreColor } from '../utils/scoreUtils';
 import {
@@ -372,10 +372,9 @@ function CommitmentTile({ commitment, onNavigate, onResolveCommitment }) {
   );
 }
 
-function WhyTile({ northStar, weekPriority, goals, now, onNavigate }) {
+function WhyTile({ northStar, weekPriority, goals, goalData, now, onNavigate }) {
   const vision = northStar?.vision?.trim();
-  const goal = getFocusGoal(goals, now);
-  const progress = goal ? getGoalProgress(goal) : null;
+  const focus = getFocusGoals(goals);
 
   return (
     <section className="wp-tile wp-tile--why" aria-label="Your why">
@@ -389,16 +388,40 @@ function WhyTile({ northStar, weekPriority, goals, now, onNavigate }) {
         <span className="wp-why-key">This week</span>
         <span className={`wp-why-text ${weekPriority ? '' : 'is-empty'}`}>{weekPriority || 'Set this week’s priority'}</span>
       </button>
-      {goal && (
+      {focus.length === 0 ? (
         <button type="button" className="wp-why-row" onClick={() => onNavigate('goals')}>
-          {goal.pinned ? <Pin size={15} className="wp-why-icon" /> : <Flag size={15} className="wp-why-icon" />}
-          <span className="wp-why-key">Goal</span>
-          <span className="wp-why-text">{goal.title}</span>
-          {progress.kind !== 'binary' && (
-            <span className="wp-why-bar" aria-label={`${Math.round(progress.ratio * 100)}% done`}>
-              <span style={{ width: `${Math.round(progress.ratio * 100)}%` }} />
-            </span>
-          )}
+          <Flag size={15} className="wp-why-icon" />
+          <span className="wp-why-key">Goals</span>
+          <span className="wp-why-text is-empty">Write down a goal</span>
+        </button>
+      ) : (
+        <button type="button" className="wp-why-row wp-why-row--goals" onClick={() => onNavigate('goals')}>
+          <Flag size={15} className="wp-why-icon" />
+          <span className="wp-why-key">Goals</span>
+          <span className="wp-why-goals">
+            {focus.map((g) => {
+              const activity = getGoalActivity(g, goalData, now);
+              const status = getGoalStatus(g, activity, now);
+              const progress = getGoalProgress(g);
+              const left = daysLeft(g, now);
+              const meta = status === 'overdue' ? 'Overdue'
+                : status === 'quiet' ? `Quiet ${activity.daysQuiet}d`
+                  : activity.movedToday ? 'Today'
+                    : left != null && left <= 14 ? `${left}d left` : null;
+              return (
+                <span key={g.id} className="wp-why-goal">
+                  <span className={`wp-why-dot wp-why-dot--${status}`} aria-label={status} />
+                  <span className="wp-why-goal-title">{g.title}</span>
+                  {progress.kind !== 'binary' && (
+                    <span className="wp-why-bar" aria-label={`${Math.round(progress.ratio * 100)}% done`}>
+                      <span style={{ width: `${Math.round(progress.ratio * 100)}%` }} />
+                    </span>
+                  )}
+                  {meta && <span className={`wp-why-goal-meta wp-why-goal-meta--${status}`}>{meta}</span>}
+                </span>
+              );
+            })}
+          </span>
         </button>
       )}
     </section>
@@ -418,6 +441,7 @@ export default function WelcomePage({
   commitmentArchive,
   goals,
   habits,
+  pomodoroSessions,
   xpLog,
   healthLog,
   brief,
@@ -465,7 +489,14 @@ export default function WelcomePage({
             onNavigate={onNavigate}
             onResolveCommitment={onResolveCommitment}
           />
-          <WhyTile northStar={user?.northStar} weekPriority={currentWeekPriority} goals={goals} now={now} onNavigate={onNavigate} />
+          <WhyTile
+            northStar={user?.northStar}
+            weekPriority={currentWeekPriority}
+            goals={goals}
+            goalData={{ todos, habits, pomodoroSessions, calendarEvents }}
+            now={now}
+            onNavigate={onNavigate}
+          />
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@ import {
   computeDailyScore, computeDailyScoreHistory, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD,
 } from './scoreUtils';
 import { getHabitStreak } from './habitUtils';
-import { getGoalProgress } from './goalUtils';
+import { getGoalProgress, getGoalActivity, getGoalStatus, daysLeft, makeGoal } from './goalUtils';
 import { ACHIEVEMENTS } from './achievementsMeta';
 import { carriedDays, isTop } from './taskUtils';
 
@@ -180,6 +180,10 @@ export const undoBlocker = (inverse, state) => {
       return 'Every one of those is already completed — the XP was earned, so they stay.';
     }
   }
+  if (inverse.kind === 'remove' && inverse.collection === 'goals') {
+    const goal = (state.goals || []).find((g) => sameId(g.id, inverse.id));
+    if (goal?.completedAt) return 'That goal is already achieved — the XP was earned, so it stays.';
+  }
   if (inverse.kind === 'removeMilestone') {
     const goal = (state.goals || []).find((g) => sameId(g.id, inverse.goalId));
     const milestone = goal?.milestones?.find((m) => sameId(m.id, inverse.milestoneId));
@@ -258,29 +262,36 @@ const READ_TOOLS = [
   },
   {
     name: 'get_goals',
-    description: 'Goals with ids, period, progress, milestones (with ids), obstacle and if-then plan.',
+    description: 'Goals with ids, deadline, progress, milestones (with ids), obstacle and if-then plan, plus momentum: what moved it in the last 7 days (linked tasks done, habit check-ins, focus minutes, kept blocks) and days since it last moved.',
     parameters: OBJ({ include_completed: B('Also include completed goals (default false).') }),
-    run: (args, { state }) => ({
-      goals: (state.goals || [])
-        .filter((g) => args?.include_completed || !g.completed)
-        .map((g) => {
-          const progress = getGoalProgress(g);
-          const touched = g.updatedAt || g.createdAt;
-          return {
-            id: String(g.id),
-            title: g.title,
-            period: g.period,
-            periodKey: g.periodKey,
-            pinned: !!g.pinned,
-            completed: !!g.completed,
-            progress: `${progress.done}/${progress.total}${g.unit ? ` ${g.unit}` : ''} (${Math.round(progress.ratio * 100)}%)`,
-            milestones: (g.milestones || []).map((m) => ({ id: String(m.id), text: m.text, completed: !!m.completed })),
-            ...(g.obstacle ? { obstacle: g.obstacle } : {}),
-            ...(g.ifThenPlan ? { ifThenPlan: g.ifThenPlan } : {}),
-            ...(touched ? { lastUpdated: new Date(touched).toISOString().slice(0, 10) } : {}),
-          };
-        }),
-    }),
+    run: (args, { state }) => {
+      const now = new Date();
+      return {
+        goals: (state.goals || [])
+          .filter((g) => args?.include_completed || !g.completed)
+          .map((g) => {
+            const progress = getGoalProgress(g);
+            const activity = getGoalActivity(g, state, now);
+            const left = daysLeft(g, now);
+            return {
+              id: String(g.id),
+              title: g.title,
+              deadline: g.deadline || null,
+              ...(left != null && !g.completed ? { daysLeft: left } : {}),
+              status: getGoalStatus(g, activity, now),
+              pinned: !!g.pinned,
+              completed: !!g.completed,
+              progress: `${progress.done}/${progress.total}${g.unit ? ` ${g.unit}` : ''} (${Math.round(progress.ratio * 100)}%)`,
+              milestones: (g.milestones || []).map((m) => ({ id: String(m.id), text: m.text, completed: !!m.completed })),
+              last7Days: { thingsDone: activity.weekCount, focusMinutes: activity.weekMinutes },
+              lastMoved: activity.lastMovedDate,
+              daysQuiet: activity.daysQuiet,
+              ...(g.obstacle ? { obstacle: g.obstacle } : {}),
+              ...(g.ifThenPlan ? { ifThenPlan: g.ifThenPlan } : {}),
+            };
+          }),
+      };
+    },
   },
   {
     name: 'get_habits',
@@ -618,6 +629,32 @@ const AUTO_TOOLS = [
     },
   },
   {
+    name: 'create_goal',
+    description: 'Create a goal the user has stated in their own words. Applied immediately (user can undo). Add milestones afterwards with add_goal_milestone if they want steps.',
+    parameters: OBJ({
+      title: S('The goal, short and specific, in their words.'),
+      deadline: S('Optional YYYY-MM-DD it should be done by. Omit for no deadline.'),
+      pinned: B('Pin it as a focus goal (default false).'),
+    }, ['title']),
+    prepare: (args, { state }) => {
+      const title = toTrimmedString(args?.title).slice(0, 140);
+      if (!title) throw new Error('title is required.');
+      const deadline = toTrimmedString(args?.deadline) || null;
+      if (deadline && !normalizeDateKey(deadline)) throw new Error('deadline must be YYYY-MM-DD.');
+      if ((state.goals || []).some((g) => !g.completed && g.title.trim().toLowerCase() === title.toLowerCase())) {
+        throw new Error('A goal with that title already exists. Call get_goals.');
+      }
+      const goal = makeGoal({ title, deadline, pinned: args?.pinned === true });
+      goal.id = makeId('goal');
+      return {
+        op: { collection: 'goals', kind: 'insert', item: goal },
+        inverse: { collection: 'goals', kind: 'remove', id: goal.id },
+        label: `Created goal "${title}"${deadline ? ` (by ${deadline})` : ''}`,
+        result: { goalId: goal.id },
+      };
+    },
+  },
+  {
     name: 'remember',
     description: `Save a durable insight about the user to long-term memory (max ${MEMORY_LIMIT}). Use for patterns, preferences, facts and wins that should shape future coaching — not one-off details.`,
     parameters: OBJ({
@@ -775,10 +812,11 @@ const CONFIRM_TOOLS = [
   },
   {
     name: 'update_goal',
-    description: 'Edit a goal: title, WOOP obstacle, if-then plan, or pinned. Needs the user\'s approval.',
+    description: 'Edit a goal: title, deadline, WOOP obstacle, if-then plan, or pinned. Needs the user\'s approval.',
     parameters: OBJ({
       goalId: S('Goal id from get_goals.'),
       title: S('New title.'),
+      deadline: S('New deadline YYYY-MM-DD, or "none" to remove it.'),
       obstacle: S('The main inner obstacle (WOOP).'),
       ifThenPlan: S('"If <obstacle>, then I will <action>."'),
       pinned: B('Pin or unpin the goal.'),
@@ -790,6 +828,12 @@ const CONFIRM_TOOLS = [
         if (has(args, key) && toTrimmedString(args[key]) !== (goal[key] || '')) fields[key] = toTrimmedString(args[key]);
       });
       if (fields.title === '') delete fields.title;
+      if (has(args, 'deadline')) {
+        const raw = toTrimmedString(args.deadline);
+        const deadline = !raw || raw.toLowerCase() === 'none' ? null : raw;
+        if (deadline && !normalizeDateKey(deadline)) throw new Error('deadline must be YYYY-MM-DD or "none".');
+        if (deadline !== (goal.deadline || null)) fields.deadline = deadline;
+      }
       if (typeof args?.pinned === 'boolean' && args.pinned !== !!goal.pinned) fields.pinned = args.pinned;
       if (!Object.keys(fields).length) throw new Error('Nothing to change.');
       const previous = Object.fromEntries(Object.keys(fields).map((key) => [key, goal[key]]));

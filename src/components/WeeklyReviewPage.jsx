@@ -7,13 +7,17 @@ import {
 import {
   toggleMilestone,
   toggleGoalCompleted,
-  cloneGoalForward,
+  pushDeadline,
   goalCompletionXp,
+  getFocusGoals,
+  getGoalEvents,
+  deadlineLabel,
+  goalDateKey,
   MILESTONE_XP,
 } from '../utils/goalUtils';
 import { computeWeekStats, getMondayKey, formatWeekRange, getWeekDays } from '../utils/weekStatsUtils';
 
-const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, setGoals, onAwardXp }) => {
+const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, calendarEvents = [], setGoals, onAwardXp }) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const mondayKey = getMondayKey(weekOffset);
   const isCurrentWeek = weekOffset === 0;
@@ -24,11 +28,22 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
     [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, Object.keys(logs).length, goals, healthLog]
   );
 
+  // This week: the focus goals plus anything due by Sunday. Past weeks: the goals
+  // that moved (or were achieved) that week. Each carries that week's activity.
   const weekGoals = useMemo(() => {
-    const weekly = goals.filter(g => g.period === 'weekly' && g.periodKey === mondayKey);
-    const pinned = weekly.filter(g => g.pinned);
-    return pinned.length > 0 ? pinned : weekly;
-  }, [goals, mondayKey]);
+    const sundayKey = getWeekDays(mondayKey)[6];
+    const data = { todos, habits, pomodoroSessions, calendarEvents };
+    const inWeek = (key) => key >= mondayKey && key <= sundayKey;
+    const withWeek = (g) => {
+      const events = getGoalEvents(g, data).filter((e) => inWeek(e.date));
+      return { goal: g, count: events.length, minutes: events.reduce((sum, e) => sum + (e.minutes || 0), 0) };
+    };
+    const picked = isCurrentWeek
+      ? [...new Set([...getFocusGoals(goals), ...goals.filter((g) => !g.completed && g.deadline && g.deadline <= sundayKey)])]
+      : goals.filter((g) => (g.completedAt && inWeek(goalDateKey(new Date(g.completedAt)))) || withWeek(g).count > 0);
+    return picked.map(withWeek);
+  }, [goals, mondayKey, isCurrentWeek, todos, habits, pomodoroSessions, calendarEvents]);
+  const sundayKey = getWeekDays(mondayKey)[6];
 
   const awardGoalXp = (goal) => {
     const xp = goalCompletionXp(goal);
@@ -60,10 +75,8 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
     if (shouldAwardGoalXp) awardGoalXp(goal);
   };
 
-  const handleCarryForward = (goal) => {
-    const nextMondayKey = getMondayKey(1);
-    const cloned = cloneGoalForward(goal, nextMondayKey);
-    setGoals(prev => [cloned, ...prev.map(g => g.id === goal.id ? { ...g, carriedForwardId: cloned.id } : g)]);
+  const handlePushDeadline = (goal) => {
+    setGoals(prev => prev.map(g => (g.id === goal.id ? pushDeadline(g, 7, new Date()) : g)));
   };
 
   const [wentWell,     setWentWell]     = useState(saved?.wentWell     || '');
@@ -166,7 +179,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
           {weekGoals.length > 0 && (
             <div className="review-goal-checkin">
               <h3 className="review-goal-checkin-title"><Target size={18} /> Goal Check-In</h3>
-              {weekGoals.map((goal) => {
+              {weekGoals.map(({ goal, count, minutes }) => {
                 const isComplete = !!goal.completed;
                 return (
                   <div key={goal.id} className={`review-goal-item ${isComplete ? 'review-goal-item--complete' : ''}`}>
@@ -181,6 +194,10 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
                       </label>
                       {goal.pinned && <span className="review-goal-pin" title="Pinned focus goal"><Pin size={14} /></span>}
                     </div>
+                    <p className={`review-goal-week ${count ? '' : 'review-goal-week--none'}`}>
+                      {count ? `${count} thing${count === 1 ? '' : 's'} moved it this week${minutes ? ` · ${minutes}m focus` : ''}` : 'Nothing moved it this week'}
+                      {' · '}{deadlineLabel(goal, new Date())}
+                    </p>
 
                     {goal.milestones?.length > 0 && (
                       <div className="review-goal-milestones">
@@ -204,14 +221,9 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
                       </div>
                     )}
 
-                    {!isComplete && isCurrentWeek && (
-                      <button
-                        type="button"
-                        className="review-goal-carry-btn"
-                        disabled={!!goal.carriedForwardId}
-                        onClick={() => handleCarryForward(goal)}
-                      >
-                        {goal.carriedForwardId ? <><Check size={14} /> Carried to next week</> : <>Carry to next week <ArrowRight size={14} /></>}
+                    {!isComplete && isCurrentWeek && goal.deadline && goal.deadline <= sundayKey && (
+                      <button type="button" className="review-goal-carry-btn" onClick={() => handlePushDeadline(goal)}>
+                        Push deadline a week <ArrowRight size={14} />
                       </button>
                     )}
                   </div>

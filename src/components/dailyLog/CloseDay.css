@@ -1200,6 +1200,7 @@
   .cd-a-feel { grid-area: feel; }
   .cd-a-habits { grid-area: habits; }
   .cd-a-body { grid-area: body; }
+  .cd-a-goals { grid-area: goals; }
   .cd-a-patterns { grid-area: patterns; }
   .cd-a-wins { grid-area: wins; }
   .cd-a-improve { grid-area: improve; }
@@ -1235,12 +1236,13 @@
 
   /* Check in: mood + rating + habits on the left, the body check-in on the right */
   .cd-body--checkIn {
-    grid-template-rows: auto auto auto auto 1fr auto;
+    grid-template-rows: auto auto auto auto auto 1fr auto;
     grid-template-areas:
       "title title"
       "rate body"
       "feel body"
       "habits body"
+      "goals body"
       ". body"
       "nav nav";
   }
@@ -1314,4 +1316,11 @@
   .cd-a-edit { justify-self: center; }
   .cd-closed-hero { padding: 0.25rem 0 0.35rem; }
   .cd-closed-moon { width: 56px; height: 56px; }
+}
+
+.cd-goal-meta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  white-space: nowrap;
 }

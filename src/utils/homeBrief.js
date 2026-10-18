@@ -6,7 +6,7 @@
 
 import { computeDailyScore, shiftDateKey } from './scoreUtils';
 import { getHabitStreak } from './habitUtils';
-import { getGoalProgress } from './goalUtils';
+import { getActiveGoals, describeGoal } from './goalUtils';
 import { getTool } from './assistantTools';
 import { toDateKey } from './calendarUtils';
 import { isTop, todayQueue } from './taskUtils';
@@ -47,14 +47,7 @@ export const buildBriefContext = (state, now, { weekPriority, logReviews } = {})
     .slice(0, 10)
     .map((t) => (isTop(t, todayKey) ? `[Top 3] ${t.text}` : t.text));
 
-  const goals = (state.goals || [])
-    .filter((g) => !g.completed)
-    .sort((a, b) => (b.pinned === true) - (a.pinned === true))
-    .slice(0, 4)
-    .map((g) => {
-      const p = getGoalProgress(g);
-      return `${g.pinned ? '(pinned) ' : ''}${g.title} [${g.period}] ${p.done}/${p.total}${g.unit ? ` ${g.unit}` : ''}`;
-    });
+  const goals = getActiveGoals(state.goals).slice(0, 4).map((g) => describeGoal(g, state, now));
 
   const yesterdayCommitment = state.logs?.[yesterdayKey]?.commitment?.trim() || null;
   const yesterdayReview = logReviews?.[yesterdayKey];

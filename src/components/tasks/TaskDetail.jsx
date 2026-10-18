@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Star, Trash2, X, Play, Check, CalendarDays, Target, Plus } from 'lucide-react';
 import {
-  dayLabel, whenOf, XP_BY_TIMEFRAME, TIMEFRAME_LABELS, isDayTask, createdAtOf, dateKeyOf,
+  dayLabel, whenOf, XP_BY_TIMEFRAME, isDayTask, createdAtOf, dateKeyOf,
 } from '../../utils/taskUtils';
+import { getActiveGoals } from '../../utils/goalUtils';
 
 const SUBTASK_XP = 10;
 
@@ -29,6 +30,7 @@ const TaskDetail = ({
   const [newSubtask, setNewSubtask] = useState('');
 
   const goal = task.goalId != null ? (goals || []).find((g) => String(g.id) === String(task.goalId)) : null;
+  const goalOptions = getActiveGoals(goals).concat(goal && goal.completed ? [goal] : []);
   const subtasks = task.subtasks || [];
   const top = task.topDate === today;
   const done = task.completed || pending;
@@ -116,38 +118,34 @@ const TaskDetail = ({
 
       <section className="tk-field">
         <h4 className="tk-field-label">When</h4>
-        {goal ? (
-          <p className="tk-field-note"><Target size={13} /> From your goal <strong>{goal.title}</strong> · {TIMEFRAME_LABELS[task.timeFrame] || 'Today'}</p>
-        ) : (
-          <div className="tk-chips">
-            {WHEN_CHIPS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                className={`tk-when${when === value ? ' tk-when--on' : ''}`}
-                aria-pressed={when === value}
-                disabled={done}
-                onClick={() => onMove(value)}
-              >
-                {label}
-                <span className="tk-when-xp">+{XP_BY_TIMEFRAME[value === 'tomorrow' ? 'today' : value]}</span>
-              </button>
-            ))}
-            <label className={`tk-when tk-when--pick${pickedDay ? ' tk-when--on' : ''}${done ? ' tk-when--disabled' : ''}`}>
-              <CalendarDays size={12} /> {pickedDay ? dayLabel(pickedDay, today) : 'Pick day'}
-              <input
-                type="date"
-                className="tk-when-date"
-                min={today}
-                value={pickedDay}
-                disabled={done}
-                aria-label="Pick a day"
-                onClick={openPicker}
-                onChange={(e) => e.target.value && onMove(e.target.value)}
-              />
-            </label>
-          </div>
-        )}
+        <div className="tk-chips">
+          {WHEN_CHIPS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={`tk-when${when === value ? ' tk-when--on' : ''}`}
+              aria-pressed={when === value}
+              disabled={done}
+              onClick={() => onMove(value)}
+            >
+              {label}
+              <span className="tk-when-xp">+{XP_BY_TIMEFRAME[value === 'tomorrow' ? 'today' : value]}</span>
+            </button>
+          ))}
+          <label className={`tk-when tk-when--pick${pickedDay ? ' tk-when--on' : ''}${done ? ' tk-when--disabled' : ''}`}>
+            <CalendarDays size={12} /> {pickedDay ? dayLabel(pickedDay, today) : 'Pick day'}
+            <input
+              type="date"
+              className="tk-when-date"
+              min={today}
+              value={pickedDay}
+              disabled={done}
+              aria-label="Pick a day"
+              onClick={openPicker}
+              onChange={(e) => e.target.value && onMove(e.target.value)}
+            />
+          </label>
+        </div>
       </section>
 
       <section className="tk-field">
@@ -163,6 +161,25 @@ const TaskDetail = ({
           {task.dueDate && <button type="button" className="tk-pill tk-pill--quiet" onClick={() => onPatch({ dueDate: null })}>Clear</button>}
         </div>
       </section>
+
+      {(goalOptions.length > 0 || goal) && (
+        <section className="tk-field">
+          <h4 className="tk-field-label"><Target size={12} /> Goal</h4>
+          <select
+            className="tk-input"
+            value={goal ? String(goal.id) : ''}
+            aria-label="Goal this task moves forward"
+            onChange={(e) => {
+              const picked = goalOptions.find((g) => String(g.id) === e.target.value);
+              onPatch({ goalId: picked ? picked.id : null, goalPeriodKey: null });
+            }}
+          >
+            <option value="">No goal</option>
+            {goalOptions.map((g) => <option key={g.id} value={String(g.id)}>{g.title}</option>)}
+          </select>
+          {goal && <p className="tk-field-note tk-field-note--sub">Finishing this counts toward the goal.</p>}
+        </section>
+      )}
 
       <section className="tk-field">
         <h4 className="tk-field-label">

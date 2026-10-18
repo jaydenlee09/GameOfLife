@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Lightbulb, Check, Loader2, Sparkles, CalendarCheck, ListChecks } from 'lucide-react';
+import { Lightbulb, Check, Loader2, Sparkles, CalendarCheck, ListChecks, Target } from 'lucide-react';
 import { FOCUS_BLOCKERS, FOCUS_OUTCOMES } from '../utils/focusInsights';
 import { getBlockOutcome } from '../utils/calendarUtils';
 import './FocusCoach.css';
@@ -7,7 +7,7 @@ import './FocusCoach.css';
 /** "This session I will…": the one outcome the session is for. */
 export function IntentField({ value, onChange, locked }) {
   if (locked) {
-    return value ? <p className="fc-intent-locked"><span>Goal</span> {value}</p> : null;
+    return value ? <p className="fc-intent-locked"><span>Finishing</span> {value}</p> : null;
   }
   return (
     <label className="fc-intent">
@@ -18,6 +18,25 @@ export function IntentField({ value, onChange, locked }) {
         placeholder="e.g. Draft the intro and first section"
         onChange={(e) => onChange(e.target.value)}
       />
+    </label>
+  );
+}
+
+/** Which goal the session counts toward (its minutes show up on that goal). */
+export function GoalField({ goals, value, onChange, locked }) {
+  const goal = (goals || []).find((g) => String(g.id) === String(value)) || null;
+  if (locked) {
+    return goal ? <p className="fc-goal-locked"><Target size={12} /> For {goal.title}</p> : null;
+  }
+  if (!goals?.length) return null;
+  return (
+    <label className="fc-goal">
+      <Target size={13} aria-hidden="true" />
+      <span className="fc-goal-label">For goal</span>
+      <select value={goal ? String(goal.id) : ''} onChange={(e) => onChange(e.target.value || null)}>
+        <option value="">None</option>
+        {goals.map((g) => <option key={g.id} value={String(g.id)}>{g.title}</option>)}
+      </select>
     </label>
   );
 }

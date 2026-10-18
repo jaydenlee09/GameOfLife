@@ -5,6 +5,7 @@ import TaskRow from './tasks/TaskRow';
 import TaskDetail from './tasks/TaskDetail';
 import QuickAdd from './tasks/QuickAdd';
 import { completeTask } from '../utils/completionUtils';
+import { getActiveGoals } from '../utils/goalUtils';
 import {
   TOP_LIMIT, todayKey, bucketTasks, countTaskCompletions, isOnToday, bringToTodayFields, whenFields,
   makeTask, migrateLegacyTomorrow, upcomingKey, dayLabel, periodLabel, TIMEFRAME_LABELS, shiftDateKey,
@@ -146,6 +147,7 @@ const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStart
   }, [setTodos]);
 
   const buckets = useMemo(() => bucketTasks(todos, today), [todos, today]);
+  const activeGoals = useMemo(() => getActiveGoals(goals), [goals]);
   const goalTitles = useMemo(() => Object.fromEntries((goals || []).map((g) => [String(g.id), g.title])), [goals]);
   const selectedTask = selectedId != null ? todos.find((t) => t.id === selectedId) || null : null;
   const topFull = buckets.top.length >= TOP_LIMIT;
@@ -199,8 +201,8 @@ const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStart
   // ── Edits ──
   const patch = (id, fields) => setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
 
-  const add = ({ text, when, top }) => {
-    const task = makeTask({ text, when, top: top && !topFull }, today);
+  const add = ({ text, when, top, goalId }) => {
+    const task = { ...makeTask({ text, when, top: top && !topFull }, today), ...(goalId != null ? { goalId } : {}) };
     setTodos((prev) => [...prev, task]);
     if (viewOf(task, today) !== view) {
       const where = task.timeFrame === 'today' ? (task.scheduledDate ? dayLabel(task.scheduledDate, today) : 'Today') : TIMEFRAME_LABELS[task.timeFrame];
@@ -221,7 +223,8 @@ const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStart
   };
 
   const move = (task, when) => {
-    const fields = whenFields(when, today);
+    // goalPeriodKey pinned old goal tasks to a week/month/year; a move frees them.
+    const fields = { ...whenFields(when, today), goalPeriodKey: null };
     patch(task.id, fields);
     if (view === 'today' && when !== 'today') {
       const where = fields.timeFrame === 'today' ? dayLabel(fields.scheduledDate, today) : TIMEFRAME_LABELS[fields.timeFrame];
@@ -423,7 +426,7 @@ const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStart
             })}
           </nav>
 
-          <QuickAdd today={today} defaultWhen={DEFAULT_WHEN[view]} topFull={topFull} onAdd={add} inputRef={addInputRef} />
+          <QuickAdd today={today} defaultWhen={DEFAULT_WHEN[view]} topFull={topFull} goals={activeGoals} onAdd={add} inputRef={addInputRef} />
 
           <div className="tk-view">
             {view === 'today' && renderToday()}

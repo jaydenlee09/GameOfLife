@@ -410,6 +410,9 @@
   opacity: 0.7;
 }
 
+/* Goal chip: a native select laid over it (same trick as the date chip). */
+.tk-when--goal .tk-chip-clip { max-width: 18ch; }
+
 /* A transparent native date input over the chip: tapping opens the OS picker. */
 .tk-when-date {
   position: absolute;
@@ -947,6 +950,7 @@
 }
 
 .tk-field-note strong { color: var(--text-primary); font-weight: 600; }
+.tk-field-note--sub { margin-top: 0.4rem; font-size: 0.78rem; }
 
 .tk-chips {
   display: flex;

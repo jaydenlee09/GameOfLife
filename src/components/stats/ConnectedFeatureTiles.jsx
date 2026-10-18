@@ -6,7 +6,7 @@ import {
 import { getLocalDateKey, shiftDateKey } from '../../utils/scoreUtils';
 import { getHabitCompletionsInLastNDays } from '../../utils/habitUtils';
 import { getBestHabitStreak } from '../../utils/achievementsMeta';
-import { getGoalProgress } from '../../utils/goalUtils';
+import { getFocusGoals, getGoalActivity, getGoalStatus } from '../../utils/goalUtils';
 import { expandEventsForDates, isInstanceCompleted } from '../../utils/calendarUtils';
 import { getScreentimeStatus } from '../../utils/healthUtils';
 
@@ -33,7 +33,7 @@ const Tile = (props) => {
 // spots are flagged (status dot) rather than just reported as a neutral number.
 const ConnectedFeatureTiles = ({
   habits = [], goals = [], healthLog = {}, pomodoroSessions = [], todos = [],
-  noPhoneBlocks = [], commitmentArchive = [], onNavigate,
+  noPhoneBlocks = [], commitmentArchive = [], calendarEvents = [], onNavigate,
 }) => {
   const last7Keys = useMemo(
     () => Array.from({ length: 7 }, (_, i) => getLocalDateKey(-(6 - i))),
@@ -48,14 +48,15 @@ const ConnectedFeatureTiles = ({
   const bestStreak = getBestHabitStreak(habits);
   const habitsStatus = consistencyPct == null ? 'neutral' : consistencyPct >= 70 ? 'good' : consistencyPct >= 40 ? 'warn' : 'bad';
 
-  // Goals — flag pinned focus goals with zero progress.
+  // Goals — flag focus goals that nothing has moved lately (or that are overdue).
   const totalGoals = goals.length;
   const completedGoals = goals.filter(g => g.completed).length;
-  const pinnedActive = goals.filter(g => g.pinned && !g.completed);
-  const stalledPinned = pinnedActive.filter(g => getGoalProgress(g).ratio === 0).length;
+  const now = new Date();
+  const focusStatuses = getFocusGoals(goals).map(g => getGoalStatus(g, getGoalActivity(g, { todos, habits, pomodoroSessions, calendarEvents }, now), now));
+  const stalledFocus = focusStatuses.filter(st => st === 'quiet' || st === 'overdue').length;
   const goalsStatus = totalGoals === 0 ? 'neutral'
-    : stalledPinned > 0 ? 'bad'
-    : (pinnedActive.length === 0 && goals.some(g => !g.completed)) ? 'warn' : 'good';
+    : stalledFocus === 0 ? 'good'
+    : stalledFocus === focusStatuses.length ? 'bad' : 'warn';
 
   // Health — sleep/water/workouts over the last 7 days, screentime as of today.
   const healthDays = last7Keys.map(k => healthLog[k]).filter(Boolean);
@@ -106,7 +107,7 @@ const ConnectedFeatureTiles = ({
 
       <Tile Icon={Target} title="Goals" status={goalsStatus}
         headline={totalGoals === 0 ? 'No goals yet' : `${completedGoals}/${totalGoals} complete`}
-        sublabel={stalledPinned > 0 ? `${stalledPinned} pinned goal${stalledPinned === 1 ? '' : 's'} stalled` : `${pinnedActive.length} pinned in progress`}
+        sublabel={stalledFocus > 0 ? `${stalledFocus} focus goal${stalledFocus === 1 ? '' : 's'} stalled` : focusStatuses.length ? `${focusStatuses.length} focus goal${focusStatuses.length === 1 ? '' : 's'} moving` : 'No open goals'}
         onClick={() => onNavigate?.('goals')} />
 
       <Tile Icon={Heart} title="Health" status={healthStatus}
