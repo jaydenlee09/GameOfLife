@@ -514,7 +514,7 @@
    position:fixed at the .cal-page root — .cal-event is overflow:hidden inside a
    scrolling grid, so a nested card would be clipped. pointer-events:none keeps
    drag / resize / click-to-edit on the block underneath fully intact.
-   z-index sits under the 1000 modal layer. */
+   z-index sits under the 9500 modal layer. */
 .cal-hovercard {
   position: fixed; left: 0; top: 0; z-index: 900;
   width: 268px; box-sizing: border-box;
@@ -727,8 +727,9 @@
 .cal-month-more { font-size: 0.62rem; font-weight: 500; color: var(--text-tertiary); padding: 1px 4px; letter-spacing: 0; }
 
 /* ─── Modal ──────────────────────────────────────────────────────────────────── */
-.cal-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.cal-modal { background: var(--bg-elevated-1); border: 1px solid var(--separator); border-radius: var(--radius-lg); width: 100%; max-width: 500px; box-shadow: var(--shadow-md); display: flex; flex-direction: column; max-height: 90vh; overflow-y: auto; }
+/* z-index: above the mobile bottom nav (9000) and AI bar, below the My Assistant drawer (9999). */
+.cal-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9500; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.cal-modal { background: var(--bg-elevated-1); border: 1px solid var(--separator); border-radius: var(--radius-lg); width: 100%; max-width: 500px; box-shadow: var(--shadow-md); display: flex; flex-direction: column; max-height: 90vh; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; }
 .cal-modal::-webkit-scrollbar { width: 4px; }
 .cal-modal::-webkit-scrollbar-thumb { background: var(--separator-strong); border-radius: 2px; }
 .cal-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid var(--separator); flex-shrink: 0; }

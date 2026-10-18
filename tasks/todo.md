@@ -1226,3 +1226,12 @@ User never looks at them and they add friction (calendar blocks with no attribut
 - [x] Verify: lint (before/after), build, unit checks for payouts, browser walk of every touched screen
 
 **Verified:** eslint unchanged (same 40 pre-existing messages, only line numbers shift), `npm run build` ok, 14 node unit checks (block/task/goal/health payouts, block kind colors, normalizers keep old event attributes, planner + Assistant tools emit no stats, system prompt has no stat lines). Harness walk with old-style data: block check-in +60 once (stats untouched, level-up fires), bonus task +10 once (was 20), subtask +10 (was 20), task +20 with ref + lifetime count +1, milestone 15 + goal 35 = 50, habit +10 / untick -10 (was ±20), close-the-day "+10 XP · High energy day", calendar colors task/habit/goal/event, hover card kind chip, block/template/goal/habit forms have no attribute fields, Statistics More has no Attributes card, Timer + Focus Mode have no stat picker, no console errors. `src/components/statMeta.js` deleted. Uncommitted.
+
+## Done, uncommitted (2026-10-17): Calendar popups reachable on phones
+
+Bug: on mobile the New/Edit Time Block popup's bottom (incl. "Add Time Block") sat under the
+floating AI bar (z 1050) and the tab bar (z 9000), because `.cal-modal-overlay` was z 1000.
+Fix: overlay to z 9500 (same layer as Plan My Day), `.cal-modal` max-height 90dvh +
+overscroll-behavior: contain. Applies to every calendar popup that uses `.cal-modal-overlay`.
+- [x] Verified in auth-stub harness at 390x664 and 320x568: wheel-scroll, tap saves the block
+- [x] Desktop still centered; build passes
