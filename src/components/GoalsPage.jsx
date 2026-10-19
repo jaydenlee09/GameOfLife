@@ -575,10 +575,10 @@ const GoalsPage = ({
   // Asks My Assistant for a goal's next step and keeps it on the goal until it's
   // added or dismissed. `askedFor` records the progress it was asked at, so the
   // automatic ask below doesn't repeat until the goal has moved again.
-  const requestStep = async (goal) => {
+  const requestStep = async (goal, { background = false } = {}) => {
     setCoach(goal.id, 'step');
     const signature = progressSignature(goal, todos);
-    const res = await coachApi.suggestNextStep(goal);
+    const res = await coachApi.suggestNextStep(goal, { background });
     setCoach(goal.id, null, res.ok ? null : res.error);
     setGoals((prev) => prev.map((g) => (g.id === goal.id
       ? patchGoal(g, { coach: { ...g.coach, askedFor: signature, ...(res.ok ? { nextStep: res.step } : {}) } })
@@ -594,7 +594,7 @@ const GoalsPage = ({
       if (autoAsked.current.has(g.id) || getNextStep(g, todos) || g.coach?.nextStep) return;
       if (g.coach?.askedFor === progressSignature(g, todos)) return;
       autoAsked.current.add(g.id);
-      requestStep(g);
+      requestStep(g, { background: true });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goals, todos]);

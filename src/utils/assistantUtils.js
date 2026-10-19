@@ -252,13 +252,76 @@ const getClient = () => {
   return clientPromise;
 };
 
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+// The free tier allows roughly 10 requests a minute, and opening the app can start
+// a check-in (several rounds), the Home line, category sorting and goal steps at
+// once. Every call waits here for a slot in a rolling one-minute window.
+// Background calls get fewer slots, so something you asked for always has room.
+// A per-minute 429 (another tab or device used the quota) waits as long as Gemini
+// asks and tries again; the daily quota can't be waited out, so that one throws.
+export const RATE_WINDOW_MS = 60_000;
+export const RATE_CAPS = { foreground: 9, background: 6 };
+const MAX_RETRIES = 2;
+const MAX_RETRY_WAIT_MS = 60_000;
+const DEFAULT_RETRY_WAIT_MS = 20_000;
+
+const errorText = (err) => err?.message || String(err);
+export const isRateLimitError = (err) => /429|RESOURCE_EXHAUSTED/.test(errorText(err));
+export const isDailyQuotaError = (err) => isRateLimitError(err) && /PerDay/i.test(errorText(err));
+/** How long Gemini says to wait (its RetryInfo "retryDelay": "23s"), in ms. */
+export const retryDelayMs = (err) => {
+  const match = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(errorText(err));
+  return match ? Math.ceil(Number(match[1]) * 1000) : DEFAULT_RETRY_WAIT_MS;
+};
+
+/** `run(request, { background })` calls `request()` once a slot is free, retrying per-minute 429s. */
+export const createRateGate = ({
+  caps = RATE_CAPS, windowMs = RATE_WINDOW_MS, now = () => Date.now(),
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+} = {}) => {
+  const starts = []; // start times of calls inside the window, oldest first
+
+  const takeSlot = async (background) => {
+    const cap = background ? caps.background : caps.foreground;
+    for (;;) {
+      const t = now();
+      while (starts.length && t - starts[0] >= windowMs) starts.shift();
+      if (starts.length < cap) {
+        starts.push(t);
+        return;
+      }
+      // Wait until enough of the oldest calls leave the window to get under the cap.
+      await sleep(starts[starts.length - cap] + windowMs - t + 50);
+    }
+  };
+
+  const run = async (request, { background = false } = {}) => {
+    for (let attempt = 0; ; attempt++) {
+      await takeSlot(background);
+      try {
+        return await request();
+      } catch (err) {
+        if (attempt >= MAX_RETRIES || !isRateLimitError(err) || isDailyQuotaError(err)) throw err;
+        await sleep(Math.min(retryDelayMs(err), MAX_RETRY_WAIT_MS));
+      }
+    }
+  };
+
+  return { run };
+};
+
+const gate = createRateGate();
+
+/** Wraps a generate function so every call it makes counts as background. */
+export const asBackground = (generate) => (args) => generate({ ...args, background: true });
+
 /** One model call. `allowTools: false` forces a plain-text answer. */
-export const geminiGenerate = async ({ contents, systemPrompt, allowTools }) => {
+export const geminiGenerate = async ({ contents, systemPrompt, allowTools, background = false }) => {
   if (!hasAssistantApiKey()) {
     throw new Error('Missing Gemini API key. Add VITE_GEMINI_API_KEY to your .env file.');
   }
   const ai = await getClient();
-  return ai.models.generateContent({
+  return gate.run(() => ai.models.generateContent({
     model: MODEL,
     contents,
     config: {
@@ -268,16 +331,19 @@ export const geminiGenerate = async ({ contents, systemPrompt, allowTools }) => 
       tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
       toolConfig: { functionCallingConfig: { mode: allowTools ? 'AUTO' : 'NONE' } },
     },
-  });
+  }), { background });
 };
 
-/** One tool-free model call constrained to a JSON `schema` (used by the Daily Log review). */
-export const geminiGenerateJson = async ({ contents, systemPrompt, schema }) => {
+/**
+ * One tool-free model call constrained to a JSON `schema`. `thinking: false` skips
+ * Gemini's reasoning step for small jobs that don't need it (fewer tokens, faster).
+ */
+export const geminiGenerateJson = async ({ contents, systemPrompt, schema, thinking = true, background = false }) => {
   if (!hasAssistantApiKey()) {
     throw new Error('Missing Gemini API key. Add VITE_GEMINI_API_KEY to your .env file.');
   }
   const ai = await getClient();
-  return ai.models.generateContent({
+  return gate.run(() => ai.models.generateContent({
     model: MODEL,
     contents,
     config: {
@@ -286,8 +352,9 @@ export const geminiGenerateJson = async ({ contents, systemPrompt, schema }) => 
       maxOutputTokens: 8192,
       responseMimeType: 'application/json',
       responseSchema: schema,
+      ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
     },
-  });
+  }), { background });
 };
 
 // ─── The agent loop ───────────────────────────────────────────────────────────

@@ -180,6 +180,7 @@ export const sortTitlesIntoCategories = async ({ titles, generate }) => {
     systemPrompt: SORT_SYSTEM_PROMPT,
     contents: [{ role: 'user', parts: [{ text: list.map((t, i) => `${i + 1}. ${t}`).join('\n') }] }],
     schema: CATEGORY_SORT_SCHEMA,
+    thinking: false, // a small, well-specified job: skip the reasoning step
   });
   return normalizeCategorySort(response.text, list);
 };

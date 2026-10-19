@@ -1,5 +1,29 @@
 # Todo
 
+## Done, uncommitted (2026-10-18): stop wasting Gemini requests
+
+Problem (user): hit "free-tier rate limit"; asked whether AI usage is wasted anywhere.
+Audit: no runaway loops; the leak was a burst on app open (check-in up to 7 calls + Home line +
+category sort + goal next steps) against ~10 requests/min, plus duplicate features.
+
+User choices: fixes 1-4; Weekly Review "AI Pattern Analysis" removed (not replaced).
+
+- [x] assistantUtils: createRateGate — rolling 60s window, 9 slots, background calls capped at 6
+      (so what you ask for always has room); per-minute 429 retried up to 2x after Gemini's
+      retryDelay (cap 60s); daily-quota 429 not retried, friendlier "resets midnight Pacific" error.
+      Background = silent check-ins, nightly pattern flags, category sort, auto Home line,
+      auto goal next step (asBackground wrapper).
+- [x] Home line = morning check-in's first line (in-app check-in prompt + server push brief);
+      standalone call only after the morning window / failed check-in, or the manual refresh.
+      send() now resolves the reply text.
+- [x] thinkingBudget 0 for category sort, focus comment, Home line.
+- [x] Weekly Review AI Pattern Analysis section + CSS removed (Daily Log flags cover it).
+      Removing it let the React compiler lint the component: fixed its dependency list.
+- Verified: node checks (gate caps/fg reserve/retry/daily no-retry/concurrency, error parsing,
+  first-line parser), lint 0 errors in changed files, app + functions build, browser harness at a
+  faked Tue 8am/4pm: morning = 1 agent call + Home line from it (no brief call), 4pm fallback =
+  1 brief call, forced 429 retried after 2s with no error, thinking off confirmed, Weekly Review OK.
+
 ## Done, uncommitted (2026-10-18): iPhone Home Screen widget (Scriptable)
 
 Problem (user): wants iPhone widgets for APEX that keep them on track. iOS gives web apps no

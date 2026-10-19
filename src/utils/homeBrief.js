@@ -81,6 +81,17 @@ const tidy = (text) => {
 };
 
 /**
+ * The morning check-in (in-app or the push brief) opens with today's #1 priority
+ * on its own line, so Home reuses that line instead of a separate model call.
+ * Null when the reply isn't in that shape (no blank line after a first line).
+ */
+export const homeBriefFromMorning = (text, now = new Date()) => {
+  const match = /^([^\n]+)\n\s*\n/.exec((text || '').trim());
+  const line = tidy(match?.[1].replace(/\*\*/g, '').replace(/^#+\s*/, ''));
+  return line ? { date: toDateKey(now), text: line, generatedAt: now.getTime() } : null;
+};
+
+/**
  * Resolves the record to store as `user.homeBrief`. `generate` is
  * geminiGenerateJson in the app (injected so this stays testable).
  */
@@ -90,6 +101,7 @@ export const generateHomeBrief = async ({ state, now = new Date(), weekPriority,
     systemPrompt: buildBriefSystemPrompt(context.name),
     contents: [{ role: 'user', parts: [{ text: `Write today's line. Here is my day, as JSON:\n${JSON.stringify(context)}` }] }],
     schema: BRIEF_SCHEMA,
+    thinking: false, // a small, well-specified job: skip the reasoning step
   });
   const data = JSON.parse(response.text || '{}');
   const text = tidy(data.line);

@@ -61,6 +61,7 @@ export const generateFocusComment = async ({ state, session, generate, now = new
     systemPrompt: buildFocusCommentPrompt(context.name),
     contents: [{ role: 'user', parts: [{ text: `Here's my focus session debrief, as JSON:\n${JSON.stringify(context)}` }] }],
     schema: FOCUS_COMMENT_SCHEMA,
+    thinking: false, // a small, well-specified job: skip the reasoning step
   });
   const data = JSON.parse(response.text || '{}');
   const comment = typeof data.comment === 'string' ? data.comment.trim() : '';

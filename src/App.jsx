@@ -25,6 +25,7 @@ import FloatingAIBar from './components/FloatingAIBar'
 import useAssistant from './hooks/useAssistant'
 import { hasAssistantApiKey } from './utils/assistantUtils'
 import { EMPTY_CHECKINS, getDueCheckin, markCheckinDone, checkinPrompt, computeNudges, dismissNudge } from './utils/assistantTriggers'
+import { homeBriefFromMorning } from './utils/homeBrief'
 import GoalsPage from './components/GoalsPage'
 import DataModal from './components/DataModal'
 import WeeklyReviewPage from './components/WeeklyReviewPage'
@@ -608,6 +609,8 @@ function App() {
           { id, role: 'model', parts: [{ text: brief.text }], kind: 'morning', unread: true },
         ]));
         setAssistantCheckins(prev => (prev.morning === brief.date ? prev : { ...prev, morning: brief.date }));
+        const homeBrief = homeBriefFromMorning(brief.text);
+        if (homeBrief) setUser(prev => (prev.homeBrief?.date === homeBrief.date ? prev : { ...prev, homeBrief }));
       }
       setPushStateReady(true);
     }).then((fn) => { if (cancelled) fn(); else unsubscribe = fn; }).catch(() => setPushStateReady(true));
@@ -957,9 +960,13 @@ function App() {
     if (!due) return;
     const failedAt = checkinFailedAt.current[due.type];
     if (failedAt && clockTick - failedAt < 60 * 60 * 1000) return;
-    assistant.send(checkinPrompt(due.type, now), { hidden: true, kind: due.type, silent: true }).then((ok) => {
-      if (ok) setAssistantCheckins(prev => markCheckinDone(prev, due, now));
-      else if (ok === false) checkinFailedAt.current[due.type] = Date.now();
+    assistant.send(checkinPrompt(due.type, now), { hidden: true, kind: due.type, silent: true }).then((reply) => {
+      if (reply) {
+        setAssistantCheckins(prev => markCheckinDone(prev, due, now));
+        // The morning briefing's first line doubles as Home's one-liner.
+        const homeBrief = due.type === 'morning' ? homeBriefFromMorning(reply) : null;
+        if (homeBrief) setUser(prev => ({ ...prev, homeBrief }));
+      } else if (reply === false) checkinFailedAt.current[due.type] = Date.now();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncSettled, clockTick]);
@@ -1032,8 +1039,10 @@ function App() {
   }, [syncSettled, widgetToken, clockTick, todos, habits, logs, xpLog, commitmentArchive, healthLog,
     calendarEvents, noPhoneBlocks, calendarDayEvents, logReviews, user.categoryColors]);
 
-  // Home's one-line brief: made once per day (after 4am) the first time Home is open,
-  // saved on the user so every device shows the same line. Failures retry after an hour.
+  // Home's one-line brief: once per day (after 4am), saved on the user so every
+  // device shows the same line. Usually it's the morning check-in's first line;
+  // its own model call only runs when there's no morning check-in to wait for
+  // (after the morning window, or that check-in failed). Failures retry after an hour.
   const [briefLoading, setBriefLoading] = useState(false);
   const briefInFlight = useRef(false);
   const briefFailedAt = useRef(0);
@@ -1041,7 +1050,7 @@ function App() {
     if (briefInFlight.current) return;
     briefInFlight.current = true;
     setBriefLoading(true);
-    const result = await assistant.briefHome({ weekPriority: currentWeekPriority, logReviews });
+    const result = await assistant.briefHome({ weekPriority: currentWeekPriority, logReviews, background: !manual });
     if (result.ok) setUser(prev => ({ ...prev, homeBrief: result.brief }));
     else if (!manual) briefFailedAt.current = Date.now();
     briefInFlight.current = false;
@@ -1053,9 +1062,12 @@ function App() {
     const now = new Date(clockTick);
     if (now.getHours() < 4 || user.homeBrief?.date === getLocalDateKey(0)) return;
     if (Date.now() - briefFailedAt.current < 60 * 60 * 1000) return;
+    const morningPending = getDueCheckin(now, assistantCheckins, { logs })?.type === 'morning'
+      && !(Date.now() - (checkinFailedAt.current.morning || 0) < 60 * 60 * 1000);
+    if (morningPending) return;
     runHomeBrief();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncSettled, clockTick, currentPage, user.homeBrief?.date]);
+  }, [syncSettled, clockTick, currentPage, user.homeBrief?.date, assistantCheckins?.morning]);
 
   // Daily Log pattern flags: grouped once per night the first time the Daily Log is
   // open, saved on the user (synced). Skipped until there are enough "improve" notes

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import './WeeklyReviewPage.css';
 import {
-  ChevronLeft, ChevronRight, Pin, ArrowRight, Check, Bot, Construction, TrendingUp,
+  ChevronLeft, ChevronRight, Pin, ArrowRight, Check, Construction, TrendingUp,
   CheckSquare, Target, Zap, Sparkles, Loader2, RotateCcw,
 } from 'lucide-react';
 import {
@@ -24,9 +24,11 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
   const isCurrentWeek = weekOffset === 0;
   const saved = weeklyReviews[mondayKey];
 
+  const logCount = Object.keys(logs).length;
   const stats = useMemo(
     () => computeWeekStats(mondayKey, xpLog, pomodoroSessions, habits, todos, logs, goals, healthLog),
-    [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, Object.keys(logs).length, goals, healthLog]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- length-keyed on purpose (recomputed when items are added/removed)
+    [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, logCount, goals, healthLog]
   );
 
   // This week: the focus goals plus anything due by Sunday. Past weeks: the goals
@@ -123,52 +125,6 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
   const [priority,     setPriority]     = useState(saved?.priority     || '');
   const [justSaved,    setJustSaved]    = useState(false);
 
-  const [aiInsight,  setAiInsight]  = useState(null);
-  const [aiLoading,  setAiLoading]  = useState(false);
-  const [aiError,    setAiError]    = useState(null);
-
-  const analyzeImprovements = async () => {
-    setAiLoading(true);
-    setAiError(null);
-    setAiInsight(null);
-
-    const days = getWeekDays(mondayKey);
-    const allItems = [];
-    for (const day of days) {
-      const entry = logs[day];
-      if (!entry?.improve) continue;
-      for (const item of entry.improve) {
-        if (item?.trim()) allItems.push(item.trim());
-      }
-    }
-
-    if (allItems.length === 0) {
-      setAiError('No improvement entries found for this week.');
-      setAiLoading(false);
-      return;
-    }
-
-    try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey });
-
-      const prompt = `Here are things I wrote as areas to improve on in my daily journal entries this week:\n\n${allItems.map((item, i) => `${i + 1}. ${item}`).join('\n')}\n\nWhat is the most common theme or pattern? Be direct and concise — 2–3 sentences max. Name the specific recurring pattern, then give one concrete action I can take.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { temperature: 0.7, maxOutputTokens: 1024 },
-      });
-
-      setAiInsight(response.text?.trim() || 'Could not generate insight.');
-    } catch {
-      setAiError('Failed to analyze. Check your API key.');
-    }
-
-    setAiLoading(false);
-  };
-
   const handleSave = () => {
     setWeeklyReviews(prev => ({
       ...prev,
@@ -189,8 +145,6 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
     setHeldBack(newSaved?.heldBack || '');
     setImprovements(newSaved?.improvements || '');
     setPriority(newSaved?.priority || '');
-    setAiInsight(null);
-    setAiError(null);
   };
 
   const pastReviews = Object.entries(weeklyReviews)
@@ -321,34 +275,6 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
               )}
             </div>
           )}
-
-          {/* AI Improvement Insight */}
-          <div className="review-ai-insight">
-            <div className="review-ai-header">
-              <span className="review-ai-title"><Bot size={16} /> AI Pattern Analysis</span>
-              <button
-                className="review-ai-btn"
-                onClick={analyzeImprovements}
-                disabled={aiLoading}
-              >
-                {aiLoading ? 'Analyzing…' : 'Analyze Improvements'}
-              </button>
-            </div>
-            {!aiInsight && !aiError && !aiLoading && (
-              <p className="review-ai-hint">Tap to find the most common thing you wrote in "things I can improve" across this week's daily logs.</p>
-            )}
-            {aiLoading && <p className="review-ai-hint">Scanning your entries…</p>}
-            {aiError && <p className="review-ai-error">{aiError}</p>}
-            {aiInsight && (
-              <div className="review-ai-result">
-                <p className="review-ai-text">
-                  {aiInsight.split(/\*\*(.*?)\*\*/g).map((part, i) =>
-                    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-                  )}
-                </p>
-              </div>
-            )}
-          </div>
 
           {/* Reflection prompts */}
           <div className="review-prompts">

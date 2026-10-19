@@ -57,7 +57,7 @@ const AUTO = (what) => `[Automatic ${what}: I just opened the app — I didn't t
 
 export const checkinPrompt = (type, now) => {
   if (type === 'morning') {
-    return `${AUTO('morning check-in')} Give me my start-of-day briefing. Look at yesterday (score, journal, commitment) and today (calendar, tasks, habits, goals). Then name the 1-3 things that matter most today. Don't create time blocks yourself: the app's Plan My Day button (shown under your message) builds the schedule, so if today isn't planned yet, end by telling me to tap it. If my North Star isn't set, end by asking me who I want to become. Under 150 words.`;
+    return `${AUTO('morning check-in')} Give me my start-of-day briefing. Look at yesterday (score, journal, commitment) and today (calendar, tasks, habits, goals). Then name the 1-3 things that matter most today. Don't create time blocks yourself: the app's Plan My Day button (shown under your message) builds the schedule, so if today isn't planned yet, end by telling me to tap it. If my North Star isn't set, end by asking me who I want to become. FORMAT: the very first line is one sentence under 22 words naming the single most important thing to do today and briefly why (it also shows at the top of my home screen; start with a verb or "Today", no greeting), then a blank line, then the briefing. Under 150 words.`;
   }
   if (type === 'evening') {
     return `${AUTO('evening check-in')} Give me a short evening debrief: how today went against the plan and my Daily Score, one thing I did well, one thing to fix tomorrow. Remind me to fill in today's Daily Log and set a commitment for tomorrow. Don't create anything unless it's clearly needed. Under 120 words.`;

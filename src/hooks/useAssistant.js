@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { runAssistantTurn, geminiGenerateJson } from '../utils/assistantUtils';
+import { runAssistantTurn, geminiGenerate, geminiGenerateJson, asBackground, isDailyQuotaError } from '../utils/assistantUtils';
 import { generateLogReview, upsertReview, reviewToChatText } from '../utils/logReview';
 import { getTool, applySliceOp, undoBlocker } from '../utils/assistantTools';
 import { generateDayPlan, planToEvents, fromMinutes } from '../utils/dayPlanner';
@@ -9,6 +9,9 @@ import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
 import { generateLessonInsight } from '../utils/lessonInsight';
 import { generateGoalDraft, generateNextStep, generateUnstuck, generateRecalibration } from '../utils/goalCoach';
+
+// Calls the app makes on its own (check-ins, nightly flags, sorting) yield to yours.
+const backgroundJson = asBackground(geminiGenerateJson);
 
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 const ACTIVITY_LIMIT = 100;
@@ -22,6 +25,9 @@ const friendlyError = (err) => {
   const message = err?.message || String(err);
   if (/API key not valid|API_KEY_INVALID/i.test(message)) {
     return 'Your Gemini API key is invalid. Get a fresh one at aistudio.google.com and put it in .env as VITE_GEMINI_API_KEY.';
+  }
+  if (isDailyQuotaError(err)) {
+    return "Gemini's free-tier daily limit is used up. It resets at midnight Pacific time.";
   }
   if (/429|RESOURCE_EXHAUSTED|quota/i.test(message)) {
     return "Gemini's free-tier rate limit was hit. Wait a minute and try again.";
@@ -73,8 +79,9 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
   /**
    * Sends a message and runs the agent loop. `hidden` keeps the prompt out of the
    * visible chat (used by check-ins); `kind` tags the reply (e.g. 'morning') and
-   * marks it unread; `silent` suppresses the error banner. Resolves true on
-   * success, false on failure, null if skipped because a turn is already running.
+   * marks it unread; `silent` suppresses the error banner and runs it as a
+   * background call. Resolves the reply text on success, false on failure, null
+   * if skipped because a turn is already running.
    */
   const send = useCallback(async (text, { hidden = false, kind = null, silent = false } = {}) => {
     const trimmed = text?.trim();
@@ -92,6 +99,7 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
         history: snapshot.chatHistory,
         userMessage: trimmed,
         state: snapshot,
+        generate: silent ? asBackground(geminiGenerate) : geminiGenerate,
       });
 
       const at = Date.now();
@@ -112,7 +120,7 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
         ...(kind ? { kind, unread: true } : {}),
       };
       setChatHistory((prev) => [...prev, modelMsg]);
-      return true;
+      return result.text;
     } catch (err) {
       if (!silent) setError(friendlyError(err));
       setChatHistory((prev) => prev.filter((msg) => msg.id !== userMsg.id));
@@ -245,9 +253,9 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
 
   // ─── Home one-liner ─────────────────────────────────────────────────────────
   /** Resolves { ok, brief } or { ok: false, error }. Writes nothing; the caller saves it. */
-  const briefHome = useCallback(async ({ weekPriority, logReviews } = {}) => {
+  const briefHome = useCallback(async ({ weekPriority, logReviews, background = false } = {}) => {
     try {
-      const brief = await generateHomeBrief({ state: stateRef.current, weekPriority, logReviews, generate: geminiGenerateJson });
+      const brief = await generateHomeBrief({ state: stateRef.current, weekPriority, logReviews, generate: background ? backgroundJson : geminiGenerateJson });
       return { ok: true, brief };
     } catch (err) {
       return { ok: false, error: friendlyError(err) };
@@ -258,7 +266,7 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
   /** Resolves { ok, patterns } or { ok: false, error }. Writes nothing; the caller saves it. */
   const findLogPatterns = useCallback(async (todayKey) => {
     try {
-      const patterns = await generateLogPatterns({ state: stateRef.current, todayKey, generate: geminiGenerateJson });
+      const patterns = await generateLogPatterns({ state: stateRef.current, todayKey, generate: backgroundJson });
       return { ok: true, patterns };
     } catch (err) {
       return { ok: false, error: friendlyError(err) };
@@ -279,20 +287,20 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
   // ─── Goal coach ─────────────────────────────────────────────────────────────
   // Each resolves { ok, … } or { ok: false, error } and writes nothing: the Goals
   // page and Weekly Review show the suggestion and apply it only on a tap.
-  const coach = useCallback(async (fn, args, key) => {
+  const coach = useCallback(async (fn, args, key, { background = false } = {}) => {
     try {
-      const value = await fn({ state: stateRef.current, generate: geminiGenerateJson, ...args });
+      const value = await fn({ state: stateRef.current, generate: background ? backgroundJson : geminiGenerateJson, ...args });
       return { ok: true, [key]: value };
     } catch (err) {
       return { ok: false, error: friendlyError(err) };
     }
   }, []);
   const draftGoal = useCallback((input) => coach(generateGoalDraft, { input }, 'draft'), [coach]);
-  const suggestNextStep = useCallback((goal) => coach(generateNextStep, { goal }, 'step'), [coach]);
+  const suggestNextStep = useCallback((goal, opts) => coach(generateNextStep, { goal }, 'step', opts), [coach]);
   const getUnstuck = useCallback((goal) => coach(generateUnstuck, { goal }, 'unstuck'), [coach]);
   const recalibrateGoals = useCallback(() => coach(generateRecalibration, {}, 'recalibration'), [coach]);
   // Calendar: sorts block titles no keyword matched into categories ({ [title]: id }).
-  const sortBlockCategories = useCallback((titles) => coach(sortTitlesIntoCategories, { titles }, 'categories'), [coach]);
+  const sortBlockCategories = useCallback((titles) => coach(sortTitlesIntoCategories, { titles }, 'categories', { background: true }), [coach]);
 
   return {
     send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson,
