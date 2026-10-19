@@ -7,6 +7,7 @@ import { decidePushes, markPushesSent, withPushDefaults, MORNING_PUSH_PROMPT, sp
 import { runAssistantTurn } from '../../src/utils/assistantUtils';
 import { TOOL_DECLARATIONS, getTool } from '../../src/utils/assistantTools';
 import { normalizeGoal } from '../../src/utils/goalUtils';
+import { buildWidgetSnapshot } from '../../src/utils/widgetSnapshot';
 
 // App data each tick needs, keyed by the state name the shared utils expect.
 // These are the same Firestore docs App.jsx syncs (users/{uid}/data/{key} → { value }).
@@ -34,6 +35,7 @@ const STATE_KEYS = {
 };
 const SETTINGS_KEY = 'gameOfLife_pushSettings';
 const PUSH_STATE_KEY = 'gameOfLife_pushState';
+const WIDGET_KEY = 'gameOfLife_widget';
 
 // The server may only look things up; it never writes app data.
 export const READ_ONLY_DECLARATIONS = TOOL_DECLARATIONS.filter((d) => getTool(d.name)?.tier === 'read');
@@ -78,23 +80,31 @@ const writeMorningBrief = async ({ state, generate, log }) => {
 };
 
 /**
- * Processes one user at instant `nowMs`. Returns a summary for logging.
- * Sets process.env.TZ to the user's timezone: the shared utils read local time.
+ * Refreshes the Home Screen widget's public snapshot (see src/services/widgetService.js),
+ * so it rolls over at midnight and stays current while the app is closed. Skipped when
+ * the app published after this tick read the data: the app's copy is newer.
  */
-export const processUser = async ({ db, messaging, generate, uid, nowMs, log = () => {} }) => {
-  const settingsRef = db.doc(`users/${uid}/data/${SETTINGS_KEY}`);
-  const stateRef = db.doc(`users/${uid}/data/${PUSH_STATE_KEY}`);
-  const [settingsSnap, pushStateSnap] = await db.getAll(settingsRef, stateRef);
-  const settings = withPushDefaults(readValue(settingsSnap, {}));
-  if (!settings.enabled || !settings.tokens.length) return { uid, skipped: 'disabled' };
-  if (!settings.timezone || !isValidTimeZone(settings.timezone)) return { uid, skipped: 'no timezone' };
+const refreshWidget = async ({ db, uid, widget, state, nowMs, readAtMs }) => {
+  process.env.TZ = widget.timezone;
+  const snapshot = buildWidgetSnapshot(state, new Date(nowMs));
+  const ref = db.doc(`widgets/${widget.token}`);
+  return db.runTransaction(async (tx) => {
+    const current = await tx.get(ref);
+    if (current.exists && current.data()?.uid !== uid) return 'not owner';
+    if ((current.data()?.updatedAt || 0) > readAtMs) return 'app is newer';
+    tx.set(ref, { uid, updatedAt: Date.now(), json: JSON.stringify(snapshot) });
+    return 'updated';
+  });
+};
+
+/** Decides and sends this user's due pushes (in their timezone). */
+const sendPushes = async ({ db, messaging, generate, nowMs, log, settings, settingsRef, stateRef, pushStateSnap, state }) => {
   process.env.TZ = settings.timezone; // Node re-reads TZ on assignment
   const now = new Date(nowMs);
 
-  const state = await loadState(db, uid);
   let pushState = readValue(pushStateSnap, {});
   const pushes = decidePushes(now, settings, state, pushState);
-  if (!pushes.length) return { uid, sent: [] };
+  if (!pushes.length) return { sent: [] };
 
   const today = localDateKey(now);
   for (const push of pushes) {
@@ -139,7 +149,38 @@ export const processUser = async ({ db, messaging, generate, uid, nowMs, log = (
       tx.set(settingsRef, { value: { ...fresh, tokens: fresh.tokens.filter((t) => !deadTokens.has(t.token)) } });
     });
   }
-  return { uid, sent: delivered, removedTokens: deadTokens.size };
+  return { sent: delivered, removedTokens: deadTokens.size };
+};
+
+/**
+ * Processes one user at instant `nowMs`: their widget, then their pushes. Returns a
+ * summary for logging. Sets process.env.TZ to the user's timezone: the shared utils
+ * read local time.
+ */
+export const processUser = async ({ db, messaging, generate, uid, nowMs, log = () => {} }) => {
+  const settingsRef = db.doc(`users/${uid}/data/${SETTINGS_KEY}`);
+  const stateRef = db.doc(`users/${uid}/data/${PUSH_STATE_KEY}`);
+  const widgetRef = db.doc(`users/${uid}/data/${WIDGET_KEY}`);
+  const [settingsSnap, pushStateSnap, widgetSnap] = await db.getAll(settingsRef, stateRef, widgetRef);
+  const settings = withPushDefaults(readValue(settingsSnap, {}));
+  const widget = readValue(widgetSnap, null);
+  const pushOn = settings.enabled && settings.tokens.length > 0 && !!settings.timezone && isValidTimeZone(settings.timezone);
+  const widgetOn = typeof widget?.token === 'string' && !!widget.timezone && isValidTimeZone(widget.timezone);
+  if (!pushOn && !widgetOn) return { uid, skipped: 'nothing on' };
+
+  const readAtMs = Date.now();
+  const state = await loadState(db, uid);
+  const result = { uid, sent: [] };
+  // Widget first, with its own catch, so a push failure can't leave it stale.
+  if (widgetOn) {
+    try {
+      result.widget = await refreshWidget({ db, uid, widget, state, nowMs, readAtMs });
+    } catch (err) {
+      log(`widget refresh failed: ${err.message}`);
+    }
+  }
+  if (pushOn) Object.assign(result, await sendPushes({ db, messaging, generate, nowMs, log, settings, settingsRef, stateRef, pushStateSnap, state }));
+  return result;
 };
 
 /** One scheduled tick over every user. */

@@ -834,6 +834,16 @@
 
 .notif-test-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.widget-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.widget-actions .notif-test-btn { align-self: auto; }
+
+.notif-steps a { color: var(--accent); }
+
 .notif-types {
   display: flex;
   flex-direction: column;

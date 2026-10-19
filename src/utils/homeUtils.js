@@ -21,12 +21,12 @@ export const getDayMode = (now) => {
 };
 
 /**
- * What's on now / next across time blocks, No Phone blocks and reminders, for today
- * and tomorrow. Time blocks keep their expanded instance (`ev`) so Home can start a
- * focus session on them. `plannedToday` says whether today has any time block at all.
+ * Today's and tomorrow's unfinished time blocks, No Phone blocks and reminders as
+ * { kind, id, label, startMs, endMs, ev } ranges (`ev` only for time blocks). Shared
+ * by getNextUp and the Home Screen widget, which picks now/next by its own clock.
+ * `plannedToday` says whether today has any time block at all.
  */
-export const getNextUp = ({ calendarEvents, noPhoneBlocks, calendarDayEvents, now }) => {
-  const nowMs = now.getTime();
+export const getDayItems = ({ calendarEvents, noPhoneBlocks, calendarDayEvents, now }) => {
   const todayKey = toDateKey(now);
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -62,6 +62,18 @@ export const getNextUp = ({ calendarEvents, noPhoneBlocks, calendarDayEvents, no
       return t ? { kind: 'reminder', id: `reminder-${ev.id}-${dk}`, label: ev.title || 'Untitled', startMs: t, endMs: t, ev: null } : null;
     }).filter(Boolean)
   );
+  return { events, blocks, reminders, plannedToday };
+};
+
+/**
+ * What's on now / next across time blocks, No Phone blocks and reminders, for today
+ * and tomorrow. Time blocks keep their expanded instance (`ev`) so Home can start a
+ * focus session on them. `plannedToday` says whether today has any time block at all.
+ */
+export const getNextUp = ({ calendarEvents, noPhoneBlocks, calendarDayEvents, now }) => {
+  const nowMs = now.getTime();
+  const todayKey = toDateKey(now);
+  const { events, blocks, reminders, plannedToday } = getDayItems({ calendarEvents, noPhoneBlocks, calendarDayEvents, now });
 
   const noPhoneActive = blocks.some((b) => b.startMs <= nowMs && nowMs < b.endMs);
   const current = events.find((e) => e.startMs <= nowMs && nowMs < e.endMs) || null;

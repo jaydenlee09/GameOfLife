@@ -32,6 +32,14 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
   {
+    // Home Screen widget: runs inside the Scriptable iOS app, not the browser.
+    files: ['src/widget/*.scriptable.js'],
+    languageOptions: {
+      globals: Object.fromEntries(['ListWidget', 'Color', 'Font', 'FileManager', 'Request', 'DrawContext', 'Size', 'Rect',
+        'Path', 'Point', 'SFSymbol', 'LinearGradient', 'config', 'Script'].map((name) => [name, 'readonly'])),
+    },
+  },
+  {
     // Push service worker: loads the Firebase compat SDK via importScripts.
     files: ['public/firebase-messaging-sw.js'],
     languageOptions: { sourceType: 'script', globals: { ...globals.serviceworker, firebase: 'readonly' } },

@@ -39,3 +39,5 @@ const results = await runPushTick({
 
 const sent = results.flatMap((r) => r.sent || []);
 console.log(sent.length ? `Sent: ${sent.join(', ')}` : 'Nothing due.');
+const widgets = results.filter((r) => r.widget === 'updated').length;
+if (widgets) console.log(`Widgets refreshed: ${widgets}`);

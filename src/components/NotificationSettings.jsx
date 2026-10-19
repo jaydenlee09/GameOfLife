@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Bell, BellOff, Share, PlusSquare, Loader2, Send } from 'lucide-react';
 import * as pushService from '../services/pushService';
 import { QUIET_GOAL_DAYS } from '../utils/goalUtils';
+import WidgetSettings from './WidgetSettings';
 
 const TYPE_ROWS = [
   { type: 'morning', label: 'Morning brief', hint: "Your assistant's plan for the day", timeKey: 'morning' },
@@ -150,6 +151,8 @@ export default function NotificationSettings({ uid, api = pushService }) {
           })}
         </div>
       )}
+
+      <WidgetSettings uid={uid} />
     </div>
   );
 }

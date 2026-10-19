@@ -19,6 +19,8 @@ import { calcStreakXp } from './utils/habitUtils'
 import CalendarPage from './components/CalendarPage'
 import AssistantDrawer from './components/AssistantDrawer'
 import { refreshPushToken, listenForegroundPushes, subscribePushState } from './services/pushService'
+import { subscribeWidgetSettings, publishWidgetSnapshot, syncWidgetTimezone } from './services/widgetService'
+import { buildWidgetSnapshot, snapshotSignature } from './utils/widgetSnapshot'
 import FloatingAIBar from './components/FloatingAIBar'
 import useAssistant from './hooks/useAssistant'
 import { hasAssistantApiKey } from './utils/assistantUtils'
@@ -994,6 +996,41 @@ function App() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [syncSettled, calendarEvents, sortBlockCategories]);
+
+  // Home Screen widget: when it's on, publish the snapshot it reads (widgetService.js)
+  // a few seconds after any change it shows, and on the 5-minute clock tick for the
+  // time-based parts. Skipped when nothing changed, so idle ticks write nothing. The
+  // server tick refreshes it too while the app is closed.
+  const [widgetSettings, setWidgetSettings] = useState(null);
+  useEffect(() => {
+    if (!firebaseUser || !cloudSyncReady) return;
+    return subscribeWidgetSettings(firebaseUser.uid, setWidgetSettings);
+  }, [firebaseUser, cloudSyncReady]);
+  useEffect(() => {
+    if (firebaseUser && widgetSettings) syncWidgetTimezone(firebaseUser.uid, widgetSettings).catch(() => {});
+  }, [firebaseUser, widgetSettings]);
+
+  const widgetToken = firebaseUser ? widgetSettings?.token || null : null;
+  const lastWidgetSignature = useRef(null);
+  useEffect(() => {
+    if (!syncSettled || !widgetToken) return;
+    const timer = setTimeout(() => {
+      const snapshot = buildWidgetSnapshot({
+        todos, habits, logs, xpLog, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks,
+        calendarDayEvents, logReviews, user: { categoryColors: user.categoryColors },
+      }, new Date());
+      const signature = widgetToken + snapshotSignature(snapshot);
+      if (signature === lastWidgetSignature.current) return;
+      lastWidgetSignature.current = signature;
+      publishWidgetSnapshot(firebaseUser.uid, widgetToken, snapshot).catch((err) => {
+        lastWidgetSignature.current = null; // retry on the next change or tick
+        console.warn('Widget update failed', err);
+      });
+    }, 3000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncSettled, widgetToken, clockTick, todos, habits, logs, xpLog, commitmentArchive, healthLog,
+    calendarEvents, noPhoneBlocks, calendarDayEvents, logReviews, user.categoryColors]);
 
   // Home's one-line brief: made once per day (after 4am) the first time Home is open,
   // saved on the user so every device shows the same line. Failures retry after an hour.

@@ -1,5 +1,43 @@
 # Todo
 
+## Done, uncommitted (2026-10-18): iPhone Home Screen widget (Scriptable)
+
+Problem (user): wants iPhone widgets for APEX that keep them on track. iOS gives web apps no
+widgets, so: Scriptable (free) script reading a small read-only summary doc.
+
+User choices: Scriptable · large widget layout = score + what's at stake (streak gap, rank
+progress) · Now/Up next block (category color, time left) · Top 3 tasks with done marks ·
+habits left · next best move, switching to Close the day after 8pm. Not real time (iOS refresh).
+
+Design:
+- [x] `utils/widgetSnapshot.js`: pure buildWidgetSnapshot(state, now) from the same utils as
+      Home (computeDailyScore/computeStreak/getNextMove/computeRankStatus/todayQueue/
+      getCloseDaySteps/blockColor). Items = today+tomorrow events/No Phone/reminders with
+      start/end ms, so the widget picks Now/Next by its own clock between refreshes.
+      Refactor getNextUp's item expansion into getDayItems (shared).
+- [x] Public doc `widgets/{token}` = { uid, updatedAt, json } (128-bit random token, get-only
+      for the world; owner-only writes). Settings in users/{uid}/data/gameOfLife_widget
+      { token, timezone }.
+- [x] Client: widgetService (enable/reset/disable/publish/subscribe); App effect publishes on
+      data change (debounced, skip if unchanged) + clockTick.
+- [x] Server tick: also refreshes the widget doc each ~5 min (day rollover, app closed);
+      loads state once for push + widget; skips if the client wrote newer data.
+- [x] Alerts tab: "Home Screen widget" card: turn on, copy script, reset link, turn off.
+- [x] `src/widget/apexWidget.scriptable.js` (imported ?raw; buildWidgetScript bakes in the doc
+      URL + app origin): large +
+      small/medium/lock-screen fallbacks; tap areas open ?page=.
+- [ ] User pastes Firestore rule for /widgets (currently 403 for public reads, probed).
+- [ ] After push + rule + Turn on: curl the widgets/{token} REST URL to confirm a live snapshot.
+- [x] Verify: node checks on snapshot, script run against a fake Scriptable API rendering to
+      canvas/PNG, lint, build, browser test of the card + copy, server build.
+- Verified: node checks (snapshot score/streak match Home helpers, Top 3 fill + done marks,
+  items colors/order/exclusions, getNextUp identical to before at 7 times of day, server
+  processUser: widget-only / app-newer skip / not-owner / both-off / push+widget), script run
+  in a fake Scriptable renderer at large 321x324 / 338x354 / 364x382, medium, small, 3 Lock
+  Screen sizes, stale/null/404/offline (no overflow after tightening for SE), card flow
+  (blocked → on → copy → reset → off) with stubbed API, real buildWidgetScript output, lint
+  0 errors, app + functions build. Not verifiable here: real Scriptable rendering on the phone.
+
 ## Done, uncommitted (2026-10-18): time blocks colored by category (auto + override)
 
 Problem (user): AI should pick a block's color from the category it fits (school/study/homework
