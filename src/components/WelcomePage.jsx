@@ -406,6 +406,7 @@ function WhyTile({ northStar, weekPriority, goals, goalData, now, onNavigate }) 
               const left = daysLeft(g, now);
               const meta = status === 'overdue' ? 'Overdue'
                 : status === 'quiet' ? `Quiet ${activity.daysQuiet}d`
+                  : status === 'behind' ? 'Behind'
                   : activity.movedToday ? 'Today'
                     : left != null && left <= 14 ? `${left}d left` : null;
               return (

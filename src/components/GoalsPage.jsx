@@ -1,19 +1,28 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './GoalsPage.css';
 import {
-  X, Pin, Pencil, Flame, Plus, ArrowUp, CalendarDays, ChevronDown, Check, Play, Trash2,
-  ListChecks, Timer, CalendarCheck, Flag, CircleCheck, CalendarPlus,
+  X, Pin, Pencil, Flame, Plus, ArrowUp, ChevronDown, Check, Play, Trash2,
+  ListChecks, Timer, CalendarCheck, Flag, CircleCheck, CalendarPlus, Sparkles, Loader2, LifeBuoy,
 } from 'lucide-react';
 import NorthStarCard from './NorthStarCard';
+import DeadlineChips from './goals/DeadlineChips';
+import GoalDraftSheet from './goals/GoalDraftSheet';
 import {
   getGoalProgress, getGoalActivity, getGoalStatus, getFocusGoals, getNextStep, deadlineLabel,
   lastMovedLabel, deadlinePresets, toggleMilestone, toggleGoalCompleted, goalCompletionXp,
-  setGoalCheckin, pushDeadline, makeGoal, patchGoal, addMilestone, goalDateKey, MILESTONE_XP, FOCUS_GOAL_LIMIT,
+  setGoalCheckin, pushDeadline, makeGoal, patchGoal, addMilestone, goalDateKey, getGoalPace, shortDay,
+  MILESTONE_XP, FOCUS_GOAL_LIMIT,
 } from '../utils/goalUtils';
+import { draftToRecords, scheduleStep } from '../utils/goalCoach';
+import { hasAssistantApiKey } from '../utils/assistantUtils';
 import { makeTask } from '../utils/taskUtils';
 import { getHabitStreak } from '../utils/habitUtils';
 
-const STATUS_LABEL = { 'on-track': 'Moving', quiet: 'Quiet', overdue: 'Overdue', done: 'Done' };
+const STATUS_LABEL = { 'on-track': 'Moving', quiet: 'Quiet', behind: 'Behind pace', overdue: 'Overdue', done: 'Done' };
+const PACE_BADGE = { behind: 'Behind pace', 'on-pace': 'On pace', ahead: 'Ahead of pace' };
+
+/** What "has the goal moved since we last asked for a step" is keyed on. */
+const progressSignature = (goal, todos) => `${(goal.milestones || []).filter((m) => m.completed).length}_${todos.filter((t) => String(t.goalId) === String(goal.id) && t.completed).length}`;
 
 const EVENT_META = {
   task: { Icon: ListChecks, verb: 'Task done' },
@@ -24,50 +33,9 @@ const EVENT_META = {
   checkin: { Icon: CircleCheck, verb: 'Checked in' },
 };
 
-const shortDay = (dateKey, todayKey) => {
-  if (dateKey === todayKey) return 'Today';
-  const [y, m, d] = dateKey.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-};
-
-// ─── Deadline chips (quick add + edit) ───────────────────────────────────────
-
-function DeadlineChips({ value, onChange, now }) {
-  const presets = deadlinePresets(now);
-  const isPreset = presets.some((p) => p.key === value);
-  const openPicker = (e) => { try { e.currentTarget.showPicker(); } catch { /* opens natively (iOS) */ } };
-  return (
-    <div className="gp-chips" role="group" aria-label="Deadline">
-      {presets.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          className={`gp-chip${value === p.key ? ' gp-chip--on' : ''}`}
-          aria-pressed={value === p.key}
-          onClick={() => onChange(p.key)}
-        >
-          {p.label}
-        </button>
-      ))}
-      <label className={`gp-chip gp-chip--pick${value && !isPreset ? ' gp-chip--on' : ''}`}>
-        <CalendarDays size={12} /> {value && !isPreset ? shortDay(value, '') : 'Pick date'}
-        <input
-          type="date"
-          className="gp-chip-date"
-          min={goalDateKey(now)}
-          value={value && !isPreset ? value : ''}
-          aria-label="Pick a deadline"
-          onClick={openPicker}
-          onChange={(e) => e.target.value && onChange(e.target.value)}
-        />
-      </label>
-    </div>
-  );
-}
-
 // ─── Quick add ───────────────────────────────────────────────────────────────
 
-function GoalQuickAdd({ onAdd, now, autoFocus }) {
+function GoalQuickAdd({ onAdd, onShape, now, autoFocus }) {
   const [title, setTitle] = useState('');
   const [deadline, setDeadline] = useState(() => deadlinePresets(now)[0].key);
 
@@ -92,6 +60,9 @@ function GoalQuickAdd({ onAdd, now, autoFocus }) {
           maxLength={140}
           autoFocus={autoFocus}
         />
+        <button type="button" className="gp-shape-btn" onClick={() => { onShape(title.trim()); setTitle(''); }} title="Let My Assistant plan it: milestones, first tasks, habit, obstacle plan">
+          <Sparkles size={14} /> <span>Shape with AI</span>
+        </button>
         <button type="submit" className="gp-add-submit" disabled={!title.trim()} aria-label="Add goal">
           <ArrowUp size={16} strokeWidth={2.6} />
         </button>
@@ -234,9 +205,24 @@ function InlineAdd({ placeholder, onAdd, label }) {
   );
 }
 
-function GoalCard({ goal, data, now, todayKey, expanded, onToggle, actions }) {
+function CoachNote({ children, onDismiss }) {
+  return (
+    <div className="gp-coach">
+      <Sparkles size={13} className="gp-coach-icon" aria-hidden="true" />
+      <div className="gp-coach-body">{children}</div>
+      {onDismiss && <button type="button" className="gp-item-x gp-coach-x" onClick={onDismiss} aria-label="Dismiss suggestion"><X size={12} /></button>}
+    </div>
+  );
+}
+
+function GoalCard({ goal, data, now, todayKey, expanded, onToggle, actions, coach }) {
   const activity = getGoalActivity(goal, data, now);
   const status = getGoalStatus(goal, activity, now);
+  const pace = getGoalPace(goal, now);
+  const suggestion = goal.coach?.nextStep || null;
+  const busy = coach.busy[goal.id];
+  const unstuck = coach.unstuck[goal.id];
+  const coachError = coach.errors[goal.id];
   const next = getNextStep(goal, data.todos);
   const openTasks = data.todos.filter((t) => String(t.goalId) === String(goal.id) && !t.completed);
   const linkedHabits = data.habits.filter((h) => String(h.goalId) === String(goal.id));
@@ -267,6 +253,11 @@ function GoalCard({ goal, data, now, todayKey, expanded, onToggle, actions }) {
       <p className="gp-card-meta">
         <span className={status === 'overdue' ? 'gp-meta-alert' : ''}>{deadlineLabel(goal, now)}</span>
         {!done && <><span aria-hidden="true">·</span><span className={status === 'quiet' ? 'gp-meta-warn' : ''}>{lastMovedLabel(activity)}</span></>}
+        {!done && pace && PACE_BADGE[pace.status] && (
+          <span className={`gp-pace gp-pace--${pace.status}`} title={`${Math.round(pace.progress * 100)}% done, ${Math.round(pace.expected * 100)}% of the time gone`}>
+            {PACE_BADGE[pace.status]}
+          </span>
+        )}
       </p>
 
       <ProgressBar goal={goal} />
@@ -293,14 +284,52 @@ function GoalCard({ goal, data, now, todayKey, expanded, onToggle, actions }) {
               />
               <span className="gp-next-text"><span className="gp-next-key">Next</span> {next.text}</span>
             </>
+          ) : suggestion ? (
+            <span className="gp-next-text"><span className="gp-next-key">Next?</span> {suggestion.text}</span>
           ) : (
-            <span className="gp-next-text gp-next-text--empty">No next step yet. Add a milestone or a task.</span>
+            <button type="button" className="gp-suggest-btn" onClick={() => actions.suggestStep(goal)} disabled={!!busy}>
+              {busy === 'step' ? <><Loader2 size={13} className="gp-spin" /> Thinking…</> : <><Sparkles size={13} /> Suggest a next step</>}
+            </button>
           )}
           <button type="button" className="gp-focus-btn" onClick={() => actions.startFocus(goal, next)} title="Start a focus session for this goal">
             <Play size={13} /> Focus
           </button>
         </div>
       )}
+
+      {!done && !next && suggestion && (
+        <CoachNote onDismiss={() => actions.dismissStep(goal)}>
+          {suggestion.why && <p className="gp-coach-why">{suggestion.why}</p>}
+          <div className="gp-coach-actions">
+            <button type="button" className="gp-btn gp-btn--primary" onClick={() => actions.acceptStep(goal)}>
+              <Plus size={13} /> {goal.targetValue != null ? 'Add as task' : 'Add as milestone'}
+            </button>
+          </div>
+        </CoachNote>
+      )}
+
+      {!done && ['quiet', 'behind', 'overdue'].includes(status) && !unstuck && (
+        <button type="button" className="gp-unstuck-btn" onClick={() => actions.getUnstuck(goal)} disabled={!!busy}>
+          {busy === 'unstuck' ? <><Loader2 size={13} className="gp-spin" /> Finding the smallest step…</> : <><LifeBuoy size={13} /> Get unstuck</>}
+        </button>
+      )}
+
+      {!done && unstuck && (
+        <CoachNote onDismiss={() => actions.clearUnstuck(goal)}>
+          <p className="gp-coach-step">{unstuck.step} <span className="gp-coach-min">~{unstuck.minutes} min</span></p>
+          {unstuck.why && <p className="gp-coach-why">{unstuck.why}</p>}
+          {unstuck.done ? (
+            <p className="gp-coach-done"><Check size={13} /> {unstuck.done}</p>
+          ) : (
+            <div className="gp-coach-actions">
+              <button type="button" className="gp-btn gp-btn--primary" onClick={() => actions.unstuckToTask(goal)}><ListChecks size={13} /> Add as task</button>
+              <button type="button" className="gp-btn" onClick={() => actions.unstuckToBlock(goal)}><CalendarPlus size={13} /> Schedule it</button>
+            </div>
+          )}
+        </CoachNote>
+      )}
+
+      {coachError && <p className="gp-draft-error" role="alert">{coachError}</p>}
 
       {expanded && (
         <div className="gp-detail">
@@ -414,9 +443,13 @@ function GoalCard({ goal, data, now, todayKey, expanded, onToggle, actions }) {
 
 const GoalsPage = ({
   northStar, onSaveNorthStar, goals = [], setGoals, todos = [], setTodos, onAwardXp, habits = [], setHabits,
-  pomodoroSessions = [], calendarEvents = [], onCompleteTask, onStartFocus,
+  pomodoroSessions = [], calendarEvents = [], setCalendarEvents, plannerSettings, onCompleteTask, onStartFocus, coachApi,
 }) => {
   const [expandedId, setExpandedId] = useState(null);
+  const [drafting, setDrafting] = useState(null); // the rough text, while the AI draft sheet is open
+  const [coachBusy, setCoachBusy] = useState({});
+  const [coachErrors, setCoachErrors] = useState({});
+  const [unstuck, setUnstuck] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [showDone, setShowDone] = useState(false);
   const now = new Date();
@@ -433,7 +466,8 @@ const GoalsPage = ({
     const a = getGoalActivity(g, data, now);
     acc.count += a.weekCount;
     acc.minutes += a.weekMinutes;
-    if (getGoalStatus(g, a, now) === 'quiet') acc.quiet += 1;
+    const st = getGoalStatus(g, a, now);
+    if (st === 'quiet' || st === 'behind') acc.quiet += 1;
     return acc;
   }, { count: 0, minutes: 0, quiet: 0 });
 
@@ -487,6 +521,41 @@ const GoalsPage = ({
     linkHabit: (goalId, habitId) => setHabits((prev) => prev.map((h) => (String(h.id) === String(habitId) ? { ...h, goalId } : h))),
     unlinkHabit: (habitId) => setHabits((prev) => prev.map((h) => (h.id === habitId ? { ...h, goalId: null } : h))),
     startFocus: (goal, next) => onStartFocus?.(goal, next),
+    suggestStep: (goal) => requestStep(goal),
+    // A number goal's % comes from its number, so its next step becomes a task
+    // (a milestone would switch the bar over to milestones).
+    acceptStep: (goal) => {
+      const step = goal.coach?.nextStep;
+      if (!step) return;
+      const cleared = { coach: { ...goal.coach, nextStep: null } };
+      if (goal.targetValue != null) {
+        setTodos((prev) => [...prev, { ...makeTask({ text: step.text, when: 'this-week' }), goalId: goal.id }]);
+        replace(goal.id, patchGoal(goal, cleared));
+      } else {
+        replace(goal.id, patchGoal(addMilestone(goal, step.text), cleared));
+      }
+    },
+    dismissStep: (goal) => replace(goal.id, patchGoal(goal, { coach: { ...goal.coach, nextStep: null } })),
+    getUnstuck: async (goal) => {
+      setCoach(goal.id, 'unstuck');
+      const res = await coachApi.getUnstuck(goal);
+      setCoach(goal.id, null, res.ok ? null : res.error);
+      if (res.ok) setUnstuck((u) => ({ ...u, [goal.id]: res.unstuck }));
+    },
+    clearUnstuck: (goal) => setUnstuck((u) => { const next = { ...u }; delete next[goal.id]; return next; }),
+    unstuckToTask: (goal) => {
+      const u = unstuck[goal.id];
+      setTodos((prev) => [...prev, { ...makeTask({ text: u.step, when: 'today' }), goalId: goal.id }]);
+      setUnstuck((all) => ({ ...all, [goal.id]: { ...u, done: 'On today’s tasks' } }));
+    },
+    unstuckToBlock: (goal) => {
+      const u = unstuck[goal.id];
+      const placed = scheduleStep({ goal, step: u.step, minutes: u.minutes, calendarEvents, settings: plannerSettings, now: new Date() });
+      if (!placed) { setCoach(goal.id, null, 'No free time left today or tomorrow. Add it as a task instead.'); return; }
+      setCalendarEvents((prev) => [...prev, placed.event]);
+      const when = `${placed.dateKey === todayKey ? 'today' : 'tomorrow'} at ${new Date(2000, 0, 1, placed.event.startHour, placed.event.startMin).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+      setUnstuck((all) => ({ ...all, [goal.id]: { ...u, done: `Scheduled ${when}` } }));
+    },
     edit: (goal) => setEditingId(goal.id),
     // Deleting a goal unlinks its tasks and habits; their history is theirs to keep.
     remove: (goal) => {
@@ -496,6 +565,48 @@ const GoalsPage = ({
       setHabits((prev) => prev.map((h) => (String(h.goalId) === String(goal.id) ? { ...h, goalId: null } : h)));
       setExpandedId(null);
     },
+  };
+
+  const setCoach = (goalId, busy, error = null) => {
+    setCoachBusy((b) => ({ ...b, [goalId]: busy }));
+    setCoachErrors((e) => ({ ...e, [goalId]: error }));
+  };
+
+  // Asks My Assistant for a goal's next step and keeps it on the goal until it's
+  // added or dismissed. `askedFor` records the progress it was asked at, so the
+  // automatic ask below doesn't repeat until the goal has moved again.
+  const requestStep = async (goal) => {
+    setCoach(goal.id, 'step');
+    const signature = progressSignature(goal, todos);
+    const res = await coachApi.suggestNextStep(goal);
+    setCoach(goal.id, null, res.ok ? null : res.error);
+    setGoals((prev) => prev.map((g) => (g.id === goal.id
+      ? patchGoal(g, { coach: { ...g.coach, askedFor: signature, ...(res.ok ? { nextStep: res.step } : {}) } })
+      : g)));
+  };
+
+  // Auto next step: a focus goal that has run out of steps (and has moved since the
+  // last ask) gets one suggested without a tap. Once per goal per page visit.
+  const autoAsked = useRef(new Set());
+  useEffect(() => {
+    if (!coachApi || !hasAssistantApiKey()) return;
+    getFocusGoals(goals).forEach((g) => {
+      if (autoAsked.current.has(g.id) || getNextStep(g, todos) || g.coach?.nextStep) return;
+      if (g.coach?.askedFor === progressSignature(g, todos)) return;
+      autoAsked.current.add(g.id);
+      requestStep(g);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goals, todos]);
+
+  const createFromDraft = (draft, options) => {
+    const { goal, tasks, habit } = draftToRecords(draft, options);
+    setGoals((prev) => [goal, ...prev]);
+    if (tasks.length) setTodos((prev) => [...prev, ...tasks]);
+    if (habit?.create) setHabits((prev) => [...prev, habit.create]);
+    if (habit?.linkId != null) setHabits((prev) => prev.map((h) => (String(h.id) === String(habit.linkId) ? { ...h, goalId: goal.id } : h)));
+    setDrafting(null);
+    setExpandedId(goal.id);
   };
 
   const addGoal = (title, deadline) => {
@@ -515,6 +626,7 @@ const GoalsPage = ({
       expanded={expandedId === goal.id}
       onToggle={() => setExpandedId((id) => (id === goal.id ? null : goal.id))}
       actions={actions}
+      coach={{ busy: coachBusy, errors: coachErrors, unstuck }}
     />
   );
 
@@ -527,11 +639,11 @@ const GoalsPage = ({
         <p className="gp-page-subtitle">
           {active === 0
             ? 'Write down what you want. Tasks, habits and focus sessions you link to it count as progress.'
-            : `This week: ${week.count} thing${week.count === 1 ? '' : 's'} moved your goals${week.minutes ? ` · ${week.minutes}m focus` : ''}${week.quiet ? ` · ${week.quiet} gone quiet` : ''}`}
+            : `This week: ${week.count} thing${week.count === 1 ? '' : 's'} moved your goals${week.minutes ? ` · ${week.minutes}m focus` : ''}${week.quiet ? ` · ${week.quiet} need${week.quiet === 1 ? 's' : ''} attention` : ''}`}
         </p>
       </header>
 
-      <GoalQuickAdd onAdd={addGoal} now={now} autoFocus={active === 0} />
+      <GoalQuickAdd onAdd={addGoal} onShape={(text) => setDrafting(text)} now={now} autoFocus={active === 0} />
 
       {focus.length > 0 && (
         <section className="gp-section">
@@ -566,6 +678,16 @@ const GoalsPage = ({
           </button>
           {showDone && <div className="gp-grid">{doneGoals.map(renderCard)}</div>}
         </section>
+      )}
+
+      {drafting !== null && (
+        <GoalDraftSheet
+          initialText={drafting}
+          now={now}
+          onDraft={coachApi.draftGoal}
+          onCreate={createFromDraft}
+          onClose={() => setDrafting(null)}
+        />
       )}
 
       {editing && (

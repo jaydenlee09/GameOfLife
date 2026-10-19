@@ -63,7 +63,7 @@ export const checkinPrompt = (type, now) => {
     return `${AUTO('evening check-in')} Give me a short evening debrief: how today went against the plan and my Daily Score, one thing I did well, one thing to fix tomorrow. Remind me to fill in today's Daily Log and set a commitment for tomorrow. Don't create anything unless it's clearly needed. Under 120 words.`;
   }
   const monday = now.getDay() === 1 ? " It's Monday, so also give me today's plan." : '';
-  return `${AUTO('weekly check-in')} Run my weekly planning: review the last 7 days (score history, habits, goals, focus, commitments), name the biggest win and the biggest leak, and propose this week's #1 priority tied to my North Star. Then set up the week: you may create up to 3 tasks (timeframe this-week) or goal milestones that move it forward. Tell me to record the priority in my Weekly Review.${monday} Under 200 words.`;
+  return `${AUTO('weekly check-in')} Run my weekly planning: review the last 7 days (score history, habits, goals, focus, commitments), name the biggest win and the biggest leak, and propose this week's #1 priority tied to my North Star. Then set up the week: you may create up to 3 tasks (timeframe this-week) or goal milestones that move it forward. Tell me to record the priority in my Weekly Review, and to tap "Recalibrate with AI" there to adjust my goals for next week.${monday} Under 200 words.`;
 };
 
 /**

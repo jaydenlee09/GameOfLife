@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import './WeeklyReviewPage.css';
 import {
   ChevronLeft, ChevronRight, Pin, ArrowRight, Check, Bot, Construction, TrendingUp,
-  CheckSquare, Target, Zap,
+  CheckSquare, Target, Zap, Sparkles, Loader2, RotateCcw,
 } from 'lucide-react';
 import {
   toggleMilestone,
@@ -15,9 +15,10 @@ import {
   goalDateKey,
   MILESTONE_XP,
 } from '../utils/goalUtils';
+import { applyCoachChange, changeLabel } from '../utils/goalCoach';
 import { computeWeekStats, getMondayKey, formatWeekRange, getWeekDays } from '../utils/weekStatsUtils';
 
-const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, calendarEvents = [], setGoals, onAwardXp }) => {
+const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, calendarEvents = [], setGoals, setTodos, onAwardXp, onRecalibrate }) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const mondayKey = getMondayKey(weekOffset);
   const isCurrentWeek = weekOffset === 0;
@@ -74,6 +75,43 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
     if (justCompleted) awardMilestoneXp(goal, milestoneText);
     if (shouldAwardGoalXp) awardGoalXp(goal);
   };
+
+  // ── Goal coach: weekly recalibration ──
+  // Saved on the week's review so it isn't re-run; each change applies on a tap.
+  const recal = saved?.goalCoach || null;
+  const [recalBusy, setRecalBusy] = useState(false);
+  const [recalError, setRecalError] = useState(null);
+  const runRecalibration = async () => {
+    setRecalBusy(true);
+    setRecalError(null);
+    const res = await onRecalibrate();
+    setRecalBusy(false);
+    if (!res.ok) { setRecalError(res.error); return; }
+    setWeeklyReviews(prev => ({ ...prev, [mondayKey]: { ...prev[mondayKey], goalCoach: { ...res.recalibration, applied: {} } } }));
+  };
+  const applyChanges = (pairs) => {
+    const live = pairs.filter(({ change }) => !recal?.applied?.[change.id]);
+    if (!live.length) return;
+    setGoals(prev => prev.map((g) => live.reduce((acc, { goalId, change }) => (
+      String(goalId) === String(acc.id) ? (applyCoachChange(acc, change).goal || acc) : acc
+    ), g)));
+    const tasks = live.map(({ goalId, change }) => {
+      const goal = goals.find((g) => String(g.id) === String(goalId));
+      return goal ? applyCoachChange(goal, change).task : null;
+    }).filter(Boolean).map((t, i) => ({ ...t, id: t.id + i }));
+    if (tasks.length) setTodos(prev => [...prev, ...tasks]);
+    setWeeklyReviews(prev => {
+      const week = prev[mondayKey] || {};
+      const applied = { ...week.goalCoach?.applied };
+      live.forEach(({ change }) => { applied[change.id] = true; });
+      return { ...prev, [mondayKey]: { ...week, goalCoach: { ...week.goalCoach, applied } } };
+    });
+  };
+  const allPending = (recal?.goals || []).flatMap((entry) => (
+    goals.some((g) => String(g.id) === String(entry.goalId))
+      ? entry.changes.filter((c) => !recal.applied?.[c.id]).map((change) => ({ goalId: entry.goalId, change }))
+      : []
+  ));
 
   const handlePushDeadline = (goal) => {
     setGoals(prev => prev.map(g => (g.id === goal.id ? pushDeadline(g, 7, new Date()) : g)));
@@ -134,7 +172,8 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
   const handleSave = () => {
     setWeeklyReviews(prev => ({
       ...prev,
-      [mondayKey]: { wentWell, heldBack, improvements, priority, completedAt: Date.now(), stats },
+      // Keep anything else stored on the week (e.g. the goal coach's recalibration).
+      [mondayKey]: { ...prev[mondayKey], wentWell, heldBack, improvements, priority, completedAt: Date.now(), stats },
     }));
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
@@ -229,6 +268,57 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Goal coach: recalibrate the plan */}
+          {(isCurrentWeek || recal) && weekGoals.some(({ goal }) => !goal.completed) && (
+            <div className="review-recal">
+              <div className="review-recal-head">
+                <h3 className="review-goal-checkin-title"><Sparkles size={16} /> Recalibrate your goals</h3>
+                {isCurrentWeek && recal && !recalBusy && (
+                  <button type="button" className="review-recal-again" onClick={runRecalibration}><RotateCcw size={13} /> Run again</button>
+                )}
+              </div>
+              {!recal && (
+                <>
+                  <p className="review-ai-hint">My Assistant compares each goal's plan with what you actually did this week, then suggests changes so next week is realistic. Nothing changes until you apply it.</p>
+                  <button type="button" className="review-recal-btn" onClick={runRecalibration} disabled={recalBusy}>
+                    {recalBusy ? <><Loader2 size={15} className="review-spin" /> Reviewing your week…</> : <><Sparkles size={15} /> Recalibrate with AI</>}
+                  </button>
+                </>
+              )}
+              {recalBusy && recal && <p className="review-ai-hint"><Loader2 size={13} className="review-spin" /> Reviewing your week…</p>}
+              {recalError && <p className="review-ai-error">{recalError}</p>}
+              {recal && recal.goals.map((entry) => {
+                const exists = goals.some((g) => String(g.id) === String(entry.goalId));
+                return (
+                  <div key={entry.goalId} className="review-recal-goal">
+                    <p className="review-recal-title">{entry.title}</p>
+                    {entry.verdict && <p className="review-recal-verdict">{entry.verdict}</p>}
+                    {entry.changes.length === 0 && <p className="review-recal-none">Keep going as planned.</p>}
+                    {entry.changes.map((change) => {
+                      const applied = !!recal.applied?.[change.id];
+                      return (
+                        <div key={change.id} className={`review-recal-change ${applied ? 'is-applied' : ''}`}>
+                          <div className="review-recal-change-text">
+                            <span>{changeLabel(change)}</span>
+                            {change.reason && <span className="review-recal-reason">{change.reason}</span>}
+                          </div>
+                          {applied ? (
+                            <span className="review-recal-done"><Check size={13} /> Applied</span>
+                          ) : isCurrentWeek && exists ? (
+                            <button type="button" className="review-recal-apply" onClick={() => applyChanges([{ goalId: entry.goalId, change }])}>Apply</button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              {recal && isCurrentWeek && allPending.length > 1 && (
+                <button type="button" className="review-recal-btn" onClick={() => applyChanges(allPending)}><Check size={15} /> Apply all {allPending.length}</button>
+              )}
             </div>
           )}
 

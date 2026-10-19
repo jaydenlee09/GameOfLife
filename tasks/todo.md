@@ -1,5 +1,80 @@
 # Todo
 
+## Done, uncommitted (2026-10-18): AI goal coach + accountability
+
+Problem (user): making one goal takes a lot of thinking and calibration; wants AI in the process,
+steps, and ways to stay accountable.
+
+User choices: draft + 2 quick chips (time per week, starting point) · draft includes measure +
+milestones, this week's tasks, linked habit, obstacle + if-then · all four accountability
+features (pace check, auto next step, weekly recalibration, get unstuck) · AI only suggests;
+nothing changes until one tap.
+
+Design:
+- New `utils/goalCoach.js` (pure, like lessonInsight/logReview): four tool-free structured-JSON
+  calls through `geminiGenerateJson`, each with schema + context builder + normalizer that
+  validates everything in code (dates YYYY-MM-DD and not past, caps on list lengths, habit link
+  must be an existing habit id or a new daily-habit name, task text trimmed).
+  1. draftGoal({ text, hoursPerWeek, startingPoint }) → { title, deadline, why, measure:
+     { kind: 'number', target, unit } | { kind: 'milestones' }, milestones[3-6] (first doable
+     this week), tasks[1-2] for this week, habit { existingId | newName } | null, obstacle,
+     ifThenPlan }. Context: North Star, other active goals, existing habits, today.
+  2. suggestNextStep(goal) → { text, why } (one milestone).
+  3. getUnstuck(goal) → { step (≤20 min), minutes, why }.
+  4. recalibrate(focus goals + this week's activity, pace, missed tasks/blocks) → per goal:
+     { verdict, changes[] } where a change is one of: moveDeadline(date), setTarget(n),
+     addMilestone(text), dropMilestone(id), addTask(text); max 3 per goal.
+- Hooks: `useAssistant` gains draftGoal / suggestNextStep / getUnstuck / recalibrateGoals
+  (same { ok, error } shape and friendlyError as the others).
+- Goal creation: quick add keeps Enter = plain add. New "Shape with AI" button beside it opens a
+  draft sheet: the typed text, chips Time per week (1h / 3h / 5h+ / skip) and an optional
+  "Where are you starting from?" line → Draft it → editable draft (title, deadline chips, measure,
+  milestone list editable/removable, tasks + habit as toggles, obstacle/if-then fields) →
+  Create goal (one tap applies goal + tasks + habit link/new habit). Failure shows the error and
+  keeps the text; plain add still works.
+- Pace (no AI, goalUtils.getGoalPace): for goals with a deadline and a % (milestones/number):
+  expected = time elapsed since creation / total time; behind when progress < expected − 15
+  points (once ≥ 15% of the time has passed); ahead when > expected + 15. Shown as a badge on the
+  card ("Behind pace"), counted in status, on Home rows, in My Assistant/Plan My Day context.
+- Auto next step: ticking the last open milestone (goal not done) fires suggestNextStep once and
+  shows "Next: … · Add" in the card's Next row; goals with no next step get a "Suggest a step"
+  button there. Suggestions are kept on the goal (`coach.nextStep`) until added or dismissed.
+- Get unstuck: quiet or behind-pace goals get a "Get unstuck" button → smallest step, then
+  "Add as task" or "Schedule it" (first free gap today, else tomorrow, via computeFreeGaps +
+  planToEvents as a goal block linked to the goal).
+- Weekly recalibration: Weekly Review's Goal Check-In gets "Recalibrate with AI" (current week).
+  Result saved on that week's review (`weeklyReviews[monday].goalCoach`) so it isn't re-run;
+  each change has its own Apply button, plus Apply all. The Sunday goals push says
+  "…Recalibrate in Weekly Review" and opens Review. In-app weekly check-in prompt mentions it.
+- No XP from any AI path (milestones/tasks it adds pay only when you complete them).
+
+Steps:
+- [x] goalCoach.js (schemas, contexts, normalizers) + getGoalPace + node checks
+- [x] useAssistant hooks + App wiring
+- [x] Draft sheet on Goals page (chips, draft editor, create)
+- [x] Pace badge (Goals, Home, AI contexts), next step + Get unstuck on cards
+- [x] Weekly Review recalibration + push/check-in copy
+- [x] Verify: node checks, harness with faked Gemini at 1440 + 375, lint diff, build, memory
+
+Changes from the plan: 'behind' became a goal status (after overdue and quiet), so Home, the
+Goals subtitle ("N need attention") and the Statistics tile count it · a number goal's suggested
+step (and any recalibration addMilestone) becomes a task, since a milestone would switch its %
+bar from the number to milestones · Get unstuck also shows on overdue goals · auto next step is
+for focus goals only and skips when there's no API key · Goals popups moved to the 9500 layer
+(above the AI bar and tab bar) · Weekly Review Save now merges instead of replacing the week.
+
+Verified: node checks (draft validation: bad/past dates, dup/over-long lists, habit by id or
+same name, number vs milestones; records incl. unique milestone ids, toggles; next step dup
+guard; unstuck minute clamp; recalibration: unknown/duplicate goal ids, setTarget only on number
+goals, dropMilestone only open ids, max 3; apply each type; scheduleStep today vs tomorrow; pace
+behind/on/ahead/early/none; push Sunday recap opens Review). Harness (real App, Gemini stubbed by
+schema) at 1440 + 375: auto next step on stepless focus goals (once), Add as task on a number
+goal, Get unstuck → Schedule it (19:45 goal block linked), Shape with AI with chips (context
+carries hours/start/North Star/habits) → edit → Create (goal, 4 milestones, 2 tasks, habit
+linked, card opens), number draft with new habit + tasks off, Weekly Review recalibrate →
+Apply one → Apply all (no duplicates) → Save keeps it; sheet fits a phone above the tab bar; no
+horizontal overflow; no console errors. Lint 39 (no new), app + functions build pass.
+
 ## Done, uncommitted (2026-10-17): Goals you actually use
 
 Problem (user): goals are too hard to create, don't connect to the rest of the site or show

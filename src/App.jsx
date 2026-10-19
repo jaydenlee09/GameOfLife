@@ -1177,8 +1177,11 @@ function App() {
             setHabits={setHabits}
             pomodoroSessions={pomodoroSessions}
             calendarEvents={calendarEvents}
+            setCalendarEvents={setCalendarEvents}
+            plannerSettings={user.planner}
             onCompleteTask={completeTaskById}
             onStartFocus={startFocusOnGoal}
+            coachApi={assistant}
           />
         );
       case 'review':
@@ -1195,7 +1198,9 @@ function App() {
             healthLog={healthLog}
             calendarEvents={calendarEvents}
             setGoals={setGoals}
+            setTodos={setTodos}
             onAwardXp={awardXp}
+            onRecalibrate={assistant.recalibrateGoals}
           />
         );
       case 'shop':

@@ -102,6 +102,52 @@
   border-top: 1px solid var(--separator);
 }
 .review-goal-item:first-of-type { border-top: none; padding-top: 0; }
+.review-recal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.1rem;
+}
+.review-recal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.review-recal-head .review-goal-checkin-title { display: inline-flex; align-items: center; gap: 0.4rem; }
+.review-recal-head svg { color: var(--accent); }
+.review-recal-again {
+  display: inline-flex; align-items: center; gap: 0.3rem; background: none; border: none; padding: 0;
+  color: var(--text-secondary); font: inherit; font-size: 0.75rem; cursor: pointer;
+}
+.review-recal-again:hover { color: var(--text-primary); }
+.review-recal-btn {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 0.4rem;
+  background: var(--accent); border: none; border-radius: var(--radius-sm); color: #fff;
+  font: inherit; font-size: 0.82rem; font-weight: 600; padding: 0.55rem 1rem; cursor: pointer;
+}
+.review-recal-btn:disabled { opacity: 0.7; cursor: default; }
+.review-recal-btn:hover:not(:disabled) { background: var(--accent-pressed); }
+@keyframes review-spin { to { transform: rotate(360deg); } }
+.review-spin { animation: review-spin 0.9s linear infinite; vertical-align: -2px; }
+.review-recal-goal { display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.6rem; border-top: 1px solid var(--separator); }
+.review-recal-title { margin: 0; font-size: 0.86rem; font-weight: 600; color: var(--text-primary); }
+.review-recal-verdict { margin: 0; font-size: 0.8rem; line-height: 1.45; color: var(--text-secondary); }
+.review-recal-none { margin: 0; font-size: 0.78rem; color: var(--success); }
+.review-recal-change {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.035); border: 1px solid var(--separator);
+}
+.review-recal-change.is-applied { opacity: 0.65; }
+.review-recal-change-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; color: var(--text-primary); overflow-wrap: anywhere; }
+.review-recal-reason { font-size: 0.74rem; color: var(--text-tertiary); }
+.review-recal-apply {
+  flex-shrink: 0; border: 1px solid rgba(56, 189, 248, 0.45); background: var(--accent-wash); color: var(--accent);
+  border-radius: 999px; font: inherit; font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.8rem; cursor: pointer;
+}
+.review-recal-apply:hover { background: rgba(56, 189, 248, 0.2); }
+.review-recal-done { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: var(--success); }
+
 .review-goal-week {
   margin: 0.15rem 0 0;
   font-size: 0.76rem;

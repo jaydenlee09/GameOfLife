@@ -21,7 +21,7 @@ import {
   computeDailyScore, computeDailyScoreHistory, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD,
 } from './scoreUtils';
 import { getHabitStreak } from './habitUtils';
-import { getGoalProgress, getGoalActivity, getGoalStatus, daysLeft, makeGoal } from './goalUtils';
+import { getGoalProgress, getGoalActivity, getGoalStatus, getGoalPace, paceLabel, daysLeft, makeGoal } from './goalUtils';
 import { ACHIEVEMENTS } from './achievementsMeta';
 import { carriedDays, isTop } from './taskUtils';
 
@@ -284,6 +284,7 @@ const READ_TOOLS = [
               progress: `${progress.done}/${progress.total}${g.unit ? ` ${g.unit}` : ''} (${Math.round(progress.ratio * 100)}%)`,
               milestones: (g.milestones || []).map((m) => ({ id: String(m.id), text: m.text, completed: !!m.completed })),
               last7Days: { thingsDone: activity.weekCount, focusMinutes: activity.weekMinutes },
+              ...(paceLabel(getGoalPace(g, now)) ? { pace: paceLabel(getGoalPace(g, now)) } : {}),
               lastMoved: activity.lastMovedDate,
               daysQuiet: activity.daysQuiet,
               ...(g.obstacle ? { obstacle: g.obstacle } : {}),

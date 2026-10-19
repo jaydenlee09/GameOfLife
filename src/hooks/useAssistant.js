@@ -7,6 +7,7 @@ import { generateHomeBrief } from '../utils/homeBrief';
 import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
 import { generateLessonInsight } from '../utils/lessonInsight';
+import { generateGoalDraft, generateNextStep, generateUnstuck, generateRecalibration } from '../utils/goalCoach';
 
 const makeId = (prefix) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 const ACTIVITY_LIMIT = 100;
@@ -274,8 +275,25 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     }
   }, []);
 
+  // ─── Goal coach ─────────────────────────────────────────────────────────────
+  // Each resolves { ok, … } or { ok: false, error } and writes nothing: the Goals
+  // page and Weekly Review show the suggestion and apply it only on a tap.
+  const coach = useCallback(async (fn, args, key) => {
+    try {
+      const value = await fn({ state: stateRef.current, generate: geminiGenerateJson, ...args });
+      return { ok: true, [key]: value };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    }
+  }, []);
+  const draftGoal = useCallback((input) => coach(generateGoalDraft, { input }, 'draft'), [coach]);
+  const suggestNextStep = useCallback((goal) => coach(generateNextStep, { goal }, 'step'), [coach]);
+  const getUnstuck = useCallback((goal) => coach(generateUnstuck, { goal }, 'unstuck'), [coach]);
+  const recalibrateGoals = useCallback(() => coach(generateRecalibration, {}, 'recalibration'), [coach]);
+
   return {
     send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson,
+    draftGoal, suggestNextStep, getUnstuck, recalibrateGoals,
     isLoading, error, clearError: () => setError(null),
   };
 }

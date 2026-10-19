@@ -149,7 +149,7 @@ export const decidePushes = (now, rawSettings, state, pushState = {}) => {
         const n = getGoalEvents(g, state).filter((e) => e.date >= weekStart && e.date <= today).length;
         return `${g.title}: ${n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing'}`;
       });
-      pushes.push({ id: `goalsweek_${today}`, type: 'goals', title: 'Your goals this week', body: `${lines.join(' · ')}. Pick next week's first step.`, page: 'goals' });
+      pushes.push({ id: `goalsweek_${today}`, type: 'goals', title: 'Your goals this week', body: `${lines.join(' · ')}. Tap to recalibrate next week in Weekly Review.`, page: 'review' });
     } else if (now.getDay() !== 0) {
       const quiet = nudges.filter((n) => n.id.startsWith('goal_') && (n.daysQuiet - QUIET_GOAL_DAYS) % GOAL_QUIET_EVERY === 0);
       if (quiet.length && fresh(`goalquiet_${today}`)) {

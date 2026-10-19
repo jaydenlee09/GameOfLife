@@ -98,6 +98,13 @@ export const deadlinePresets = (now) => {
   ];
 };
 
+/** "Today" for today's key, else "Oct 18". */
+export const shortDay = (dateKey, todayKey) => {
+  if (dateKey === todayKey) return 'Today';
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
 /** Days until the deadline (0 = due today, negative = past), or null when there's none. */
 export const daysLeft = (goal, now) => (goal?.deadline ? daysBetweenKeys(goalDateKey(now), goal.deadline) : null);
 
@@ -244,12 +251,48 @@ export const getGoalActivity = (goal, data, now) => {
   };
 };
 
-/** 'done' | 'overdue' | 'quiet' | 'on-track'. */
+// ─── Pace: is progress keeping up with the calendar? ────────────────────────
+
+/** How far progress may trail (or lead) the time elapsed before it counts. */
+export const PACE_SLACK = 0.15;
+
+/**
+ * For a goal with a deadline and a measurable % (milestones or a number):
+ * compares progress with the share of time gone since it was created.
+ * Returns null when pace doesn't apply, else { status, expected, progress } where
+ * status is 'early' (under 15% of the time gone), 'behind', 'on-pace' or 'ahead'.
+ */
+export const getGoalPace = (goal, now) => {
+  if (goal.completed || !goal.deadline || !goal.createdAt) return null;
+  const progress = getGoalProgress(goal);
+  if (progress.kind === 'binary') return null;
+  const start = new Date(goal.createdAt);
+  start.setHours(0, 0, 0, 0);
+  const end = parseKey(goal.deadline);
+  end.setDate(end.getDate() + 1);
+  const total = end - start;
+  if (total <= 0) return null;
+  const expected = Math.min(1, Math.max(0, (now - start) / total));
+  const ratio = progress.ratio;
+  if (expected < PACE_SLACK) return { status: 'early', expected, progress: ratio };
+  const diff = ratio - expected;
+  return { status: diff < -PACE_SLACK ? 'behind' : diff > PACE_SLACK ? 'ahead' : 'on-pace', expected, progress: ratio };
+};
+
+/** 'done' | 'overdue' | 'quiet' | 'behind' (moving, but slower than the deadline needs) | 'on-track'. */
 export const getGoalStatus = (goal, activity, now) => {
   if (goal.completed) return 'done';
   if (isGoalOverdue(goal, now)) return 'overdue';
   if (activity.daysQuiet >= QUIET_GOAL_DAYS) return 'quiet';
+  if (getGoalPace(goal, now)?.status === 'behind') return 'behind';
   return 'on-track';
+};
+
+/** "Behind pace (40% done, 65% of the time gone)", or null when pace doesn't apply. */
+export const paceLabel = (pace) => {
+  if (!pace || pace.status === 'early') return null;
+  const word = { behind: 'Behind pace', 'on-pace': 'On pace', ahead: 'Ahead of pace' }[pace.status];
+  return `${word} (${Math.round(pace.progress * 100)}% done, ${Math.round(pace.expected * 100)}% of the time gone)`;
 };
 
 /** "Moved today", "Last moved yesterday", "Quiet for 6 days", "Nothing yet". */
@@ -296,6 +339,7 @@ export const describeGoal = (goal, data, now) => {
     deadlineLabel(goal, now),
     p.kind !== 'binary' ? `${p.done}/${p.total}${goal.unit ? ` ${goal.unit}` : ''}` : null,
     `${a.weekCount} thing${a.weekCount === 1 ? '' : 's'} done for it this week${a.weekMinutes ? ` (${a.weekMinutes} focus min)` : ''}`,
+    paceLabel(getGoalPace(goal, now)),
     lastMovedLabel(a).toLowerCase(),
   ];
   return parts.filter(Boolean).join(' · ');

@@ -908,7 +908,8 @@ button.wp-move:hover {
   background: var(--success);
 }
 
-.wp-why-dot--quiet { background: var(--warning); }
+.wp-why-dot--quiet,
+.wp-why-dot--behind { background: var(--warning); }
 .wp-why-dot--overdue { background: var(--danger); }
 
 .wp-why-goal-meta {
@@ -919,7 +920,8 @@ button.wp-move:hover {
   white-space: nowrap;
 }
 
-.wp-why-goal-meta--quiet { color: var(--warning); }
+.wp-why-goal-meta--quiet,
+.wp-why-goal-meta--behind { color: var(--warning); }
 .wp-why-goal-meta--overdue { color: var(--danger); }
 
 /* ── Wide monitors ────────────────────────────────────────────────────────── */

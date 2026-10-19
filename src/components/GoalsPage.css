@@ -756,7 +756,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  /* Above the mobile bottom nav (9000) and AI bar, below the My Assistant drawer (9999). */
+  z-index: 9500;
   padding: 1.5rem;
 }
 
@@ -965,7 +966,108 @@
 }
 
 
-.gp-modal { max-height: calc(100svh - 3rem); overflow-y: auto; }
+/* ── Goal coach (AI) ─────────────────────────────────────────────────────── */
+@keyframes gp-spin { to { transform: rotate(360deg); } }
+.gp-spin { animation: gp-spin 0.9s linear infinite; }
+
+.gp-shape-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 36px;
+  padding: 0 0.8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease);
+}
+
+.gp-shape-btn:hover { background: rgba(56, 189, 248, 0.2); }
+
+.gp-pace {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.6;
+  border: 1px solid var(--separator-strong);
+  color: var(--text-secondary);
+}
+
+.gp-pace--behind { color: var(--warning); border-color: rgba(255, 159, 10, 0.45); background: var(--warning-wash); }
+.gp-pace--ahead { color: var(--success); border-color: rgba(48, 209, 88, 0.4); background: var(--success-wash); }
+
+.gp-dot--behind { background: var(--warning); }
+.gp-card--behind { border-color: rgba(255, 159, 10, 0.28); }
+
+.gp-suggest-btn,
+.gp-unstuck-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gp-suggest-btn { flex: 1; min-width: 0; }
+.gp-unstuck-btn { align-self: flex-start; padding: 0.15rem 0; color: var(--warning); }
+.gp-suggest-btn:disabled, .gp-unstuck-btn:disabled { cursor: default; opacity: 0.8; }
+
+.gp-coach {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: var(--accent-wash);
+}
+
+.gp-coach-icon { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+.gp-coach-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.gp-coach-x { opacity: 1; }
+.gp-coach-step { margin: 0; font-size: 0.86rem; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+.gp-coach-min { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-left: 0.25rem; }
+.gp-coach-why { margin: 0; font-size: 0.78rem; line-height: 1.4; color: var(--text-secondary); }
+.gp-coach-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.gp-coach-done { margin: 0; display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 600; color: var(--success); }
+
+/* Draft sheet */
+.gp-draft-icon { color: var(--accent); vertical-align: -2px; margin-right: 0.2rem; }
+.gp-modal-title { display: inline-flex; align-items: center; gap: 0.3rem; }
+.gp-draft-go { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
+.gp-draft-error { margin: 0; font-size: 0.78rem; line-height: 1.4; color: var(--danger); }
+.gp-draft-row { display: flex; align-items: center; gap: 6px; }
+.gp-draft-row .gp-text-input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 0.85rem; }
+
+.gp-draft-num {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.gp-draft-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gp-draft-actions .gp-submit-btn { flex: 1; }
+.gp-label { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.gp-field-checkbox-label strong { color: var(--text-primary); font-weight: 600; }
+
+.gp-modal { max-height: calc(100dvh - 3rem); overflow-y: auto; }
 
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -980,5 +1082,7 @@
   .gp-grid { grid-template-columns: minmax(0, 1fr); }
   .gp-chip { height: 34px; }
   .gp-item-x { opacity: 1; }
+  .gp-shape-btn span { display: none; }
+  .gp-shape-btn { width: 36px; padding: 0; justify-content: center; }
   .gp-modal-overlay { padding: 1rem; }
 }

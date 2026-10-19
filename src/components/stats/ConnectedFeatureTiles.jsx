@@ -53,7 +53,7 @@ const ConnectedFeatureTiles = ({
   const completedGoals = goals.filter(g => g.completed).length;
   const now = new Date();
   const focusStatuses = getFocusGoals(goals).map(g => getGoalStatus(g, getGoalActivity(g, { todos, habits, pomodoroSessions, calendarEvents }, now), now));
-  const stalledFocus = focusStatuses.filter(st => st === 'quiet' || st === 'overdue').length;
+  const stalledFocus = focusStatuses.filter(st => st === 'quiet' || st === 'overdue' || st === 'behind').length;
   const goalsStatus = totalGoals === 0 ? 'neutral'
     : stalledFocus === 0 ? 'good'
     : stalledFocus === focusStatuses.length ? 'bad' : 'warn';

@@ -7,7 +7,7 @@
 // anything: the plan is a proposal the user reviews, then adds in one step.
 
 import { expandEventsForDates, toDateKey } from './calendarUtils';
-import { getGoalProgress, getActiveGoals, getGoalActivity, getNextStep, daysLeft } from './goalUtils';
+import { getGoalProgress, getActiveGoals, getGoalActivity, getNextStep, daysLeft, getGoalPace, paceLabel } from './goalUtils';
 import { getHabitStreak } from './habitUtils';
 import { shiftDateKey } from './scoreUtils';
 import { computeFocusInsights, describeBestWindows } from './focusInsights';
@@ -152,6 +152,7 @@ const planGoals = (state, now) => getActiveGoals(state.goals)
       progress: `${progress.done}/${progress.total}${g.unit ? ` ${g.unit}` : ''}`,
       ...(next ? { nextStep: next.text } : {}),
       daysSinceProgress: activity.daysQuiet,
+      ...(paceLabel(getGoalPace(g, now)) ? { pace: paceLabel(getGoalPace(g, now)) } : {}),
     };
   });
 
@@ -237,7 +238,7 @@ export const buildPlanSystemPrompt = (name) => `You are ${name}'s planning coach
 RULES:
 - Only use the free gaps listed. Never overlap "alreadyBooked". Start and end on 15-minute boundaries.
 - Hardest, most important work goes in their best focus windows (focus.bestWindows). If there's no history, mornings are a safe default.
-- Priority: overdue or due-soon tasks, then this week's #1 priority, pinned goals and goals with a close deadline (daysLeft), then other tasks. A goal with many daysSinceProgress deserves a goal block even with no task for it; use its nextStep as the intent.
+- Priority: overdue or due-soon tasks, then this week's #1 priority, pinned goals, goals with a close deadline (daysLeft) or behind pace, then other tasks. A goal with many daysSinceProgress deserves a goal block even with no task for it; use its nextStep as the intent.
 - Deep work blocks are 25-90 minutes; small tasks can share one 30-minute admin block. After any block of 50+ minutes, add a 10-15 minute break (kind=break).
 - Habits not done yet get short blocks (15 minutes) at sensible times.
 - Leave slack: fill at most about 75% of the free time. Don't plan the last 30 minutes before bed.
