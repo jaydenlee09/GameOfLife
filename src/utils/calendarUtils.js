@@ -43,12 +43,12 @@ export const fmtRemaining = (targetMs, nowMs) => {
   return `${mins}m`;
 };
 
-// A block's color says what kind of block it is (matching the Plan My Day preview):
-// task/goal/habit blocks carry `plan.kind`; anything else is a plain event.
+// What kind of block it is (matching the Plan My Day preview): task/goal/habit
+// blocks carry `plan.kind`; anything else is a plain event. Blocks are colored by
+// category (see blockCategories.js); the kind colors only mark unscheduled tasks.
 export const BLOCK_KIND_COLORS = { task: '#38bdf8', goal: '#30d158', habit: '#ff9f0a', event: '#5e5ce6' };
 export const BLOCK_KIND_LABELS = { task: 'Task', goal: 'Goal', habit: 'Habit', event: 'Event' };
 export const blockKind = (ev) => (Object.hasOwn(BLOCK_KIND_COLORS, ev?.plan?.kind ?? '') ? ev.plan.kind : 'event');
-export const blockColor = (ev) => BLOCK_KIND_COLORS[blockKind(ev)];
 
 export const cloneSubEvents = (subEvents = []) => subEvents.map((subEvent) => ({ ...subEvent }));
 export const normalizeBonusTask = (task = {}, index = 0) => ({

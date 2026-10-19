@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles, Palette } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
@@ -8,8 +8,12 @@ import {
   normalizeEvent, expandEventsForDates, isInstanceCompleted,
   cloneSubEvents, cloneBonusTasks, normalizeBonusTask,
   getBlockStatus, getBlockOutcome, PLAN_KEPT_START,
-  blockKind, blockColor, BLOCK_KIND_COLORS, BLOCK_KIND_LABELS,
+  blockKind, BLOCK_KIND_COLORS, BLOCK_KIND_LABELS,
 } from '../utils/calendarUtils';
+import {
+  BLOCK_CATEGORIES, COLOR_SWATCHES, blockColor, blockCategory, categoryColor, categoryMeta,
+  storedCategoryFields, categoryFormFields, autoCategoryForForm, applyCategoryForm,
+} from '../utils/blockCategories';
 import { computeFreeGaps } from '../utils/dayPlanner';
 import TodayStrip from './calendar/TodayStrip';
 import TaskTray from './calendar/TaskTray';
@@ -166,6 +170,7 @@ const buildDetachedInstanceEvent = (ev, overrides = {}) => {
     completed: isInstanceCompleted(ev),
     completedDates: [],
     ...(storedOutcome(ev) ? { outcome: storedOutcome(ev) } : {}),
+    ...storedCategoryFields(ev),
   };
 };
 const buildDetachedNoPhoneInstance = (block, overrides = {}) => {
@@ -186,7 +191,8 @@ const buildDetachedNoPhoneInstance = (block, overrides = {}) => {
 const defaultForm = (o = {}) => ({
   title: '', date: toDateKey(new Date()),
   startHour: 9, startMin: 0, endHour: 10, endMin: 0,
-  xpAmount: 20, recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [], ...o,
+  xpAmount: 20, recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [],
+  category: null, aiCategory: null, origTitle: '', color: '', ...o,
 });
 const defaultTmplForm = () => ({ title: '', duration: 60, xpAmount: 20, recurrence: 'none', recurrenceDays: [], color: '#38bdf8' });
 const defaultNoPhoneForm = (o = {}) => ({
@@ -214,6 +220,8 @@ export default function CalendarPage({
   onStartFocus,
   onCheckInBlock,
   planner,
+  categoryColors = {},
+  onSaveCategoryColors,
 }) {
   const [view, setView] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_calendarView');
@@ -250,6 +258,7 @@ export default function CalendarPage({
   const [noPhoneDeleteScope, setNoPhoneDeleteScope] = useState(null);
   const [logViewerDate, setLogViewerDate] = useState(null);
   const [checkInEv, setCheckInEv] = useState(null); // block whose "did you do it?" is open
+  const [catColorsDraft, setCatColorsDraft] = useState(null); // app-wide category colors being edited (null = closed)
   const [draggingTask, setDraggingTask] = useState(null); // task dragged from the tray
   const [hoverCard, setHoverCard] = useState(null); // { ev, rect } — detail card for a hovered time block
   const hoverTimerRef = useRef(null);
@@ -346,7 +355,7 @@ export default function CalendarPage({
   const openEdit = (ev) => {
     if (ev.recurrence !== 'none' && ev._isVirtual) { setEditScope({ show: true, ev }); return; }
     const normalizedEvent = normalizeEvent(ev);
-    setForm({ title: normalizedEvent.title, date: normalizedEvent.date, startHour: normalizedEvent.startHour, startMin: normalizedEvent.startMin, endHour: normalizedEvent.endHour, endMin: normalizedEvent.endMin, xpAmount: normalizedEvent.xpAmount, recurrence: normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes: normalizedEvent.notes || '', subEvents: cloneSubEvents(normalizedEvent.subEvents), bonusTasks: cloneBonusTasks(normalizedEvent.bonusTasks) });
+    setForm({ title: normalizedEvent.title, date: normalizedEvent.date, startHour: normalizedEvent.startHour, startMin: normalizedEvent.startMin, endHour: normalizedEvent.endHour, endMin: normalizedEvent.endMin, xpAmount: normalizedEvent.xpAmount, recurrence: normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes: normalizedEvent.notes || '', subEvents: cloneSubEvents(normalizedEvent.subEvents), bonusTasks: cloneBonusTasks(normalizedEvent.bonusTasks), ...categoryFormFields(normalizedEvent) });
     setEditingId(ev.id);
     setNewBonusTask(defaultBonusTaskForm());
     setModal('edit');
@@ -415,12 +424,12 @@ export default function CalendarPage({
     closeDayEventModal();
   };
 
-  const buildEventFromForm = (id) => ({
+  const buildEventFromForm = (id) => applyCategoryForm({
     id: id || Date.now(), title: form.title.trim(), date: form.date,
     startHour: form.startHour, startMin: form.startMin, endHour: form.endHour, endMin: form.endMin,
     xpAmount: Number(form.xpAmount)||20, recurrence: form.recurrence, recurrenceDays: form.recurrenceDays||[],
     notes: form.notes||'', subEvents: cloneSubEvents(form.subEvents||[]), bonusTasks: cloneBonusTasks(form.bonusTasks||[]), completed: false, completedDates: [],
-  });
+  }, form);
 
   const isFormValid = () => form.title.trim() && (form.endHour*60+form.endMin) > (form.startHour*60+form.startMin);
 
@@ -429,11 +438,11 @@ export default function CalendarPage({
   const updateEvent = (scope='all') => {
     if (!isFormValid()) return;
     if (scope === 'all') {
-      setCalendarEvents(prev=>prev.map(ev=>ev.id!==editingId?ev:{
+      setCalendarEvents(prev=>prev.map(ev=>ev.id!==editingId?ev:applyCategoryForm({
         ...ev, title:form.title.trim(), startHour:form.startHour, startMin:form.startMin,
         endHour:form.endHour, endMin:form.endMin, xpAmount:Number(form.xpAmount)||20,
         recurrence:form.recurrence, recurrenceDays:form.recurrenceDays||[], notes:form.notes||'', subEvents:cloneSubEvents(form.subEvents||[]), bonusTasks:cloneBonusTasks(form.bonusTasks||[]),
-      }));
+      }, form)));
     } else {
       setCalendarEvents(prev=>[
         ...prev.map(ev=>ev.id!==editingId?ev:{...ev,_exceptDates:[...(ev._exceptDates||[]),form.date]}),
@@ -452,7 +461,7 @@ export default function CalendarPage({
         ? { ...normalizedTask, completed: isBonusTaskCompleted(normalizedTask, ev), completedDates: [] }
         : normalizedTask;
     });
-    setForm({ title:normalizedEvent.title, date:ev._instanceDate, startHour:normalizedEvent.startHour, startMin:normalizedEvent.startMin, endHour:normalizedEvent.endHour, endMin:normalizedEvent.endMin, xpAmount:normalizedEvent.xpAmount, recurrence:normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes:normalizedEvent.notes||'', subEvents:cloneSubEvents(normalizedEvent.subEvents), bonusTasks:instanceBonusTasks });
+    setForm({ title:normalizedEvent.title, date:ev._instanceDate, startHour:normalizedEvent.startHour, startMin:normalizedEvent.startMin, endHour:normalizedEvent.endHour, endMin:normalizedEvent.endMin, xpAmount:normalizedEvent.xpAmount, recurrence:normalizedEvent.recurrence, recurrenceDays: normalizedEvent.recurrenceDays.length ? normalizedEvent.recurrenceDays : [weekdayOfDateKey(normalizedEvent.date)], notes:normalizedEvent.notes||'', subEvents:cloneSubEvents(normalizedEvent.subEvents), bonusTasks:instanceBonusTasks, ...categoryFormFields(normalizedEvent) });
     setEditingId(ev.id);
     setEditScope(null);
     setNewBonusTask(defaultBonusTaskForm());
@@ -1206,7 +1215,7 @@ export default function CalendarPage({
                   const height=Math.max(((endMin-startMin)/(24*60))*TOTAL_HEIGHT,18);
                   const left=`calc(${(ev.colIndex/ev.totalCols)*100}% + 2px)`;
                   const width=`calc(${(1/ev.totalCols)*100}% - 4px)`;
-                  const color=blockColor(ev);
+                  const color=blockColor(ev, categoryColors);
                   const done=isInstanceCompleted(ev);
                   // Missed/partly/skipped only from the day check-ins began; older blocks look as they did.
                   const rawStatus=getBlockStatus(ev, nowMs);
@@ -1366,7 +1375,7 @@ export default function CalendarPage({
                     const done=isInstanceCompleted(ev);
                     return (
                       <div key={`${ev.id}-${ei}`} className={`cal-month-chip ${done?'cal-month-chip--done':''}`}
-                        style={{'--chip-color':blockColor(ev)}}
+                        style={{'--chip-color':blockColor(ev, categoryColors)}}
                         onClick={(e)=>{e.stopPropagation();openEdit(ev);}}>
                         {ev.title}
                       </div>
@@ -1571,7 +1580,7 @@ export default function CalendarPage({
         key={`${ev.id}-${ev._instanceDate}`}
         ref={hoverCardRef}
         className="cal-hovercard"
-        style={{ '--ev-color': blockColor(ev) }}
+        style={{ '--ev-color': blockColor(ev, categoryColors) }}
         role="tooltip"
       >
         <div className="cal-hovercard-head">
@@ -1588,7 +1597,8 @@ export default function CalendarPage({
         </div>
 
         <div className="cal-hovercard-chips">
-          <span className="cal-hovercard-chip cal-hovercard-chip--kind">{BLOCK_KIND_LABELS[kind]}</span>
+          <span className="cal-hovercard-chip cal-hovercard-chip--kind">{categoryMeta(blockCategory(ev)).label}</span>
+          {kind !== 'event' && <span className="cal-hovercard-chip">{BLOCK_KIND_LABELS[kind]}</span>}
           <span className="cal-hovercard-chip cal-hovercard-chip--xp">+{totalXp} XP</span>
           {recurLabel && (
             <span className="cal-hovercard-chip"><Repeat size={9} strokeWidth={3} />{recurLabel}</span>
@@ -1640,6 +1650,33 @@ export default function CalendarPage({
   };
 
   // ─── Shared Modal Fields ─────────────────────────────────────────────────────
+  // Preset swatches plus "any color" through the native picker.
+  const renderSwatches = (value, onPick, label) => {
+    const isOther = Boolean(value) && !COLOR_SWATCHES.includes(value);
+    return (
+      <>
+        {COLOR_SWATCHES.map(c=>(
+          <button key={c} type="button" className={`cal-color-swatch ${value===c?'cal-color-swatch--active':''}`} style={{background:c}}
+            onClick={()=>onPick(c)} aria-label={`${label} ${c}`} aria-pressed={value===c} />
+        ))}
+        <label className={`cal-color-swatch cal-color-swatch--any ${isOther?'cal-color-swatch--active':''}`} style={isOther?{background:value}:undefined} title="Any color">
+          {!isOther && <Plus size={12} strokeWidth={3} />}
+          <input type="color" value={value || '#38bdf8'} onChange={e=>onPick(e.target.value)} aria-label={`${label}: any color`} />
+        </label>
+      </>
+    );
+  };
+
+  // ─── Category colors (app-wide) ──────────────────────────────────────────────
+  const openCatColors = () => setCatColorsDraft({ ...categoryColors });
+  const saveCatColors = () => {
+    // Only colors that differ from the default are stored.
+    const next = Object.fromEntries(Object.entries(catColorsDraft || {})
+      .filter(([id, c]) => c && c.toLowerCase() !== categoryMeta(id).color.toLowerCase()));
+    onSaveCategoryColors?.(next);
+    setCatColorsDraft(null);
+  };
+
   const renderRecurBtns = (val, set) => (
     <div className="cal-recur-row">
       {['none','daily','weekly'].map(r=>(
@@ -1706,6 +1743,11 @@ export default function CalendarPage({
               title={noPhoneMode ? 'Exit No Phone mode' : 'Drag on the grid to block out No Phone time'}
             >
               <PhoneOff size={13} strokeWidth={2.5} /> No Phone
+            </button>
+          )}
+          {onSaveCategoryColors && (
+            <button className="cal-nav-btn cal-colors-btn" onClick={openCatColors} title="Category colors" aria-label="Category colors">
+              <Palette size={14} strokeWidth={2.5} />
             </button>
           )}
           <button className="cal-nav-btn" onClick={()=>navigate(-1)}>&#8249;</button>
@@ -1776,6 +1818,52 @@ export default function CalendarPage({
                 <label className="cal-label">Title</label>
                 <input className="cal-input" placeholder="Time block title…" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} autoFocus />
               </div>
+              {(() => {
+                // Auto = the AI's earlier pick (title unchanged) or a keyword match; with
+                // neither, the block shows as Other until App's background sort answers.
+                const auto = autoCategoryForForm(form);
+                const effective = form.category || auto || 'other';
+                return (
+                  <>
+                    <div className="cal-field">
+                      <div className="cal-label-row">
+                        <label className="cal-label">Category</label>
+                        {onSaveCategoryColors && <button type="button" className="cal-link-btn" onClick={openCatColors}>Edit category colors</button>}
+                      </div>
+                      <div className="cal-cat-row" role="radiogroup" aria-label="Category">
+                        <button type="button" role="radio" aria-checked={!form.category}
+                          className={`cal-cat-chip ${!form.category?'cal-cat-chip--active':''}`}
+                          style={{'--cat-color': auto ? categoryColor(auto, categoryColors) : 'var(--text-tertiary)'}}
+                          onClick={()=>setForm(f=>({...f,category:null}))}>
+                          <Sparkles size={10} strokeWidth={2.5} />Auto{auto ? ` · ${categoryMeta(auto).label}` : ''}
+                        </button>
+                        {BLOCK_CATEGORIES.map(c=>(
+                          <button key={c.id} type="button" role="radio" aria-checked={form.category===c.id}
+                            className={`cal-cat-chip ${form.category===c.id?'cal-cat-chip--active':''}`}
+                            style={{'--cat-color': categoryColor(c.id, categoryColors)}}
+                            onClick={()=>setForm(f=>({...f,category:c.id}))}>
+                            <span className="cal-cat-dot" />{c.label}
+                          </button>
+                        ))}
+                      </div>
+                      {!form.category && !auto && form.title.trim() && (
+                        <p className="cal-field-hint">No keyword match, so My Assistant will sort it after you save.</p>
+                      )}
+                    </div>
+                    <div className="cal-field">
+                      <label className="cal-label">Color</label>
+                      <div className="cal-color-row">
+                        <button type="button" className={`cal-color-default ${!form.color?'cal-color-default--active':''}`}
+                          style={{'--cat-color': categoryColor(effective, categoryColors)}}
+                          onClick={()=>setForm(f=>({...f,color:''}))} aria-pressed={!form.color}>
+                          <span className="cal-cat-dot" />Category color
+                        </button>
+                        {renderSwatches(form.color, c=>setForm(f=>({...f,color:c})), 'Block color')}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
               <div className="cal-field">
                 <label className="cal-label">Date</label>
                 <input className="cal-input" type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
@@ -1893,6 +1981,42 @@ export default function CalendarPage({
               <button className="cal-btn cal-btn--primary" disabled={!isFormValid()} onClick={modal==='create'?saveEvent:()=>updateEvent('all')}>
                 {modal==='create'?'Add Time Block':'Save Changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Category Colors Modal (opens over the block editor too) ── */}
+      {catColorsDraft && (
+        <div className="cal-modal-overlay" onClick={()=>setCatColorsDraft(null)}>
+          <div className="cal-modal" onClick={e=>e.stopPropagation()} role="dialog" aria-label="Category colors">
+            <div className="cal-modal-header">
+              <h3>Category colors</h3>
+              <button className="cal-modal-close" onClick={()=>setCatColorsDraft(null)} aria-label="Close"><X size={14} /></button>
+            </div>
+            <div className="cal-modal-body">
+              <p className="cal-field-hint">Every block in a category uses its color, unless you gave that block its own.</p>
+              {BLOCK_CATEGORIES.map(c=>{
+                const value = categoryColor(c.id, catColorsDraft);
+                const changed = value.toLowerCase() !== c.color.toLowerCase();
+                return (
+                  <div key={c.id} className="cal-catcolor-row" style={{'--cat-color': value}}>
+                    <div className="cal-catcolor-head">
+                      <span className="cal-cat-dot" />
+                      <span className="cal-catcolor-name">{c.label}</span>
+                      <span className="cal-catcolor-hint">{c.hint}</span>
+                      {changed && <button type="button" className="cal-link-btn" onClick={()=>setCatColorsDraft(d=>({...d,[c.id]:null}))}>Reset</button>}
+                    </div>
+                    <div className="cal-color-row cal-color-row--sm">
+                      {renderSwatches(value, col=>setCatColorsDraft(d=>({...d,[c.id]:col})), `${c.label} color`)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="cal-modal-footer">
+              <button className="cal-btn cal-btn--ghost" onClick={()=>setCatColorsDraft(null)}>Cancel</button>
+              <button className="cal-btn cal-btn--primary" onClick={saveCatColors}>Save colors</button>
             </div>
           </div>
         </div>

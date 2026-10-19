@@ -23,6 +23,7 @@ import {
 import { getHabitStreak } from './habitUtils';
 import { getGoalProgress, getGoalActivity, getGoalStatus, getGoalPace, paceLabel, daysLeft, makeGoal } from './goalUtils';
 import { ACHIEVEMENTS } from './achievementsMeta';
+import { CATEGORY_IDS, CATEGORY_GUIDE, aiCategoryFields } from './blockCategories';
 import { carriedDays, isTop } from './taskUtils';
 
 // How the user said a block went, when it wasn't simply done ("partly", "skipped: Distracted").
@@ -529,6 +530,7 @@ const AUTO_TOOLS = [
       recurrence: E(VALID_RECURRENCE, 'Default none.'),
       recurrenceDays: WEEKDAYS,
       notes: S('Optional notes shown on hover.'),
+      category: E(CATEGORY_IDS, `What area of life the block is; it sets the block's color. ${CATEGORY_GUIDE}.`),
     }, ['title', 'date', 'startTime', 'endTime']),
     prepare: (args) => {
       const title = toTrimmedString(args?.title);
@@ -551,6 +553,7 @@ const AUTO_TOOLS = [
         bonusTasks: [],
         completed: false,
         completedDates: [],
+        ...aiCategoryFields(args?.category),
       };
       const repeat = recurrence === 'none' ? '' : `, repeats ${recurrence}`;
       return {

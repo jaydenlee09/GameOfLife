@@ -11,6 +11,7 @@ import { getGoalProgress, getActiveGoals, getGoalActivity, getNextStep, daysLeft
 import { getHabitStreak } from './habitUtils';
 import { shiftDateKey } from './scoreUtils';
 import { computeFocusInsights, describeBestWindows } from './focusInsights';
+import { CATEGORY_IDS, CATEGORY_GUIDE, isCategoryId, aiCategoryFields } from './blockCategories';
 
 // ─── Settings (stored as user.planner) ───────────────────────────────────────
 export const DEFAULT_PLANNER_SETTINGS = { configured: false, wake: '07:00', bed: '23:00', busy: [] };
@@ -218,9 +219,10 @@ export const PLAN_SCHEMA = {
           habitId: STR('For kind=habit: the habit id. Omit otherwise.'),
           intent: STR('What "done" looks like at the end of this block, as one concrete sentence they can check. Empty for breaks.'),
           reason: STR('Why this slot, under 15 words.'),
+          category: { type: 'STRING', enum: CATEGORY_IDS, description: `Area of life the block belongs to (sets its color). ${CATEGORY_GUIDE}. Use rest for breaks.` },
         },
         required: ['kind', 'title', 'start', 'end'],
-        propertyOrdering: ['kind', 'title', 'start', 'end', 'taskId', 'goalId', 'habitId', 'intent', 'reason'],
+        propertyOrdering: ['kind', 'title', 'start', 'end', 'taskId', 'goalId', 'habitId', 'intent', 'reason', 'category'],
       },
     },
     unscheduled: {
@@ -305,6 +307,7 @@ export const normalizePlan = (raw, { gaps, tasks = [], goals = [], habits = [] }
       ...(habit ? { habitId: habit.id } : {}),
       intent: kind === 'break' ? '' : text(b.intent, 200),
       reason: text(b.reason, 120),
+      ...(isCategoryId(b.category) ? { category: b.category } : {}),
     });
   });
 
@@ -360,6 +363,7 @@ export const planToEvents = (blocks, { dateKey, planId, makeId = () => Date.now(
       bonusTasks: [],
       completed: false,
       completedDates: [],
+      ...aiCategoryFields(b.category),
       plan: {
         id: planId,
         kind: b.kind,

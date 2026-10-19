@@ -4,6 +4,7 @@ import { generateLogReview, upsertReview, reviewToChatText } from '../utils/logR
 import { getTool, applySliceOp, undoBlocker } from '../utils/assistantTools';
 import { generateDayPlan, planToEvents, fromMinutes } from '../utils/dayPlanner';
 import { generateHomeBrief } from '../utils/homeBrief';
+import { sortTitlesIntoCategories } from '../utils/blockCategories';
 import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
 import { generateLessonInsight } from '../utils/lessonInsight';
@@ -290,10 +291,12 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
   const suggestNextStep = useCallback((goal) => coach(generateNextStep, { goal }, 'step'), [coach]);
   const getUnstuck = useCallback((goal) => coach(generateUnstuck, { goal }, 'unstuck'), [coach]);
   const recalibrateGoals = useCallback(() => coach(generateRecalibration, {}, 'recalibration'), [coach]);
+  // Calendar: sorts block titles no keyword matched into categories ({ [title]: id }).
+  const sortBlockCategories = useCallback((titles) => coach(sortTitlesIntoCategories, { titles }, 'categories'), [coach]);
 
   return {
     send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson,
-    draftGoal, suggestNextStep, getUnstuck, recalibrateGoals,
+    draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, sortBlockCategories,
     isLoading, error, clearError: () => setError(null),
   };
 }

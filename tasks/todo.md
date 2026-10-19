@@ -1,5 +1,37 @@
 # Todo
 
+## Done, uncommitted (2026-10-18): time blocks colored by category (auto + override)
+
+Problem (user): AI should pick a block's color from the category it fits (school/study/homework
+→ Academic), and the user can change it.
+
+User choices: fixed 9 categories (Academic, Work, Fitness, Health, Social, Chores, Creative,
+Rest & fun, Other) · keywords first, Gemini only when no keyword matches; Assistant + Plan My
+Day blocks get a category from the AI directly · per-block override = category chips + custom
+color · category colors editable app-wide.
+
+Design:
+- [x] `utils/blockCategories.js`: categories + keyword lists, guessCategory(title),
+      blockCategory(ev) = ev.category || keyword || 'other', blockColor(ev, categoryColors)
+      = ev.color || category color; batched Gemini classify (schema + normalizer).
+      Replaces color-by-type (kind still shown in the hover card).
+- [x] Stored fields on a block: `category` + `categoryBy` ('user'|'ai'), `color` (custom hex).
+      Keyword matches are never stored (derived at render). Old blocks: no migration.
+- [x] App.jsx: background effect sends uncategorized, keyword-less titles to Gemini in one
+      batch, writes category (incl. 'other') so it is never re-asked; per-session attempted set,
+      retry after 1h on failure. `user.categoryColors` holds per-category color overrides.
+- [x] Block editor: Category chips (Auto · <guess> + 9) and Color row (Category default,
+      swatches, any color); title edit drops a non-user category so it re-derives.
+- [x] Category colors modal: palette button in the Calendar header (phone too) + "Edit category colors" link in the editor. (Sidebar was too full for a list.)
+- [x] Blocks get a light category tint; hover card shows the category.
+- [x] create_calendar_event tool + Plan My Day schema gain an optional `category` enum.
+- [x] Verify: node checks for guess/normalize, lint, build, browser test of editor/modal/colors.
+- Verified: node checks (36 keyword cases, editor save rules, plan/tool category), lint 0 errors
+  (27 old warnings), build, browser harness (stubbed auth + fake Gemini): grid colors per category,
+  one batched AI call for keyword-less titles saved as categoryBy 'ai', rename → Auto re-guesses,
+  user pick + custom color saved, category recolor saved to user.categoryColors, phone 375px fits.
+
+
 ## Done, uncommitted (2026-10-18): AI goal coach + accountability
 
 Problem (user): making one goal takes a lot of thinking and calibration; wants AI in the process,

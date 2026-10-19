@@ -36,6 +36,7 @@ import { pruneDoneTasks } from './utils/taskUtils'
 import { ALT_PAGE_KEYS, IS_MAC, shortcutKeyOf } from './utils/navUtils'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
 import { normalizeGoal } from './utils/goalUtils'
+import { needsAiCategory, aiCategoryFields, MAX_SORT_TITLES } from './utils/blockCategories'
 
 // Every page renderPage() knows, for validating notification deep links.
 const PAGE_IDS = ['welcome', 'statistics', 'tasks', 'daily-log', 'timer', 'calendar', 'goals', 'review', 'shop', 'brain-dump'];
@@ -961,6 +962,39 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncSettled, clockTick]);
 
+  // Time-block categories: titles no keyword matches go to Gemini in one batch, and
+  // the answer is stored on the block (even "other") so no device asks again. Each
+  // title is asked once per session; a failed call waits an hour before retrying.
+  const { sortBlockCategories } = assistant;
+  const categorySortBusy = useRef(false);
+  const categorySortAsked = useRef(new Set());
+  const categorySortFailedAt = useRef(0);
+  useEffect(() => {
+    if (!syncSettled || !hasAssistantApiKey() || categorySortBusy.current) return;
+    if (Date.now() - categorySortFailedAt.current < 60 * 60 * 1000) return;
+    const titles = [...new Set(calendarEvents.filter(needsAiCategory).map(ev => ev.title.trim()))]
+      .filter(t => !categorySortAsked.current.has(t))
+      .slice(0, MAX_SORT_TITLES);
+    if (!titles.length) return;
+    // Short wait so a burst of edits (drag, duplicate, undo) becomes one call.
+    const timer = setTimeout(async () => {
+      categorySortBusy.current = true;
+      titles.forEach(t => categorySortAsked.current.add(t));
+      const result = await sortBlockCategories(titles);
+      categorySortBusy.current = false;
+      if (!result.ok) {
+        titles.forEach(t => categorySortAsked.current.delete(t));
+        categorySortFailedAt.current = Date.now();
+        return;
+      }
+      setCalendarEvents(prev => prev.map(ev => {
+        const category = needsAiCategory(ev) ? result.categories[ev.title.trim()] : null;
+        return category ? { ...ev, ...aiCategoryFields(category) } : ev;
+      }));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [syncSettled, calendarEvents, sortBlockCategories]);
+
   // Home's one-line brief: made once per day (after 4am) the first time Home is open,
   // saved on the user so every device shows the same line. Failures retry after an hour.
   const [briefLoading, setBriefLoading] = useState(false);
@@ -1161,6 +1195,8 @@ function App() {
             onStartFocus={startFocusFromBlock}
             onCheckInBlock={checkInBlockInstance}
             planner={user.planner}
+            categoryColors={user.categoryColors}
+            onSaveCategoryColors={(categoryColors) => setUser(prev => ({ ...prev, categoryColors }))}
           />
         );
       case 'goals':
