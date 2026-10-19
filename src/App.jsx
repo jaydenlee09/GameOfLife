@@ -1246,6 +1246,8 @@ function App() {
             planner={user.planner}
             categoryColors={user.categoryColors}
             onSaveCategoryColors={(categoryColors) => setUser(prev => ({ ...prev, categoryColors }))}
+            goals={goals}
+            onNavigate={handleNavigate}
           />
         );
       case 'goals':

@@ -304,13 +304,26 @@ export const migrateLegacyTomorrow = (todos, today = getLocalDateKey(0)) => {
 };
 
 /**
- * Today's open tasks that don't have a time block yet (today or in the week ahead,
- * so one dragged onto tomorrow counts as placed), for the Calendar's tray: the
- * Top 3 first, then the rest of today's queue (carried, then today's).
+ * This week's open tasks that don't have a time block yet (today or in the week
+ * ahead, so one dragged onto tomorrow counts as placed), for the Calendar's tray:
+ * `top` + `rest` are today's queue (Top 3, then carried and today's); `upcoming` is
+ * the next six days as [{ dateKey, tasks }], each day-task on its own day and a
+ * week/month/year task on its due date.
  */
 export const getUnscheduledTasks = (todos, calendarEvents, today = getLocalDateKey(0)) => {
-  const planned = plannedTaskIds(calendarEvents, Array.from({ length: 7 }, (_, i) => shiftDateKey(today, i)));
+  const week = Array.from({ length: 7 }, (_, i) => shiftDateKey(today, i));
+  const planned = plannedTaskIds(calendarEvents, week);
   const open = (t) => !planned.has(String(t.id));
   const b = bucketTasks(todos || [], today);
-  return { top: b.top.filter(open), rest: [...b.carried, ...b.today].filter(open) };
+  const later = Object.values(b.later).flat();
+  const upcoming = week.slice(1)
+    .map((dateKey) => ({
+      dateKey,
+      tasks: [
+        ...b.upcoming.filter((t) => upcomingKey(t) === dateKey),
+        ...later.filter((t) => t.dueDate === dateKey),
+      ].filter(open),
+    }))
+    .filter((day) => day.tasks.length);
+  return { top: b.top.filter(open), rest: [...b.carried, ...b.today].filter(open), upcoming };
 };

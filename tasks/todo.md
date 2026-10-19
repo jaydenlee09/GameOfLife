@@ -1,5 +1,32 @@
 # Todo
 
+## Done, uncommitted (2026-10-19): Calendar sidebar, ideas 1-4
+
+Problem (user): make the Calendar page's sidebar better and more helpful.
+User choices: ideas 1-4; Schedule puts a later task on its own day; goal deadlines 14 days ahead + overdue.
+
+- [x] 1. One task list: "Needs a time slot" covers this week (Today / Tomorrow / weekday groups).
+      Every row drags + has Schedule (first free hour on the task's own day). Read-only "Tasks"
+      section removed. Later-timeframe tasks with a due date this week land on the due day.
+      taskUtils.getUnscheduledTasks gains `upcoming` [{ dateKey, tasks }]; phone row stays today-only.
+- [x] 2. "Time left today" card at the top: free time before bedtime (planner hours via
+      computeFreeGaps), booked vs free bar, next free gap.
+- [x] 3. Quick blocks: one-tap "next free slot" button. One-off template → placed directly,
+      same block drag+Save would make. Recurring template → create form opens prefilled at that
+      slot (a series shouldn't start silently).
+- [x] 4. Coming up: friendly dates ("Tomorrow 3 PM", "Thu", "Oct 30"), plus goal deadlines
+      (next 14 days + overdue, not done); a goal row opens Goals. Needs `goals` + `onNavigate` props.
+- [x] Verify: node checks on new helpers, lint (non-empty before/after), build, browser harness
+      with heavy data (sidebar overflow, ellipsis, min-width:0), click-test each button.
+- Verified: node checks (getTimeLeft now/next/ended/full, findFreeSlot today/other day/none,
+  getUnscheduledTasks week groups + planned/done/8-days-out excluded, getComingUp order, labels,
+  14-day edge, overdue, completed/no-deadline excluded, raw time kept), lint 0 errors (App's 27
+  warnings unchanged), build, scratchpad harness mounting the real CalendarPage at 1280x800 + heavy
+  data: tomorrow Schedule → Tue 7:00 AM block, one-off template → 4:00 PM (skipped a 45-min gap),
+  repeating template → form at 5:30 PM, goal row → Goals, reminder row → edit form with its time,
+  no horizontal overflow, 16/16 long titles ellipsized; phone tray still today-only.
+- Bug caught in browser: reminder rows lost their raw `time`, so the edit form opened blank. Fixed.
+
 ## Done, uncommitted (2026-10-18): stop wasting Gemini requests
 
 Problem (user): hit "free-tier rate limit"; asked whether AI usage is wasted anywhere.

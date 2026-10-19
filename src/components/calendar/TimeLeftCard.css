@@ -1,0 +1,22 @@
+/* ─── Calendar sidebar: Time left today ─────────────────────────────────────── */
+.ctl {
+  display: flex; flex-direction: column; gap: 5px; padding: 9px 10px; flex-shrink: 0;
+  border-radius: var(--radius-md); border: 1px solid var(--separator); background: var(--bg-elevated-2);
+}
+.ctl svg { stroke: currentColor; fill: none; flex-shrink: 0; }
+.ctl-head { display: flex; align-items: center; gap: 5px; color: var(--text-tertiary); }
+.ctl-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.ctl-big { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.ctl-big-unit { font-size: 0.68rem; font-weight: 500; color: var(--text-secondary); }
+.ctl-bar {
+  position: relative; height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--accent-wash); border: 1px solid rgba(56,189,248,0.25);
+}
+.ctl-bar-booked {
+  position: absolute; inset: 0 auto 0 0; background: var(--text-tertiary); border-radius: 999px 0 0 999px;
+  transition: width var(--duration) var(--ease);
+}
+.ctl-sub { margin: 0; display: flex; align-items: center; gap: 5px; font-size: 0.66rem; color: var(--text-tertiary); }
+.ctl-booked-key { width: 7px; height: 7px; border-radius: 50%; background: var(--text-tertiary); flex-shrink: 0; }
+.ctl-next { margin: 0; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); }
+.ctl-next--now { color: var(--accent); }

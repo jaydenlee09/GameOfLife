@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles, Palette } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles, Palette, CalendarPlus, Target } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
@@ -14,9 +14,11 @@ import {
   BLOCK_CATEGORIES, COLOR_SWATCHES, blockColor, blockCategory, categoryColor, categoryMeta,
   storedCategoryFields, categoryFormFields, autoCategoryForForm, applyCategoryForm,
 } from '../utils/blockCategories';
-import { computeFreeGaps } from '../utils/dayPlanner';
+import { findFreeSlot, getComingUp } from '../utils/calendarSidebar';
+import { dayLabel } from '../utils/taskUtils';
 import TodayStrip from './calendar/TodayStrip';
 import TaskTray from './calendar/TaskTray';
+import TimeLeftCard from './calendar/TimeLeftCard';
 import BlockCheckIn from './calendar/BlockCheckIn';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -52,12 +54,6 @@ const fmtDuration = (mins) => {
   if (h && m) return `${h}h ${m}m`;
   if (h) return `${h}h`;
   return `${m}m`;
-};
-const daysUntil = (targetMs, nowMs) => {
-  if (!targetMs || !nowMs) return null;
-  const diff = targetMs - nowMs;
-  if (diff <= 0) return 0;
-  return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
 };
 const weekdayOfDateKey = (dateKey) => new Date(dateKey + 'T00:00:00').getDay();
 const getMondayOfWeek = (date) => {
@@ -222,6 +218,8 @@ export default function CalendarPage({
   planner,
   categoryColors = {},
   onSaveCategoryColors,
+  goals = [],
+  onNavigate,
 }) {
   const [view, setView] = useState(() => {
     const saved = localStorage.getItem('gameOfLife_calendarView');
@@ -239,7 +237,7 @@ export default function CalendarPage({
   const [deleteScope, setDeleteScope] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [upcomingMinimized, setUpcomingMinimized] = useState(false);
-  const [tasksMinimized, setTasksMinimized] = useState(false);
+  const [tmplNote, setTmplNote] = useState(null); // { ok, text } after a one-tap quick block
   const [nextEventMinimized, setNextEventMinimized] = useState(false);
   const [tmplModal, setTmplModal] = useState(null);
   const [tmplForm, setTmplForm] = useState(defaultTmplForm());
@@ -626,13 +624,43 @@ export default function CalendarPage({
 
   // ─── Tray: tasks into time blocks ────────────────────────────────────────────
   // Schedule = the first free hour left today, inside the usual day set in the planner.
-  const scheduleTask = (task) => {
-    const { gaps } = computeFreeGaps({ dateKey: todayKey, settings: planner, now: new Date(), calendarEvents });
-    const gap = gaps.find((g) => g.end - g.start >= TASK_BLOCK_MINS);
-    if (!gap) return { ok: false, text: 'No free hour left today. Make room on the grid, or plan it for tomorrow.' };
-    const block = taskToBlock(task, todayKey, gap.start);
+  // Tray "Schedule": the first free hour on the task's own day (today unless it's set for later).
+  const scheduleTask = (task, dateKey = todayKey) => {
+    const start = findFreeSlot({ dateKey, minutes: TASK_BLOCK_MINS, planner, calendarEvents });
+    const day = dateKey === todayKey ? null : dayLabel(dateKey, todayKey);
+    if (start == null) {
+      return { ok: false, text: day
+        ? `No free hour left on ${day}. Drag it onto the grid instead.`
+        : 'No free hour left today. Make room on the grid, or plan it for tomorrow.' };
+    }
+    const block = taskToBlock(task, dateKey, start);
     setCalendarEvents((prev) => [...prev, block]);
-    return { ok: true, text: `Scheduled for ${fmtTime(block.startHour, block.startMin)}.` };
+    return { ok: true, text: `Scheduled for ${day ? `${day}, ` : ''}${fmtTime(block.startHour, block.startMin)}.` };
+  };
+
+  // Quick block one-tap: today's first free slot that fits. A one-off template becomes
+  // the same block drag + Save would make; a repeating one opens the form at that slot,
+  // so a series never starts without you seeing it.
+  useEffect(() => {
+    if (!tmplNote) return undefined;
+    const id = setTimeout(() => setTmplNote(null), 4000);
+    return () => clearTimeout(id);
+  }, [tmplNote]);
+
+  const placeTemplate = (tmpl) => {
+    const minutes = Math.max(15, Number(tmpl.duration) || 60);
+    const start = findFreeSlot({ dateKey: todayKey, minutes, planner, calendarEvents });
+    if (start == null) { setTmplNote({ ok: false, text: `No free ${fmtDuration(minutes)} left today. Drag it onto another day.` }); return; }
+    if (tmpl.recurrence && tmpl.recurrence !== 'none') { openCreate(todayKey, start / 15, tmpl); return; }
+    const end = Math.min(start + minutes, 24 * 60 - 1);
+    setCalendarEvents((prev) => [...prev, {
+      id: Date.now(), title: (tmpl.title || 'Block').trim(), date: todayKey,
+      startHour: Math.floor(start / 60), startMin: start % 60,
+      endHour: Math.floor(end / 60), endMin: end % 60,
+      xpAmount: Number(tmpl.xpAmount) || 20, recurrence: 'none', recurrenceDays: [],
+      notes: '', subEvents: [], bonusTasks: [], completed: false, completedDates: [],
+    }]);
+    setTmplNote({ ok: true, text: `${tmpl.title} placed at ${fmtTime(Math.floor(start / 60), start % 60)}.` });
   };
 
   const setBonusTaskCompletion = (ev, task, shouldBeCompleted) => {
@@ -984,28 +1012,7 @@ export default function CalendarPage({
   for (const dk of activeDateKeys) noPhoneByDate[dk] = [];
   for (const block of expandedNoPhone) { if (noPhoneByDate[block._instanceDate]!==undefined) noPhoneByDate[block._instanceDate].push(block); }
 
-  const upcomingDayEvents = (() => {
-    const entries = [];
-    const obj = calendarDayEvents && typeof calendarDayEvents === 'object' ? calendarDayEvents : {};
-    for (const [dateKey, items] of Object.entries(obj)) {
-      if (!Array.isArray(items)) continue;
-      for (const item of items) {
-        const targetMs = buildDayEventTargetMs(dateKey, item?.time);
-        if (!targetMs) continue;
-        if (targetMs < nowMs) continue;
-        entries.push({
-          dateKey,
-          id: item?.id,
-          title: item?.title || 'Untitled',
-          time: item?.time || null,
-          color: item?.color || '#38bdf8',
-          targetMs,
-        });
-      }
-    }
-    entries.sort((a, b) => a.targetMs - b.targetMs);
-    return entries.slice(0, 6);
-  })();
+  const comingUp = getComingUp({ dayEvents: calendarDayEvents, goals, now: new Date(nowMs) });
 
   const todosByDate = (() => {
     const map = {};
@@ -1017,16 +1024,6 @@ export default function CalendarPage({
       map[dk].push(todo);
     }
     return map;
-  })();
-
-  const upcomingTodos = (() => {
-    const entries = [];
-    for (const [dk, tasks] of Object.entries(todosByDate)) {
-      if (dk < todayKey) continue;
-      for (const task of tasks) entries.push({ ...task, _dateKey: dk });
-    }
-    entries.sort((a, b) => a._dateKey.localeCompare(b._dateKey));
-    return entries.slice(0, 8);
   })();
 
   // ─── Time Grid (Day / Week) ──────────────────────────────────────────────────
@@ -1419,10 +1416,14 @@ export default function CalendarPage({
       <div className={`cal-sidebar ${sidebarOpen?'cal-sidebar--open':'cal-sidebar--closed'}`}>
       {sidebarOpen&&(
         <div className="cal-sidebar-content">
+          <TimeLeftCard planner={planner} calendarEvents={calendarEvents} nowMs={nowMs} />
+
+          <div className="cal-sidebar-divider" />
+
           <div className="cal-sidebar-header">
             <span className="cal-sidebar-title">Needs a time slot</span>
           </div>
-          <p className="cal-sidebar-hint">Today&rsquo;s tasks with no block yet</p>
+          <p className="cal-sidebar-hint">This week&rsquo;s tasks with no block yet</p>
           <TaskTray
             todos={todos}
             calendarEvents={calendarEvents}
@@ -1440,7 +1441,7 @@ export default function CalendarPage({
               <Plus size={14} strokeWidth={3} />
             </button>
           </div>
-          <p className="cal-sidebar-hint">Drag onto the calendar to place</p>
+          <p className="cal-sidebar-hint">Drag onto the calendar, or tap <CalendarPlus size={11} className="cal-sidebar-hint-icon" aria-label="place" /> for today&rsquo;s next free slot</p>
           <div className="cal-sidebar-list">
             {quickEvents.map(tmpl=>(
               <div key={tmpl.id} className="cal-tmpl-card" style={{'--tmpl-color':tmpl.color||'#38bdf8'}}
@@ -1452,6 +1453,9 @@ export default function CalendarPage({
                     {tmpl.recurrence!=='none'&&<span className="cal-tmpl-recur">{tmpl.recurrence==='weekly'&&tmpl.recurrenceDays?.length?tmpl.recurrenceDays.map(d=>WEEKDAY_LABELS[d]).join(' '):tmpl.recurrence}</span>}
                   </div>
                 </div>
+                <button className="cal-tmpl-place" onClick={()=>placeTemplate(tmpl)} title="Place in today's next free slot" aria-label={`Place ${tmpl.title} in today's next free slot`}>
+                  <CalendarPlus size={13} strokeWidth={2.6} />
+                </button>
                 <div className="cal-tmpl-actions">
                   <button className="cal-tmpl-btn" onClick={()=>openTmplEdit(tmpl)} title="Edit" aria-label="Edit template">
                     <Pencil size={13} strokeWidth={3} />
@@ -1464,84 +1468,47 @@ export default function CalendarPage({
             ))}
             {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click the + button to add one.</p>}
           </div>
+          {tmplNote && <p className={`cal-sidebar-note${tmplNote.ok ? '' : ' cal-sidebar-note--warn'}`} role="status">{tmplNote.text}</p>}
 
           <div className="cal-sidebar-divider" />
 
           <div className="cal-sidebar-header">
-            <span className="cal-sidebar-title">Upcoming Events</span>
+            <span className="cal-sidebar-title">Coming up</span>
             <button
               className="cal-sidebar-minimize-btn"
               onClick={() => setUpcomingMinimized(m => !m)}
               title={upcomingMinimized ? 'Expand' : 'Minimize'}
-              aria-label={upcomingMinimized ? 'Expand upcoming events' : 'Minimize upcoming events'}
+              aria-label={upcomingMinimized ? 'Expand coming up' : 'Minimize coming up'}
             >
               {upcomingMinimized ? <ChevronRight size={12} strokeWidth={3} /> : <ChevronLeft size={12} strokeWidth={3} style={{ transform: 'rotate(-90deg)' }} />}
             </button>
           </div>
-          {!upcomingMinimized && <p className="cal-sidebar-hint">Deadlines & reminders</p>}
+          {!upcomingMinimized && <p className="cal-sidebar-hint">Reminders, deadlines &amp; goals</p>}
           {!upcomingMinimized && (
             <div className="cal-sidebar-list cal-sidebar-list--events">
-              {upcomingDayEvents.map((evt) => {
-                const d = daysUntil(evt.targetMs, nowMs);
-                const meta = d === 0 ? 'Today' : `${d}d`;
+              {comingUp.map((item) => {
+                const isGoal = item.kind === 'goal';
                 return (
                   <button
-                    key={`${evt.dateKey}-${evt.id}`}
+                    key={item.key}
                     type="button"
-                    className="cal-upcoming-item"
-                    style={{ '--up-color': evt.color }}
-                    onClick={() => openDayEventEdit(evt.dateKey, evt)}
-                    title="Edit event"
+                    className={`cal-upcoming-item${isGoal ? ' cal-upcoming-item--goal' : ''}`}
+                    style={isGoal ? undefined : { '--up-color': item.color }}
+                    onClick={() => (isGoal ? onNavigate?.('goals') : openDayEventEdit(item.dateKey, item))}
+                    disabled={isGoal && !onNavigate}
+                    title={isGoal ? 'Open Goals' : 'Edit event'}
                   >
-                    <span className="cal-upcoming-dot" />
+                    {isGoal ? <Target size={11} strokeWidth={2.6} className="cal-upcoming-goal-icon" aria-label="Goal" /> : <span className="cal-upcoming-dot" />}
                     <span className="cal-upcoming-main">
-                      <span className="cal-upcoming-title">{evt.title}</span>
-                      <span className="cal-upcoming-sub">{evt.dateKey}{evt.time ? ` • ${evt.time}` : ''}</span>
+                      <span className="cal-upcoming-title">{item.title}</span>
+                      <span className="cal-upcoming-sub">{item.when}</span>
                     </span>
-                    <span className="cal-upcoming-meta">{meta}</span>
+                    <span className={`cal-upcoming-meta${item.tone ? ` cal-upcoming-meta--${item.tone}` : ''}`}>{item.meta}</span>
                   </button>
                 );
               })}
-              {upcomingDayEvents.length === 0 && (
-                <p className="cal-sidebar-empty">No upcoming events.</p>
-              )}
-            </div>
-          )}
-
-          <div className="cal-sidebar-divider" />
-
-          <div className="cal-sidebar-header">
-            <span className="cal-sidebar-title">Tasks</span>
-            <button
-              className="cal-sidebar-minimize-btn"
-              onClick={() => setTasksMinimized(m => !m)}
-              title={tasksMinimized ? 'Expand' : 'Minimize'}
-              aria-label={tasksMinimized ? 'Expand tasks' : 'Minimize tasks'}
-            >
-              {tasksMinimized ? <ChevronRight size={12} strokeWidth={3} /> : <ChevronLeft size={12} strokeWidth={3} style={{ transform: 'rotate(-90deg)' }} />}
-            </button>
-          </div>
-          {!tasksMinimized && <p className="cal-sidebar-hint">Scheduled &amp; due soon</p>}
-          {!tasksMinimized && (
-            <div className="cal-sidebar-list cal-sidebar-list--tasks">
-              {upcomingTodos.map((task) => {
-                const color = BLOCK_KIND_COLORS.task;
-                const dk = task._dateKey;
-                const d = daysUntil(buildDayEventTargetMs(dk, null), nowMs);
-                const meta = d === 0 ? 'Today' : `${d}d`;
-                return (
-                  <div key={task.id} className="cal-task-sidebar-item" style={{ '--task-color': color }}>
-                    <span className="cal-task-sidebar-dot" />
-                    <span className="cal-task-sidebar-main">
-                      <span className="cal-task-sidebar-title">{task.text}</span>
-                      <span className="cal-task-sidebar-sub">{dk}</span>
-                    </span>
-                    <span className="cal-task-sidebar-meta">{meta}</span>
-                  </div>
-                );
-              })}
-              {upcomingTodos.length === 0 && (
-                <p className="cal-sidebar-empty">No tasks scheduled.</p>
+              {comingUp.length === 0 && (
+                <p className="cal-sidebar-empty">Nothing coming up.</p>
               )}
             </div>
           )}

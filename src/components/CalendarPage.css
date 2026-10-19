@@ -102,7 +102,14 @@
 
 .cal-sidebar-toggle svg { display: block; }
 
-.cal-sidebar-content { display: flex; flex-direction: column; flex: 1; padding: 10px 10px 10px; padding-top: 40px; min-height: 0; overflow: hidden; }
+.cal-sidebar-content {
+  display: flex; flex-direction: column; flex: 1; padding: 4px 10px 16px; margin-top: 36px; min-height: 0; min-width: 0;
+  /* The whole column scrolls as one, so no section gets clipped on short windows. It starts
+     under the collapse toggle (top 10px + 22px), so nothing scrolls beneath that button. */
+  overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
+}
+.cal-sidebar-content::-webkit-scrollbar { width: 3px; }
+.cal-sidebar-content::-webkit-scrollbar-thumb { background: var(--separator-strong); border-radius: 2px; }
 
 .cal-sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .cal-sidebar-title { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; color: var(--text-secondary); }
@@ -124,12 +131,13 @@
 
 .cal-sidebar-add-btn svg { display: block; }
 
-.cal-sidebar-hint { font-size: 0.68rem; font-weight: 500; color: var(--text-tertiary); margin: 0 0 10px; }
+.cal-sidebar-hint { font-size: 0.68rem; font-weight: 500; color: var(--text-tertiary); margin: 0 0 10px; line-height: 1.4; }
+.cal-sidebar-hint-icon { vertical-align: -2px; stroke: currentColor; fill: none; }
+.cal-sidebar-note { margin: 6px 0 0; font-size: 0.7rem; color: var(--success); line-height: 1.35; }
+.cal-sidebar-note--warn { color: var(--warning); }
 .cal-sidebar-empty { font-size: 0.75rem; font-weight: 400; color: var(--text-tertiary); text-align: center; margin-top: 20px; line-height: 1.6; }
 
-.cal-sidebar-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; }
-.cal-sidebar-list::-webkit-scrollbar { width: 3px; }
-.cal-sidebar-list::-webkit-scrollbar-thumb { background: var(--separator-strong); border-radius: 2px; }
+.cal-sidebar-list { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; min-width: 0; }
 
 .cal-sidebar-divider {
   height: 1px;
@@ -138,48 +146,6 @@
   margin: 12px 0;
   flex-shrink: 0;
 }
-
-.cal-sidebar-list--events {
-  flex: 0 0 auto;
-  max-height: 140px;
-}
-
-.cal-sidebar-list--tasks {
-  flex: 0 0 auto;
-  max-height: 150px;
-}
-
-/* ─── Task Sidebar Items ────────────────────────────────────────────────────── */
-.cal-task-sidebar-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--separator);
-  background: var(--bg-elevated-2);
-}
-
-.cal-task-sidebar-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  background: var(--task-color, #6e6e73);
-  flex-shrink: 0;
-}
-
-.cal-task-sidebar-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-.cal-task-sidebar-title {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: 0;
-}
-.cal-task-sidebar-sub { font-size: 0.65rem; font-weight: 400; color: var(--text-tertiary); letter-spacing: 0; }
-.cal-task-sidebar-meta { font-size: 0.68rem; font-weight: 500; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
 
 /* ─── Month View Task Chips ─────────────────────────────────────────────────── */
 .cal-month-chip--task {
@@ -227,6 +193,10 @@
 }
 .cal-upcoming-sub { font-size: 0.65rem; font-weight: 400; color: var(--text-tertiary); letter-spacing: 0; }
 .cal-upcoming-meta { font-size: 0.7rem; font-weight: 500; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
+.cal-upcoming-meta--soon { color: var(--warning); }
+.cal-upcoming-meta--late { color: var(--danger); }
+.cal-upcoming-goal-icon { color: var(--accent); stroke: currentColor; fill: none; flex-shrink: 0; }
+.cal-upcoming-item:disabled { cursor: default; }
 
 .cal-tmpl-card {
   background: var(--bg-elevated-2);
@@ -258,6 +228,16 @@
 .cal-tmpl-btn--del:hover { color: var(--danger); background: var(--danger-wash); }
 
 .cal-tmpl-btn svg { display: block; }
+
+/* One-tap: drop the template into today's next free slot. */
+.cal-tmpl-place {
+  align-self: center; width: 26px; height: 26px; flex-shrink: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  border-radius: 6px; border: 1px solid rgba(56,189,248,0.35); background: var(--accent-wash); color: var(--accent);
+  transition: all var(--duration) var(--ease);
+}
+.cal-tmpl-place svg { display: block; stroke: currentColor; fill: none; }
+@media (hover: hover) { .cal-tmpl-place:hover { background: rgba(56,189,248,0.2); } }
 
 /* ─── Grid Wrapper (Day/Week) ────────────────────────────────────────────────── */
 .cal-grid-wrapper { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
