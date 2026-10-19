@@ -1,5 +1,38 @@
 # Todo
 
+## Done, uncommitted (2026-10-19): sidebar "Missed": reschedule or let go slipped blocks
+
+User picked idea 1 + recommended options: originals become Skipped ("Plans changed") when rescheduled
+unanswered; window = today + yesterday; a Let it go button.
+
+- [x] calendarSidebar: getSlippedBlocks (missed/skipped, today+yesterday, from PLAN_KEPT_START, not
+      `outcome.handled`), handleSlippedBlock (checks in Skipped via completionUtils.checkInBlock if
+      unanswered, then stores handled: 'rescheduled' | 'let-go'), rescheduledCopy (one-off, same
+      length, category + plan link minus planner id, `rescheduledFrom`).
+- [x] Sidebar "Missed" section on top (hidden when empty): category stripe, "Yesterday · 4pm–5:30pm ·
+      No check-in / Skipped (reason)", Reschedule (today's next free slot) + Let it go. Notes share
+      one `sideNote` state with quick blocks.
+- Verified: node checks (list/order/exclusions, outcome writes incl. recurring date only, yesterday's
+  Plan kept credit unchanged, check-in prompt stops asking, copy fields), lint 0, build, harness:
+  4 rows, reschedule 90-min block → 4:00 PM today (skipped a 30-min gap), let go, strip prompt moved
+  on, long titles ellipsized, reason line wraps, no horizontal overflow.
+
+## Done, uncommitted (2026-10-19): sidebar follow-up: drop Time left, quick blocks by category
+
+User: remove "Time left today"; quick time blocks should be the same color as their category, like the calendar.
+
+- [x] TimeLeftCard (.jsx/.css) + getTimeLeft deleted.
+- [x] calendarSidebar.templateCategoryLookup: template pick → category stored on a same-title block
+      (user/AI) → keyword → Other, so a template matches the blocks it makes. Card stripe uses it
+      with the user's category color overrides.
+- [x] Template editor: color swatches → the block editor's Category chips (Auto shows its guess);
+      old per-template `color` dropped on save. A picked category rides onto placed blocks
+      (one-tap and drag → form) as categoryBy 'user'.
+- [x] Fixed: template editor had a second close button wired to closeDayEventModal (did nothing).
+- Verified: node checks (lookup order + time-left removal), lint 0 errors, build, harness:
+  4 templates colored Work/Creative(AI-stored)/Social(picked)/Fitness, placed blocks same colors,
+  editor chips + save recolors card (Piano → Health).
+
 ## Done, uncommitted (2026-10-19): Calendar sidebar, ideas 1-4
 
 Problem (user): make the Calendar page's sidebar better and more helpful.
@@ -1503,3 +1536,9 @@ Fix: overlay to z 9500 (same layer as Plan My Day), `.cal-modal` max-height 90dv
 overscroll-behavior: contain. Applies to every calendar popup that uses `.cal-modal-overlay`.
 - [x] Verified in auth-stub harness at 390x664 and 320x568: wheel-scroll, tap saves the block
 - [x] Desktop still centered; build passes
+
+## 2026-10-19 — Calendar sidebar: remember collapsed state (idea 7)
+Sir picked only idea 7 (skipped 5 "week by category" and 6 "mini month").
+- [x] `sidebarOpen` / `upcomingMinimized` read + written via try/catch `readFlag`/`writeFlag` in CalendarPage.jsx (keys `gameOfLife_calendarSidebarOpen`, `gameOfLife_calendarUpcomingMinimized`; local only, not synced)
+- [x] Harness check: defaults with empty storage, both survive reload, garbage values fall back to defaults, no overflow in the 220px sidebar with heavy data
+- [x] Lint JSON 0 messages before and after; build passes. Not committed.

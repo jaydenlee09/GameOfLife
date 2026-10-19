@@ -7,18 +7,19 @@ import {
   toDateKey, buildDayEventTargetMs, fmtRemaining,
   normalizeEvent, expandEventsForDates, isInstanceCompleted,
   cloneSubEvents, cloneBonusTasks, normalizeBonusTask,
-  getBlockStatus, getBlockOutcome, PLAN_KEPT_START,
+  getBlockStatus, getBlockOutcome, PLAN_KEPT_START, blockRange,
   blockKind, BLOCK_KIND_COLORS, BLOCK_KIND_LABELS,
 } from '../utils/calendarUtils';
 import {
   BLOCK_CATEGORIES, COLOR_SWATCHES, blockColor, blockCategory, categoryColor, categoryMeta,
-  storedCategoryFields, categoryFormFields, autoCategoryForForm, applyCategoryForm,
+  storedCategoryFields, categoryFormFields, autoCategoryForForm, applyCategoryForm, isCategoryId,
 } from '../utils/blockCategories';
-import { findFreeSlot, getComingUp } from '../utils/calendarSidebar';
+import {
+  findFreeSlot, getComingUp, templateCategoryLookup, getSlippedBlocks, handleSlippedBlock, rescheduledCopy, blockMinutes,
+} from '../utils/calendarSidebar';
 import { dayLabel } from '../utils/taskUtils';
 import TodayStrip from './calendar/TodayStrip';
 import TaskTray from './calendar/TaskTray';
-import TimeLeftCard from './calendar/TimeLeftCard';
 import BlockCheckIn from './calendar/BlockCheckIn';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -55,6 +56,20 @@ const fmtDuration = (mins) => {
   if (h) return `${h}h`;
   return `${m}m`;
 };
+// Per-device UI flags (sidebar collapsed etc.). Storage can be blocked or full,
+// so a failed read falls back to the default and a failed write is ignored.
+const readFlag = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved === 'true' ? true : saved === 'false' ? false : fallback;
+  } catch { return fallback; }
+};
+const writeFlag = (key, value) => {
+  try { localStorage.setItem(key, String(value)); } catch { /* not persisted this time */ }
+};
+const SIDEBAR_OPEN_KEY = 'gameOfLife_calendarSidebarOpen';
+const UPCOMING_MIN_KEY = 'gameOfLife_calendarUpcomingMinimized';
+
 const weekdayOfDateKey = (dateKey) => new Date(dateKey + 'T00:00:00').getDay();
 const getMondayOfWeek = (date) => {
   const d = new Date(date);
@@ -190,7 +205,9 @@ const defaultForm = (o = {}) => ({
   xpAmount: 20, recurrence: 'none', recurrenceDays: [], notes: '', subEvents: [], bonusTasks: [],
   category: null, aiCategory: null, origTitle: '', color: '', ...o,
 });
-const defaultTmplForm = () => ({ title: '', duration: 60, xpAmount: 20, recurrence: 'none', recurrenceDays: [], color: '#38bdf8' });
+const defaultTmplForm = () => ({ title: '', duration: 60, xpAmount: 20, recurrence: 'none', recurrenceDays: [], category: null });
+// A template's own pick, as block fields: a placed block keeps it like an editor pick would.
+const tmplCategoryFields = (tmpl) => (isCategoryId(tmpl?.category) ? { category: tmpl.category, categoryBy: 'user' } : {});
 const defaultNoPhoneForm = (o = {}) => ({
   date: toDateKey(new Date()), startHour: 8, startMin: 0, endHour: 9, endMin: 0,
   label: 'No Phone', recurrence: 'none', recurrenceDays: [], ...o,
@@ -235,9 +252,9 @@ export default function CalendarPage({
   const [editingId, setEditingId] = useState(null);
   const [editScope, setEditScope] = useState(null);
   const [deleteScope, setDeleteScope] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [upcomingMinimized, setUpcomingMinimized] = useState(false);
-  const [tmplNote, setTmplNote] = useState(null); // { ok, text } after a one-tap quick block
+  const [sidebarOpen, setSidebarOpen] = useState(() => readFlag(SIDEBAR_OPEN_KEY, true));
+  const [upcomingMinimized, setUpcomingMinimized] = useState(() => readFlag(UPCOMING_MIN_KEY, false));
+  const [sideNote, setSideNote] = useState(null); // { where: 'slip'|'tmpl', ok, text } after a sidebar one-tap
   const [nextEventMinimized, setNextEventMinimized] = useState(false);
   const [tmplModal, setTmplModal] = useState(null);
   const [tmplForm, setTmplForm] = useState(defaultTmplForm());
@@ -291,6 +308,9 @@ export default function CalendarPage({
     localStorage.setItem('gameOfLife_calendarView', view);
   }, [view]);
 
+  useEffect(() => { writeFlag(SIDEBAR_OPEN_KEY, sidebarOpen); }, [sidebarOpen]);
+  useEffect(() => { writeFlag(UPCOMING_MIN_KEY, upcomingMinimized); }, [upcomingMinimized]);
+
   useEffect(() => {
     if (gridRef.current) {
       const pct = currentMinute / (24*60);
@@ -343,7 +363,7 @@ export default function CalendarPage({
       date,
       startHour: Math.floor(startMins/60), startMin: startMins%60,
       endHour: Math.floor(clampEnd/60), endMin: clampEnd%60,
-      ...(fromTemplate ? { title: fromTemplate.title, xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence, recurrenceDays: [...(fromTemplate.recurrenceDays || [])] } : {}),
+      ...(fromTemplate ? { title: fromTemplate.title, xpAmount: fromTemplate.xpAmount, recurrence: fromTemplate.recurrence, recurrenceDays: [...(fromTemplate.recurrenceDays || [])], category: isCategoryId(fromTemplate.category) ? fromTemplate.category : null } : {}),
     }));
     setEditingId(null);
     setNewBonusTask(defaultBonusTaskForm());
@@ -638,19 +658,32 @@ export default function CalendarPage({
     return { ok: true, text: `Scheduled for ${day ? `${day}, ` : ''}${fmtTime(block.startHour, block.startMin)}.` };
   };
 
+  useEffect(() => {
+    if (!sideNote) return undefined;
+    const id = setTimeout(() => setSideNote(null), 4000);
+    return () => clearTimeout(id);
+  }, [sideNote]);
+
+  // Missed: a slipped block goes into today's first free slot of the same length (the
+  // original is marked handled, and Skipped if it was never answered), or is let go.
+  const rescheduleSlipped = (ev) => {
+    const minutes = Math.max(15, blockMinutes(ev));
+    const start = findFreeSlot({ dateKey: todayKey, minutes, planner, calendarEvents });
+    if (start == null) { setSideNote({ where: 'slip', ok: false, text: `No free ${fmtDuration(minutes)} left today. Let it go, or drag time around on the grid.` }); return; }
+    const copy = rescheduledCopy(ev, todayKey, start);
+    setCalendarEvents((prev) => [...handleSlippedBlock(ev, 'rescheduled')(prev), copy]);
+    setSideNote({ where: 'slip', ok: true, text: `${ev.title} moved to ${fmtTime(copy.startHour, copy.startMin)} today.` });
+  };
+  const letGoSlipped = (ev) => setCalendarEvents(handleSlippedBlock(ev, 'let-go'));
+
   // Quick block one-tap: today's first free slot that fits. A one-off template becomes
   // the same block drag + Save would make; a repeating one opens the form at that slot,
   // so a series never starts without you seeing it.
-  useEffect(() => {
-    if (!tmplNote) return undefined;
-    const id = setTimeout(() => setTmplNote(null), 4000);
-    return () => clearTimeout(id);
-  }, [tmplNote]);
 
   const placeTemplate = (tmpl) => {
     const minutes = Math.max(15, Number(tmpl.duration) || 60);
     const start = findFreeSlot({ dateKey: todayKey, minutes, planner, calendarEvents });
-    if (start == null) { setTmplNote({ ok: false, text: `No free ${fmtDuration(minutes)} left today. Drag it onto another day.` }); return; }
+    if (start == null) { setSideNote({ where: 'tmpl', ok: false, text: `No free ${fmtDuration(minutes)} left today. Drag it onto another day.` }); return; }
     if (tmpl.recurrence && tmpl.recurrence !== 'none') { openCreate(todayKey, start / 15, tmpl); return; }
     const end = Math.min(start + minutes, 24 * 60 - 1);
     setCalendarEvents((prev) => [...prev, {
@@ -659,8 +692,9 @@ export default function CalendarPage({
       endHour: Math.floor(end / 60), endMin: end % 60,
       xpAmount: Number(tmpl.xpAmount) || 20, recurrence: 'none', recurrenceDays: [],
       notes: '', subEvents: [], bonusTasks: [], completed: false, completedDates: [],
+      ...tmplCategoryFields(tmpl),
     }]);
-    setTmplNote({ ok: true, text: `${tmpl.title} placed at ${fmtTime(Math.floor(start / 60), start % 60)}.` });
+    setSideNote({ where: 'tmpl', ok: true, text: `${tmpl.title} placed at ${fmtTime(Math.floor(start / 60), start % 60)}.` });
   };
 
   const setBonusTaskCompletion = (ev, task, shouldBeCompleted) => {
@@ -993,8 +1027,10 @@ export default function CalendarPage({
   const openTmplCreate = () => { setTmplForm(defaultTmplForm()); setTmplModal('create'); };
   const openTmplEdit = (tmpl) => { setTmplForm({...defaultTmplForm(), ...tmpl}); setTmplModal({edit:true,id:tmpl.id}); };
   const closeTmplModal = () => setTmplModal(null);
-  const saveTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>[...prev,{...tmplForm,id:Date.now(),title:tmplForm.title.trim()}]); closeTmplModal(); };
-  const updateTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>prev.map(t=>t.id===tmplModal.id?{...tmplForm,id:tmplModal.id,title:tmplForm.title.trim()}:t)); closeTmplModal(); };
+  // Templates are colored by category now; an old per-template `color` is dropped on save.
+  const tmplToSave = () => { const { color: _oldColor, ...rest } = tmplForm; return { ...rest, title: tmplForm.title.trim(), category: isCategoryId(tmplForm.category) ? tmplForm.category : null }; };
+  const saveTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>[...prev,{...tmplToSave(),id:Date.now()}]); closeTmplModal(); };
+  const updateTmpl = () => { if (!tmplForm.title.trim()) return; setQuickEvents(prev=>prev.map(t=>t.id===tmplModal.id?{...tmplToSave(),id:tmplModal.id}:t)); closeTmplModal(); };
   const deleteTmpl = (id) => setQuickEvents(prev=>prev.filter(t=>t.id!==id));
 
   // ─── Expand events ───────────────────────────────────────────────────────────
@@ -1012,6 +1048,8 @@ export default function CalendarPage({
   for (const dk of activeDateKeys) noPhoneByDate[dk] = [];
   for (const block of expandedNoPhone) { if (noPhoneByDate[block._instanceDate]!==undefined) noPhoneByDate[block._instanceDate].push(block); }
 
+  const tmplCategoryOf = templateCategoryLookup(calendarEvents);
+  const slipped = getSlippedBlocks(calendarEvents, new Date(nowMs));
   const comingUp = getComingUp({ dayEvents: calendarDayEvents, goals, now: new Date(nowMs) });
 
   const todosByDate = (() => {
@@ -1403,6 +1441,10 @@ export default function CalendarPage({
   };
 
   // ─── Sidebar ─────────────────────────────────────────────────────────────────
+  const renderSideNote = (where) => (sideNote?.where === where
+    ? <p className={`cal-sidebar-note${sideNote.ok ? '' : ' cal-sidebar-note--warn'}`} role="status">{sideNote.text}</p>
+    : null);
+
   const renderSidebar = () => (
     <>
       <button
@@ -1416,9 +1458,39 @@ export default function CalendarPage({
       <div className={`cal-sidebar ${sidebarOpen?'cal-sidebar--open':'cal-sidebar--closed'}`}>
       {sidebarOpen&&(
         <div className="cal-sidebar-content">
-          <TimeLeftCard planner={planner} calendarEvents={calendarEvents} nowMs={nowMs} />
-
-          <div className="cal-sidebar-divider" />
+          {(slipped.length > 0 || sideNote?.where === 'slip') && (
+            <>
+              <div className="cal-sidebar-header">
+                <span className="cal-sidebar-title">Missed</span>
+                {slipped.length > 0 && <span className="cal-sidebar-count">{slipped.length}</span>}
+              </div>
+              <p className="cal-sidebar-hint">Blocks that slipped today or yesterday</p>
+              <ul className="cal-slip-list">
+                {slipped.map((ev) => {
+                  const outcome = getBlockOutcome(ev);
+                  const why = outcome ? `Skipped${outcome.reason ? ` (${outcome.reason})` : ''}` : 'No check-in';
+                  return (
+                    <li key={`${ev.id}-${ev._instanceDate}`} className="cal-slip-item" style={{ '--slip-color': blockColor(ev, categoryColors) }}>
+                      <span className="cal-slip-main">
+                        <span className="cal-slip-title">{ev.title}</span>
+                        <span className="cal-slip-sub">{dayLabel(ev._instanceDate, todayKey)} · {blockRange(ev)} · {why}</span>
+                      </span>
+                      <button type="button" className="cal-slip-btn cal-slip-btn--go" onClick={() => rescheduleSlipped(ev)}
+                        title="Move to today's next free slot" aria-label={`Reschedule ${ev.title} to today's next free slot`}>
+                        <CalendarPlus size={13} strokeWidth={2.6} />
+                      </button>
+                      <button type="button" className="cal-slip-btn" onClick={() => letGoSlipped(ev)}
+                        title="Let it go" aria-label={`Let ${ev.title} go`}>
+                        <X size={13} strokeWidth={2.6} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {renderSideNote('slip')}
+              <div className="cal-sidebar-divider" />
+            </>
+          )}
 
           <div className="cal-sidebar-header">
             <span className="cal-sidebar-title">Needs a time slot</span>
@@ -1444,7 +1516,7 @@ export default function CalendarPage({
           <p className="cal-sidebar-hint">Drag onto the calendar, or tap <CalendarPlus size={11} className="cal-sidebar-hint-icon" aria-label="place" /> for today&rsquo;s next free slot</p>
           <div className="cal-sidebar-list">
             {quickEvents.map(tmpl=>(
-              <div key={tmpl.id} className="cal-tmpl-card" style={{'--tmpl-color':tmpl.color||'#38bdf8'}}
+              <div key={tmpl.id} className="cal-tmpl-card" style={{'--tmpl-color':categoryColor(tmplCategoryOf(tmpl), categoryColors)}}
                 draggable onDragStart={(e)=>handleTemplateDragStart(e,tmpl)} onDragEnd={handleDragEnd}>
                 <div className="cal-tmpl-info">
                   <div className="cal-tmpl-title">{tmpl.title}</div>
@@ -1468,7 +1540,7 @@ export default function CalendarPage({
             ))}
             {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click the + button to add one.</p>}
           </div>
-          {tmplNote && <p className={`cal-sidebar-note${tmplNote.ok ? '' : ' cal-sidebar-note--warn'}`} role="status">{tmplNote.text}</p>}
+          {renderSideNote('tmpl')}
 
           <div className="cal-sidebar-divider" />
 
@@ -2033,8 +2105,7 @@ export default function CalendarPage({
           <div className="cal-modal" onClick={e=>e.stopPropagation()}>
             <div className="cal-modal-header">
               <h3>{tmplModal==='create'?'New Template':'Edit Template'}</h3>
-              <button className="cal-modal-close" onClick={closeTmplModal}><X size={14} /></button>
-              <button className="cal-modal-close" onClick={closeDayEventModal} aria-label="Close">
+              <button className="cal-modal-close" onClick={closeTmplModal} aria-label="Close">
                 <X size={16} strokeWidth={3} />
               </button>
             </div>
@@ -2064,14 +2135,31 @@ export default function CalendarPage({
                   (days) => setTmplForm(f => ({ ...f, recurrenceDays: days })),
                 )}
               </div>
-              <div className="cal-field">
-                <label className="cal-label">Color</label>
-                <div className="cal-color-row">
-                  {['#fbbf24','#f87171','#4ade80','#38bdf8','#c084fc','#fb923c','#f472b6','#a3e635'].map(c=>(
-                    <button key={c} type="button" className={`cal-color-swatch ${tmplForm.color===c?'cal-color-swatch--active':''}`} style={{background:c}} onClick={()=>setTmplForm(f=>({...f,color:c}))}/>
-                  ))}
-                </div>
-              </div>
+              {(() => {
+                // Same chips as the block editor; Auto is what the calendar would color it.
+                const auto = templateCategoryLookup(calendarEvents)({ title: tmplForm.title });
+                return (
+                  <div className="cal-field">
+                    <label className="cal-label">Category</label>
+                    <div className="cal-cat-row" role="radiogroup" aria-label="Category">
+                      <button type="button" role="radio" aria-checked={!tmplForm.category}
+                        className={`cal-cat-chip ${!tmplForm.category?'cal-cat-chip--active':''}`}
+                        style={{'--cat-color': categoryColor(auto, categoryColors)}}
+                        onClick={()=>setTmplForm(f=>({...f,category:null}))}>
+                        <Sparkles size={10} strokeWidth={2.5} />Auto{tmplForm.title.trim() ? ` · ${categoryMeta(auto).label}` : ''}
+                      </button>
+                      {BLOCK_CATEGORIES.map(c=>(
+                        <button key={c.id} type="button" role="radio" aria-checked={tmplForm.category===c.id}
+                          className={`cal-cat-chip ${tmplForm.category===c.id?'cal-cat-chip--active':''}`}
+                          style={{'--cat-color': categoryColor(c.id, categoryColors)}}
+                          onClick={()=>setTmplForm(f=>({...f,category:c.id}))}>
+                          <span className="cal-cat-dot" />{c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div className="cal-modal-footer">
               <button className="cal-btn cal-btn--ghost" onClick={closeTmplModal}>Cancel</button>
