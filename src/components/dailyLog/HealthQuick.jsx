@@ -7,8 +7,7 @@ import { getScreentimeStatus, SCREENTIME_COLORS } from '../../utils/healthUtils'
 import { calcSleepHours } from '../../utils/closeDay';
 
 // Today's health check-in for the Close the Day routine. Every field saves to
-// healthLog[todayKey] as you change it (no Save button); the health XP for it is
-// paid when you close the day (see getPendingHealthAwards).
+// healthLog[todayKey] as you change it (no Save button). Sleep feeds the Daily Score.
 
 const WORKOUT_TYPES = ['Run', 'Lift', 'HIIT', 'Yoga', 'Walk', 'Swim', 'Cycle', 'Basketball', 'Muay Thai', 'Other'];
 
@@ -272,7 +271,7 @@ const HealthQuick = ({ todayKey, healthLog, setHealthLog, foodLog, setFoodLog, f
 
       <FoodTracker todayKey={todayKey} foodLog={foodLog} setFoodLog={setFoodLog} foodPoints={foodPoints} setFoodPoints={setFoodPoints} />
 
-      <p className="hq-xp-note"><Sparkles size={12} /> Health XP is paid when you close the day.</p>
+      <p className="hq-note"><Sparkles size={12} /> Over 9h of sleep counts toward today’s Daily Score.</p>
     </div>
   );
 };

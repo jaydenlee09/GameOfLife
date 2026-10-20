@@ -564,7 +564,6 @@
   color: var(--text-secondary); background: var(--bg-elevated-2);
   border-radius: 5px; padding: 2px 7px;
 }
-.cal-hovercard-chip--xp { color: var(--accent); background: var(--accent-wash); }
 .cal-hovercard-chip--kind { color: var(--ev-color); background: color-mix(in srgb, var(--ev-color) 14%, transparent); }
 
 .cal-hovercard-section { display: flex; flex-direction: column; gap: 5px; }
@@ -589,7 +588,6 @@
 .cal-hovercard-bonus--done { color: var(--success); background: var(--success-wash); }
 .cal-hovercard-bonus--done .cal-hovercard-bonus-label { text-decoration: line-through; }
 .cal-hovercard-bonus-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-hovercard-bonus-xp { flex-shrink: 0; color: var(--text-tertiary); font-weight: 600; }
 .cal-hovercard-more { font-size: 0.62rem; color: var(--text-tertiary); padding-left: 2px; }
 
 .cal-hovercard-notes {
@@ -772,20 +770,6 @@
 .cal-input:focus { border-color: var(--accent); }
 .cal-input[type="date"], .cal-input[type="time"] { color-scheme: dark; }
 .cal-input--xp { max-width: 130px; }
-.cal-xp-earned {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  background: var(--accent-wash);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  font-size: 0.88rem;
-  color: var(--text-primary);
-}
-.cal-xp-earned--sm { padding: 6px 10px; font-size: 0.82rem; }
-.cal-xp-earned strong { color: var(--accent); }
-.cal-xp-earned-note { font-size: 0.72rem; color: var(--text-secondary); }
 .cal-textarea { resize: vertical; min-height: 70px; font-size: 0.82rem; line-height: 1.5; }
 
 /* ─── Recurrence ─────────────────────────────────────────────────────────────── */
@@ -879,10 +863,6 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .cal-bonus-row--done .cal-bonus-name { color: var(--success); text-decoration: line-through; }
-.cal-bonus-meta {
-  font-size: 0.66rem; font-weight: 500; color: var(--success);
-  letter-spacing: 0;
-}
 .cal-bonus-builder {
   display: flex; flex-direction: column; gap: 12px;
   padding: 12px; border-radius: var(--radius-md);

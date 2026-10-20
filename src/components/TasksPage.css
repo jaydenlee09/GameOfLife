@@ -404,12 +404,6 @@
   color: var(--warning);
 }
 
-.tk-when-xp {
-  font-size: 0.68rem;
-  font-weight: 600;
-  opacity: 0.7;
-}
-
 /* Goal chip: a native select laid over it (same trick as the date chip). */
 .tk-when--goal .tk-chip-clip { max-width: 18ch; }
 
@@ -828,12 +822,6 @@
   max-width: 14ch;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.tk-xp {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-tertiary);
 }
 
 .tk-triage {

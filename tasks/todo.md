@@ -1,5 +1,40 @@
 # Todo
 
+## Done, uncommitted (2026-10-20): XP = your Daily Score, banked
+
+Problem (user): XP/levels mean nothing and don't keep them on track; the Daily Score is accurate.
+User picked: each day pays round(score x 10) XP, level recalculated from past scores, flat 500 XP
+per level, "+score" feedback instead of "+XP", and make it look appealing.
+
+Finding: xpLog is capped at 500 entries, so scoring old days live would slowly lose task credit and
+shrink XP. So finished days are BANKED in `user.xpBank` ({dateKey: xp}); the last 7 days stay live
+(late check-ins, past-log edits), older banked days are frozen. Bank writes wait for cloudSyncReady
+(a setUser during the initial load would mark user "touched" and block the remote user doc).
+
+- [x] xpUtils: XP_PER_POINT 10, XP_PER_LEVEL 500, XP_LIVE_DAYS 7, xpForScore, levelForXp,
+      updateXpBank (returns same ref when unchanged), getXpStatus, xp series + days-that-built-a-level.
+- [x] App: useTodayKey (date rollover), xpBank memo + gated persist effect, derived level/xp,
+      levelSeen (max only, silent first baseline, after sync) -> LevelUpModal; awardXp -> logActivity
+      (xpLog stays the activity log: tasks are counted from it), no more user.level/xp/lifetimeXp writes.
+- [x] Score bump toast (+0.8 Daily Score · +8 XP), positive changes only, same day, merged,
+      suppressed after remote sync applies.
+- [x] Surfaces: sidebar footer bar (banked + today segment), Statistics Level card (ring, 14-day bars,
+      days to next level, the rule), LevelUpModal shows the days that built the level, heatmap by score,
+      activity feed without amounts.
+- [x] Remove "+N XP" copy: TaskRow, TaskDetail, TasksPage toast, Timer, FocusMode, FocusCoach,
+      Calendar (hover card, editor, bonus tasks, template, no-phone title), Close the Day health XP
+      panel + its awards, HealthQuick note, commitment toast.
+- [x] Achievements level_*/xp_* on derived values; WeeklyReview XP from bank; assistant prompt +
+      xp tool use score XP.
+- [x] Verify: node checks (bank freeze/live window, rollover, level math, unchanged ref), lint, build,
+      harness UI (sidebar, Statistics card, level-up modal, bump toast, phone width), grep no "+XP" left.
+- Verified: node checks (level math, bank freeze/live window/migration fill/rollover, same-ref when
+  unchanged, days-that-built-a-level; 400-day migration 3ms), lint diff = no new messages (37 before
+  and after), build, harness (21 seeded days -> L3 78/500, old level 14 ignored, silent baseline,
+  sidebar bar + today segment, Statistics card desktop + 375px, level-up card w/ 10 days, bump toast
+  +0.8/+0.9 desktop + phone, no toast on untick, Close the Day "+17 XP this day banks", all pages
+  open with no console errors). Also fixed: Statistics never got calendarEvents (Plan kept was 0 there).
+
 ## Done, uncommitted (2026-10-19): sidebar "Missed": reschedule or let go slipped blocks
 
 User picked idea 1 + recommended options: originals become Skipped ("Plans changed") when rescheduled

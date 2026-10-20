@@ -665,16 +665,6 @@
 
 .cd-stat-label { font-size: 0.72rem; color: var(--text-tertiary); }
 
-.cd-awards {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.3rem 0.9rem;
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--accent);
-}
-
 .cd-close-btn {
   display: flex;
   align-items: center;
@@ -910,7 +900,7 @@
 
 .hq-food-body { display: flex; flex-direction: column; gap: 0.6rem; }
 
-.hq-xp-note {
+.hq-note {
   grid-column: 1 / -1;
   display: inline-flex;
   align-items: center;
@@ -1212,7 +1202,6 @@
   .cd-a-checklist { grid-area: checklist; }
   .cd-a-stats { grid-area: stats; }
   .cd-a-points { grid-area: points; }
-  .cd-a-awards { grid-area: awards; }
   .cd-a-close { grid-area: close; }
   .cd-a-hint { grid-area: hint; }
   .cd-a-hero { grid-area: hero; }
@@ -1289,12 +1278,11 @@
 
   /* Finish: checklist + numbers + the button on the left, the points on the right */
   .cd-body--finish {
-    grid-template-rows: auto auto auto auto auto auto 1fr auto;
+    grid-template-rows: auto auto auto auto auto 1fr auto;
     grid-template-areas:
       "title title"
       "checklist points"
       "stats points"
-      "awards points"
       "close points"
       "hint points"
       ". points"

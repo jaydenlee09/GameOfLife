@@ -1,0 +1,185 @@
+/* ─── Level card (Statistics) ─────────────────────────────────────────────
+   Ring + numbers on the left, the last two weeks as bars on the right; stacks
+   on narrow widths. */
+.level-card {
+  flex-direction: row;
+  align-items: center;
+  gap: clamp(1rem, 2.5vw, 2rem);
+  padding: 18px 24px;
+}
+
+.level-card-main {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.level-card-ring {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.25));
+}
+
+.level-card-arc {
+  transition: stroke-dasharray 0.6s var(--ease), stroke-dashoffset 0.6s var(--ease);
+}
+
+.level-card-arc--today {
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.9));
+}
+
+.level-card-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.level-card-ring-lvl {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.level-card-ring-num {
+  margin-top: 2px;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.level-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.level-card-eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.level-card-xp {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.level-card-xp strong {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.level-card-today {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.level-card-today-chip {
+  padding: 0.12rem 0.45rem;
+  border-radius: 99px;
+  background: var(--accent-wash);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: var(--accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Last 14 days */
+.level-card-days {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.level-card-bars {
+  height: 72px;
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.level-card-day {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.level-card-bar {
+  width: 100%;
+  max-width: 18px;
+  height: var(--h);
+  border-radius: 4px 4px 2px 2px;
+  background: var(--c);
+  opacity: 0.8;
+  transition: height 0.5s var(--ease), opacity var(--duration) var(--ease);
+}
+
+.level-card-bar:hover { opacity: 1; }
+
+/* Today is still being earned: brighter, with a pulsing outline */
+.level-card-day.is-today .level-card-bar {
+  opacity: 1;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55), 0 0 10px var(--c);
+  animation: level-card-live 2s ease-in-out infinite;
+}
+
+.level-card-day-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.level-card-day.is-today .level-card-day-label { color: var(--accent); }
+
+.level-card-rule {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.level-card-rule strong { color: var(--text-secondary); font-weight: 600; }
+
+@keyframes level-card-live {
+  0%, 100% { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55), 0 0 6px var(--c); }
+  50%      { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.8), 0 0 14px var(--c); }
+}
+
+@media (max-width: 720px) {
+  .level-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-card-day.is-today .level-card-bar { animation: none; }
+}

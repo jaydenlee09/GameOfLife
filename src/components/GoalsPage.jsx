@@ -442,7 +442,7 @@ function GoalCard({ goal, data, now, todayKey, expanded, onToggle, actions, coac
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 const GoalsPage = ({
-  northStar, onSaveNorthStar, goals = [], setGoals, todos = [], setTodos, onAwardXp, habits = [], setHabits,
+  northStar, onSaveNorthStar, goals = [], setGoals, todos = [], setTodos, onLogActivity, habits = [], setHabits,
   pomodoroSessions = [], calendarEvents = [], setCalendarEvents, plannerSettings, onCompleteTask, onStartFocus, coachApi,
 }) => {
   const [expandedId, setExpandedId] = useState(null);
@@ -474,7 +474,7 @@ const GoalsPage = ({
   const replace = (goalId, next) => setGoals((prev) => prev.map((g) => (g.id === goalId ? next : g)));
   const awardGoalXp = (goal) => {
     const xp = goalCompletionXp(goal);
-    if (xp > 0) onAwardXp?.(xp, { source: 'goal', label: goal.title });
+    if (xp > 0) onLogActivity?.(xp, { source: 'goal', label: goal.title });
   };
 
   const actions = {
@@ -496,7 +496,7 @@ const GoalsPage = ({
         awardGoal = result.shouldAwardXp;
       }
       replace(goal.id, final);
-      if (justCompleted) onAwardXp?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
+      if (justCompleted) onLogActivity?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
       if (awardGoal) awardGoalXp(goal);
     },
     addMilestone: (goal, text) => replace(goal.id, addMilestone(goal, text)),

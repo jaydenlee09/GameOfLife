@@ -1,7 +1,7 @@
 // ─── Daily Log: "Close the Day" ───────────────────────────────────────────────
 // The night routine the Daily Log walks through for today's entry. Everything in
 // here is pure (no React, no storage) so the step rules, the carry-forward loop,
-// the nightly prompt and the XP rules can be checked in plain node.
+// and the nightly prompt can be checked in plain node.
 //
 // Entry fields the routine adds (all optional, so older entries keep working):
 //   dayRating  1-10, how the day felt (separate from the computed Daily Score)
@@ -205,46 +205,6 @@ export const parseIfThen = (text) => {
 };
 
 export const composeIfThen = (cue, action) => (cue || action ? `When ${cue}, I will ${action}` : '');
-
-// ─── Health XP ────────────────────────────────────────────────────────────────
-
-// The same once-per-day health rewards the old "Save Today's Log" button gave,
-// now paid at "Close the day". Each reward is tracked by key, so closing again
-// after logging a workout pays the workout without repaying sleep.
-export const HEALTH_AWARDS = [
-  {
-    key: 'sleep',
-    earned: (h) => h.sleepHours >= 8 && h.sleepHours <= 10,
-    award: { amount: 20, label: 'Good sleep logged' },
-  },
-  {
-    key: 'workout',
-    earned: (h) => (h.workouts?.length || 0) > 0,
-    award: { amount: 30, label: 'Workout logged' },
-  },
-  {
-    key: 'energy',
-    earned: (h) => h.energyLevel >= 4,
-    award: { amount: 10, label: 'High energy day' },
-  },
-  {
-    key: 'food',
-    earned: (h, foodNet) => foodNet > 0,
-    award: { amount: 15, label: 'Ate well' },
-  },
-];
-
-/**
- * Health rewards earned but not yet paid today. A legacy entry (`xpAwarded: true`
- * with no `xpAwardedFor`) was paid by the old Save button, so it owes nothing.
- */
-export const getPendingHealthAwards = (healthEntry = {}, foodEntries = []) => {
-  if (healthEntry.xpAwarded === true && !Array.isArray(healthEntry.xpAwardedFor)) return { keys: [], awards: [] };
-  const paid = new Set(healthEntry.xpAwardedFor || []);
-  const foodNet = foodEntries.reduce((sum, e) => sum + (e.points || 0), 0);
-  const due = HEALTH_AWARDS.filter((r) => !paid.has(r.key) && r.earned(healthEntry, foodNet));
-  return { keys: due.map((r) => r.key), awards: due.map((r) => r.award) };
-};
 
 /** Sleep length from bed/wake "HH:MM" times, wrapping past midnight; null if either is missing. */
 export const calcSleepHours = (bed, wake) => {

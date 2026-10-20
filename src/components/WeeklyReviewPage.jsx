@@ -18,17 +18,20 @@ import {
 import { applyCoachChange, changeLabel } from '../utils/goalCoach';
 import { computeWeekStats, getMondayKey, formatWeekRange, getWeekDays } from '../utils/weekStatsUtils';
 
-const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, calendarEvents = [], setGoals, setTodos, onAwardXp, onRecalibrate }) => {
+const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {}, goals = [], healthLog = {}, calendarEvents = [], xpSeries = [], setGoals, setTodos, onLogActivity, onRecalibrate }) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const mondayKey = getMondayKey(weekOffset);
   const isCurrentWeek = weekOffset === 0;
   const saved = weeklyReviews[mondayKey];
 
   const logCount = Object.keys(logs).length;
+  // XP is banked per day from the Daily Score, so a week's XP is just its days added up.
+  const xpByDay = useMemo(() => Object.fromEntries(xpSeries.map(d => [d.dateKey, d.xp])), [xpSeries]);
+  const weekXp = (monday) => getWeekDays(monday).reduce((sum, d) => sum + (xpByDay[d] || 0), 0);
   const stats = useMemo(
-    () => computeWeekStats(mondayKey, xpLog, pomodoroSessions, habits, todos, logs, goals, healthLog),
+    () => computeWeekStats(mondayKey, xpLog, pomodoroSessions, habits, todos, logs, goals, healthLog, xpByDay),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- length-keyed on purpose (recomputed when items are added/removed)
-    [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, logCount, goals, healthLog]
+    [mondayKey, xpLog.length, pomodoroSessions.length, habits.length, todos.length, logCount, goals, healthLog, xpByDay]
   );
 
   // This week: the focus goals plus anything due by Sunday. Past weeks: the goals
@@ -50,11 +53,11 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
 
   const awardGoalXp = (goal) => {
     const xp = goalCompletionXp(goal);
-    if (onAwardXp && xp > 0) onAwardXp(xp, { source: 'goal', label: goal.title });
+    if (onLogActivity && xp > 0) onLogActivity(xp, { source: 'goal', label: goal.title });
   };
 
   const awardMilestoneXp = (goal, milestoneText) => {
-    onAwardXp?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
+    onLogActivity?.(MILESTONE_XP, { source: 'milestone', label: milestoneText });
   };
 
   const handleToggleGoalComplete = (goal) => {
@@ -345,7 +348,7 @@ const WeeklyReviewPage = ({ weeklyReviews = {}, setWeeklyReviews, xpLog = [], po
                 }}
               >
                 <span className="review-past-range">{formatWeekRange(key)}</span>
-                {r.stats && <span className="review-past-xp"><Zap size={12} /> {r.stats.xpEarned} XP</span>}
+                <span className="review-past-xp"><Zap size={12} /> {weekXp(key)} XP</span>
                 {r.priority && <p className="review-past-priority"><Target size={12} /> {r.priority}</p>}
               </div>
             ))

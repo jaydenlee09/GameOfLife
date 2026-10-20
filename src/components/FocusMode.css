@@ -160,20 +160,7 @@
 /* Config */
 .focus-config { display: flex; flex-direction: column; gap: 0.5rem; align-items: center; }
 .focus-config-row { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: center; }
-.focus-xp-earned-row {
-  align-items: center;
-  gap: 0.5rem;
-}
-.focus-xp-earned {
-  background: var(--accent-wash);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  padding: 0.25rem 0.7rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-.focus-xp-earned-note {
+.focus-counts-note {
   font-size: 0.72rem;
   color: var(--text-secondary);
 }

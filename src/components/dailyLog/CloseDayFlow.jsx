@@ -9,13 +9,14 @@ import EMOTIONS from '../../utils/logMeta';
 import {
   STEP_META, getLookBack, getSteps, getStepStatus, getFirstOpenStep, isCommitmentLocked,
   pickPrompt, getLastPromptId, pickResurfacedLesson, getCommitmentSuggestions,
-  parseIfThen, composeIfThen, getPendingHealthAwards, explainScore,
+  parseIfThen, composeIfThen, explainScore,
 } from '../../utils/closeDay';
 import { getHabitLeak } from '../../utils/logPatterns';
 import { getYesterdayCommitment } from '../../utils/homeUtils';
 import { getFocusGoal, getFocusGoals, getGoalActivity, setGoalCheckin, lastMovedLabel } from '../../utils/goalUtils';
 import { getPendingCheckIns } from '../../utils/calendarUtils';
 import { computeDailyScore, computeStreak, scoreColor, shiftDateKey, STREAK_THRESHOLD } from '../../utils/scoreUtils';
+import { xpForScore } from '../../utils/xpUtils';
 import { entryHasContent, entryFingerprint } from '../../utils/logReview';
 import HealthQuick from './HealthQuick';
 import HabitChecklist from './HabitChecklist';
@@ -566,8 +567,7 @@ const ScoreBreakdown = ({ explained, score, streak, onFix }) => {
   );
 };
 
-const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canClose, onClose, breakdown }) => {
-  const xpTotal = pendingAwards.reduce((sum, a) => sum + a.amount, 0);
+const FinishStep = ({ steps, status, onGoTo, score, rating, canClose, onClose, breakdown }) => {
   return (
     <>
       <Block className="cd-block--quiet" area="checklist">
@@ -592,26 +592,18 @@ const FinishStep = ({ steps, status, onGoTo, score, rating, pendingAwards, canCl
           <span className="cd-stat-label">Your rating</span>
         </div>
         <div className="cd-stat">
-          <span className="cd-stat-value">{xpTotal ? `+${xpTotal}` : '0'}</span>
-          <span className="cd-stat-label">Health XP to collect</span>
+          <span className="cd-stat-value cd-stat-value--xp">+{xpForScore(score)}</span>
+          <span className="cd-stat-label">XP this day banks</span>
         </div>
       </div>
 
       {breakdown}
 
-      {pendingAwards.length > 0 && (
-        <p className="cd-awards cd-a-awards">
-          {pendingAwards.map((a, i) => (
-            <span key={i}>+{a.amount} XP · {a.label}</span>
-          ))}
-        </p>
-      )}
-
       <button type="button" className="cd-close-btn cd-a-close" onClick={onClose} disabled={!canClose}>
         <Moon size={18} /> Close the day
       </button>
       <p className="cd-close-hint cd-a-hint">
-        {canClose ? 'Saves everything, pays your health XP and asks your assistant for tonight’s review.' : 'Write something first, even one win.'}
+        {canClose ? 'Saves everything and asks your assistant for tonight’s review.' : 'Write something first, even one win.'}
       </p>
     </>
   );
@@ -675,7 +667,7 @@ const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, revi
 const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
-  healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints, onAwardXp,
+  healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints,
   goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
 }) => {
   const reduceMotion = useReducedMotion();
@@ -723,7 +715,6 @@ const CloseDayFlow = ({
     [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents]
   );
 
-  const pending = getPendingHealthAwards(healthLog[todayKey] || {}, foodLog[todayKey]?.entries || []);
   const review = logReviews[todayKey] || null;
   const [reviewError, setReviewError] = useState(null);
 
@@ -752,13 +743,6 @@ const CloseDayFlow = ({
   };
 
   const closeTheDay = async () => {
-    pending.awards.forEach(a => onAwardXp?.(a.amount, { source: 'manual', label: a.label }));
-    if (pending.keys.length) {
-      setHealthLog(prev => {
-        const day = prev[todayKey] || {};
-        return { ...prev, [todayKey]: { ...day, xpAwarded: true, xpAwardedFor: [...new Set([...(day.xpAwardedFor || []), ...pending.keys])] } };
-      });
-    }
     updateField('closedAt', Date.now());
     goTo('closed');
     setReviewError(null);
@@ -864,7 +848,6 @@ const CloseDayFlow = ({
                   onGoTo={goTo}
                   score={score}
                   rating={entry.dayRating}
-                  pendingAwards={pending.awards}
                   canClose={entryHasContent(entry)}
                   onClose={closeTheDay}
                   breakdown={scoreBreakdown}

@@ -112,45 +112,6 @@ body {
   border-bottom-color: var(--accent);
 }
 
-.level-bar-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 10px 14px;
-  background: var(--bg-elevated-1);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-md);
-}
-
-.level-bar-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.level-text-left, .level-text-right {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.level-progress-bar {
-  position: relative;
-  width: 100%;
-  height: 8px;
-  background: var(--bg-elevated-2);
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.level-progress-fill {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.45s var(--ease);
-  border-radius: 9999px;
-}
-
 /* ─── Trend Chart ────────────────────────────────────────────────────────── */
 .trend-chart-card { padding: 1.25rem 1.5rem; }
 .trend-chart-header {
@@ -269,11 +230,8 @@ body {
 .activity-feed-icon { font-size: 0.85rem; margin-top: 1px; }
 .activity-feed-body { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .activity-feed-label { font-size: 0.75rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.activity-feed-stat  { font-size: 0.68rem; font-weight: 500; color: #fbbf24; }
+.activity-feed-stat  { font-size: 0.68rem; font-weight: 500; color: var(--text-tertiary); }
 .activity-feed-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
-.activity-feed-xp    { font-size: 0.8rem; font-weight: 600; }
-.activity-feed-xp.pos { color: var(--success); }
-.activity-feed-xp.neg { color: var(--danger); }
 .activity-feed-time  { font-size: 0.65rem; color: var(--text-tertiary); }
 
 /* ─── Heatmap ────────────────────────────────────────────────────────────── */
@@ -543,10 +501,11 @@ body {
     min-height: calc(100% - 70px);
     display: grid;
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.35fr) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(320px, 1fr);
+    grid-template-rows: auto auto auto minmax(320px, 1fr);
     grid-template-areas:
       "head    head  head"
       "verdict leak  strength"
+      "level   level level"
       "trend   trend deltas";
   }
   .stats-header { grid-area: head; }
@@ -555,6 +514,7 @@ body {
   .stats-leak { grid-area: leak; }
   .stats-strength { grid-area: strength; }
   .trend-chart-card { grid-area: trend; }
+  .level-card { grid-area: level; }
   .stats-deltas { grid-area: deltas; }
   /* Rows share the card's height evenly instead of bunching at the top. */
   .stats-delta-list { flex: 1; }

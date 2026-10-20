@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Star, Trash2, X, Play, Check, CalendarDays, Target, Plus } from 'lucide-react';
 import {
-  dayLabel, whenOf, XP_BY_TIMEFRAME, isDayTask, createdAtOf, dateKeyOf,
+  dayLabel, whenOf, isDayTask, createdAtOf, dateKeyOf,
 } from '../../utils/taskUtils';
 import { getActiveGoals } from '../../utils/goalUtils';
 
@@ -24,7 +24,7 @@ const WHEN_CHIPS = [
 // parent mounts it with key={task.id}, so drafts reset when the task changes.
 const TaskDetail = ({
   task, today, goals, topFull, pending, onPatch, onMove, onComplete, onDelete, onToggleTop, onStartFocus, onClose,
-  onAwardXp, onToast,
+  onLogActivity, onToast,
 }) => {
   const [title, setTitle] = useState(task.text);
   const [newSubtask, setNewSubtask] = useState('');
@@ -52,14 +52,14 @@ const TaskDetail = ({
     setNewSubtask('');
   };
 
-  // A sub-task pays once, the first time it's ticked (unticking and re-ticking doesn't farm XP).
+  // A sub-task is logged once, the first time it's ticked (unticking and re-ticking doesn't re-log it).
   const toggleSubtask = (sub) => {
     const completing = !sub.completed;
     const award = completing && !sub.awarded;
     onPatch({ subtasks: subtasks.map((s) => (s.id === sub.id ? { ...s, completed: completing, ...(award ? { awarded: true } : {}) } : s)) });
     if (award) {
-      onAwardXp(SUBTASK_XP, { source: 'subtask', label: sub.text });
-      onToast({ text: `+${SUBTASK_XP} XP`, sub: `"${sub.text}" done` });
+      onLogActivity(SUBTASK_XP, { source: 'subtask', label: sub.text });
+      onToast({ text: 'Sub-task done', sub: sub.text });
     }
   };
 
@@ -129,7 +129,6 @@ const TaskDetail = ({
               onClick={() => onMove(value)}
             >
               {label}
-              <span className="tk-when-xp">+{XP_BY_TIMEFRAME[value === 'tomorrow' ? 'today' : value]}</span>
             </button>
           ))}
           <label className={`tk-when tk-when--pick${pickedDay ? ' tk-when--on' : ''}${done ? ' tk-when--disabled' : ''}`}>
@@ -231,10 +230,7 @@ const TaskDetail = ({
         />
       </section>
 
-      <p className="tk-detail-foot">
-        +{task.xp || 0} XP
-        {created ? ` · Added ${addedLabel(dateKeyOf(created), today)}` : ''}
-      </p>
+      {created && <p className="tk-detail-foot">Added {addedLabel(dateKeyOf(created), today)}</p>}
     </div>
   );
 };

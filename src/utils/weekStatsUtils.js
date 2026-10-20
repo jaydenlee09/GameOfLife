@@ -35,9 +35,10 @@ export const getWeekDays = (mondayKey) => {
 export const computeWeekStats = (mondayKey, ...rest) => computeStatsForDays(getWeekDays(mondayKey), ...rest);
 
 // Same stats over any list of day keys (e.g. a partial week, for like-for-like deltas).
-export const computeStatsForDays = (days, xpLog, pomodoroSessions, habits, todos, logs, goals = [], healthLog = {}) => {
+// `xpByDay` is { dateKey: xp } from the banked Daily Scores (xpUtils); XP is the sum of those days.
+export const computeStatsForDays = (days, xpLog, pomodoroSessions, habits, todos, logs, goals = [], healthLog = {}, xpByDay = {}) => {
 
-  const xpEarned     = xpLog.filter(e => days.includes(e.date) && e.amount > 0).reduce((s, e) => s + e.amount, 0);
+  const xpEarned     = days.reduce((s, d) => s + (xpByDay[d] || 0), 0);
   const tasksCompleted = countTaskCompletions(xpLog, days);
   const habitsCompleted = xpLog.filter(e => days.includes(e.date) && e.source === 'habit' && e.amount > 0).length;
   const focusMinutes  = pomodoroSessions.filter(s => days.includes(s.date) && s.completed).reduce((s, p) => s + Math.floor(p.durationSecs / 60), 0);

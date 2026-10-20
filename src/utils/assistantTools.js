@@ -398,16 +398,16 @@ const READ_TOOLS = [
   },
   {
     name: 'get_xp_breakdown',
-    description: 'Where XP came from over the last N days: totals by source (task, habit, calendar, focus, commitment…).',
+    description: 'XP per day over the last N days. XP is the Daily Score banked (score × 10 per day, 500 XP a level), so this is each day\'s score as XP, plus the current level.',
     parameters: OBJ({ days: I('Days back including today (default 7, max 60).') }),
     run: (args, { state }) => {
       const n = clamp(Math.round(toNumber(args?.days, 7)), 1, 60);
       const since = shiftDateKey(getLocalDateKey(0), -(n - 1));
-      const bySource = {};
-      (state.xpLog || []).filter((e) => e.date >= since).forEach((e) => {
-        bySource[e.source] = (bySource[e.source] || 0) + e.amount;
-      });
-      return { since, bySource };
+      const days = (state.xpSeries || [])
+        .filter((d) => d.dateKey >= since)
+        .map((d) => ({ date: d.dateKey, score: d.xp / 10, xp: d.xp, ...(d.today ? { soFar: true } : {}) }));
+      const { level, into, cap, total } = state.xp || {};
+      return { since, days, level, into, cap, total };
     },
   },
   {
@@ -459,7 +459,7 @@ const READ_TOOLS = [
   },
   {
     name: 'get_wishlist',
-    description: 'Unpurchased Reward Shop wishlist items (bought by spending earned XP).',
+    description: 'Unpurchased Reward Shop wishlist items (things to buy, with prices).',
     parameters: OBJ(),
     run: (_args, { state }) => ({
       items: (state.shop?.items || []).filter((i) => !i.purchased).map((i) => ({

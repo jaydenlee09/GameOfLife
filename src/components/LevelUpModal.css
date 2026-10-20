@@ -11,15 +11,100 @@
   animation: levelup-fadeIn 0.3s ease;
 }
 
-/* ─── Modal card ─────────────────────────────────────────────────────────── */
+/* ─── Modal: glowing badge on top, the days that built it below ─────────── */
 .levelup-modal {
   position: relative;
-  width: min(340px, 90vw);
-  height: min(340px, 90vw);
+  width: min(360px, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  animation: levelup-scaleIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.levelup-badge {
+  position: relative;
+  width: 200px;
+  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: levelup-scaleIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.levelup-panel {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1.1rem 1.2rem 1.2rem;
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg), rgba(28, 28, 30, 0.82);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  animation: levelup-slideUp 0.5s 0.25s both;
+}
+
+/* One bar per day, height = that day's Daily Score */
+.levelup-days {
+  width: 100%;
+  height: 64px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.levelup-day {
+  flex: 1;
+  max-width: 14px;
+  margin: 0 auto;
+  height: var(--h);
+  border-radius: 3px 3px 1px 1px;
+  background: var(--c);
+  opacity: 0.85;
+  transform-origin: bottom;
+  animation: levelup-grow 0.45s var(--d) cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.levelup-day.is-best {
+  opacity: 1;
+  box-shadow: 0 0 10px var(--c);
+}
+
+.levelup-facts {
+  width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.levelup-facts > div {
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--separator);
+}
+
+.levelup-facts dt {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.levelup-facts dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ─── Glow ring ──────────────────────────────────────────────────────────── */
@@ -64,7 +149,7 @@
 
 @keyframes levelup-particle {
   0%   { transform: rotate(calc(var(--i) * 30deg)) translateY(-20px) scale(1); opacity: 1; }
-  100% { transform: rotate(calc(var(--i) * 30deg)) translateY(-160px) scale(0); opacity: 0; }
+  100% { transform: rotate(calc(var(--i) * 30deg)) translateY(-130px) scale(0); opacity: 0; }
 }
 
 /* ─── Content ────────────────────────────────────────────────────────────── */
@@ -92,7 +177,7 @@
 }
 
 .levelup-number {
-  font-size: 7rem;
+  font-size: 5.2rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -108,11 +193,13 @@
   color: var(--text-secondary);
   margin: 0;
   letter-spacing: 0;
-  animation: levelup-slideDown 0.5s 0.3s both;
+  text-align: center;
 }
 
+.levelup-sub strong { color: var(--text-primary); font-weight: 700; }
+
 .levelup-btn {
-  margin-top: 1rem;
+  margin-top: 0.1rem;
   background: var(--accent);
   color: #fff;
   border: none;
@@ -123,7 +210,6 @@
   letter-spacing: 0;
   cursor: pointer;
   transition: transform 0.1s, background var(--duration) var(--ease);
-  animation: levelup-slideDown 0.5s 0.4s both;
 }
 
 .levelup-btn:hover  { background: var(--accent-pressed); }
@@ -153,4 +239,20 @@
 @keyframes levelup-slideDown {
   from { transform: translateY(-12px); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
+}
+
+@keyframes levelup-slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes levelup-grow {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .levelup-modal, .levelup-panel, .levelup-day, .levelup-ring, .levelup-particle,
+  .levelup-number, .levelup-pre { animation: none; }
+  .levelup-particle { display: none; }
 }

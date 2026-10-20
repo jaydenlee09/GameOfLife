@@ -47,7 +47,6 @@ const TaskRow = ({
           {showTimeframe && !isDayTask(task) && <span className="tk-chip">{TIMEFRAME_LABELS[task.timeFrame]}</span>}
           {subtasks.length > 0 && <span className="tk-chip"><ListChecks size={11} />{subDone}/{subtasks.length}</span>}
           {goalTitle && <span className="tk-chip tk-chip--goal"><Target size={11} /><span className="tk-chip-clip">{goalTitle}</span></span>}
-          <span className="tk-xp">+{task.xp || 0} XP</span>
         </div>
       </div>
 

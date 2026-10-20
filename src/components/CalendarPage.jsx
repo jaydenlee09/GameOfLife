@@ -226,7 +226,7 @@ export default function CalendarPage({
   setCalendarDayEvents,
   quickEvents,
   setQuickEvents,
-  onAwardXp,
+  onLogActivity,
   todos = [],
   logs = {},
   onPlanDay,
@@ -587,7 +587,7 @@ export default function CalendarPage({
     setNoPhoneDeleteScope(null);
   };
 
-  // ─── No-Phone adherence: honoring a block earns XP, so it's a tracked commitment ──
+  // ─── No-Phone adherence: honoring a block is logged, so it's a tracked commitment ──
   const isNoPhoneHonored = (block) => (block.recurrence==='none'||!block.recurrence)
     ? !!block.honored
     : (block.honoredDates||[]).includes(block._instanceDate);
@@ -595,9 +595,9 @@ export default function CalendarPage({
   const honorNoPhoneBlock = (block, e) => {
     e.stopPropagation();
     if (isNoPhoneHonored(block)) return;
-    // Earned from the block's length, like any other block.
+    // Logged with the block's length, like any other block.
     const xp = Math.max(1, xpForBlockMinutes(minsEndFromEvent(block) - minsFromEvent(block)));
-    onAwardXp(xp, { source: 'nophone', label: block.label || 'No-phone time honored' });
+    onLogActivity(xp, { source: 'nophone', label: block.label || 'No-phone time honored' });
     if (block.recurrence==='none'||!block.recurrence) {
       setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,honored:true}:b));
     } else {
@@ -709,7 +709,7 @@ export default function CalendarPage({
     if (currentlyCompleted === shouldBeCompleted) return;
 
     const xpDelta = shouldBeCompleted ? normalizedTask.xpAmount : -normalizedTask.xpAmount;
-    onAwardXp(xpDelta, { source: 'calendar', label: normalizedTask.title });
+    onLogActivity(xpDelta, { source: 'calendar', label: normalizedTask.title });
 
     if (!isRecurring) {
       setCalendarEvents((prev) => prev.map((calendarEvent) => {
@@ -1223,7 +1223,7 @@ export default function CalendarPage({
                         <button
                           className={`cal-nophone-honor${honored?' is-honored':''}`}
                           onClick={(e)=>honorNoPhoneBlock(block,e)}
-                          title={honored?'Honored — you earned XP':'Mark honored (earn XP)'}
+                          title={honored?'Honored':'Mark honored'}
                           aria-label="Mark honored"
                         ><Check size={11} strokeWidth={3} /></button>
                         <button className="cal-nophone-delete" onClick={(e)=>requestDeleteNoPhone(block,e)} title="Delete" aria-label="Delete">
@@ -1592,14 +1592,13 @@ export default function CalendarPage({
 
   // ─── Time-Block Hover Detail Card ────────────────────────────────────────────
   // Everything a block is too short to show: full title, exact times, duration,
-  // XP split, sub-events, bonus tasks and — the one field the grid never renders
+  // sub-events, bonus tasks and — the one field the grid never renders
   // anywhere else — the event's notes.
   const renderEventHoverCard = () => {
     if (!hoverCardVisible) return null;
     const ev = hoverCard.ev;
     const startMin = minsFromEvent(ev), endMin = minsEndFromEvent(ev);
     const durMin = Math.max(0, endMin - startMin);
-    const totalXp = durMin > 0 ? xpForBlockMinutes(durMin) : 0;
     const kind = blockKind(ev);
     const outcome = getBlockOutcome(ev);
     const missed = !outcome && ev._instanceDate >= PLAN_KEPT_START && getBlockStatus(ev, nowMs) === 'missed';
@@ -1638,7 +1637,6 @@ export default function CalendarPage({
         <div className="cal-hovercard-chips">
           <span className="cal-hovercard-chip cal-hovercard-chip--kind">{categoryMeta(blockCategory(ev)).label}</span>
           {kind !== 'event' && <span className="cal-hovercard-chip">{BLOCK_KIND_LABELS[kind]}</span>}
-          <span className="cal-hovercard-chip cal-hovercard-chip--xp">+{totalXp} XP</span>
           {recurLabel && (
             <span className="cal-hovercard-chip"><Repeat size={9} strokeWidth={3} />{recurLabel}</span>
           )}
@@ -1667,7 +1665,6 @@ export default function CalendarPage({
                   <span key={normalizedTask.id} className={`cal-hovercard-bonus ${bonusDone ? 'cal-hovercard-bonus--done' : ''}`}>
                     {bonusDone ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={3} />}
                     <span className="cal-hovercard-bonus-label">{normalizedTask.title}</span>
-                    <span className="cal-hovercard-bonus-xp">+{normalizedTask.xpAmount}</span>
                   </span>
                 );
               })}
@@ -1918,19 +1915,6 @@ export default function CalendarPage({
                 </div>
               </div>
               <div className="cal-field">
-                <label className="cal-label">Reward</label>
-                {(() => {
-                  const dur = (form.endHour*60+form.endMin) - (form.startHour*60+form.startMin);
-                  const total = dur > 0 ? xpForBlockMinutes(dur) : 0;
-                  return (
-                    <div className="cal-xp-earned">
-                      <span><strong>+{total} XP</strong></span>
-                      <span className="cal-xp-earned-note">earned from the block's length · 1 XP/min</span>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="cal-field">
                 <label className="cal-label">Repeat</label>
                 {renderRecurBtns(form.recurrence, r=>setForm(f=>({...f,recurrence:r})))}
                 {form.recurrence === 'weekly' && renderWeekdayPicker(
@@ -1984,7 +1968,6 @@ export default function CalendarPage({
                       )}
                       <div className="cal-bonus-main">
                         <span className="cal-bonus-name">{normalizedTask.title}</span>
-                        <span className="cal-bonus-meta">+{normalizedTask.xpAmount} XP</span>
                       </div>
                       <button type="button" className="cal-subevent-del" onClick={()=>removeBonusTask(normalizedTask.id)}><X size={12} /></button>
                     </div>
@@ -2118,13 +2101,6 @@ export default function CalendarPage({
                 <div className="cal-field">
                   <label className="cal-label">Duration (min)</label>
                   <input className="cal-input cal-input--xp" type="number" min="5" max="480" step="5" value={tmplForm.duration} onChange={e=>setTmplForm(f=>({...f,duration:Number(e.target.value)}))}/>
-                </div>
-                <div className="cal-field">
-                  <label className="cal-label">Reward</label>
-                  <div className="cal-xp-earned cal-xp-earned--sm">
-                    <span><strong>+{xpForBlockMinutes(tmplForm.duration || 0)} XP</strong></span>
-                    <span className="cal-xp-earned-note">from duration</span>
-                  </div>
                 </div>
               </div>
               <div className="cal-field">

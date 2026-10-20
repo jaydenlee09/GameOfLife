@@ -21,7 +21,7 @@ const PRESETS = [5 * 60, 10 * 60, 25 * 60, 45 * 60, 60 * 60, 90 * 60];
  * `linkedBlock` is that block's current instance (null once deleted).
  */
 const FocusMode = ({
-  todos = [], goals = [], onAwardXp, pomodoroSessions = [], onSessionComplete, onClose,
+  todos = [], goals = [], onLogActivity, pomodoroSessions = [], onSessionComplete, onClose,
   launch = null, linkedBlock = null, onPark, onComment, onCommentSaved, onCompleteBlock, onCompleteTask,
 }) => {
   const launchedTask = launch?.taskId != null ? todos.find(t => String(t.id) === String(launch.taskId) && !t.completed) : null;
@@ -44,7 +44,7 @@ const FocusMode = ({
   const { totalSecs, timeLeft, isRunning, hasStarted, start, pause, reset, setDuration } =
     useCountdownTimer(launch?.durationSecs || 25 * 60, () => setTimeout(() => { savedRef.current = false; setShowDone(true); }, 600));
 
-  // Reward is EARNED from session length, not chosen — 1 XP per focused minute.
+  // Logged on the session and in the activity log (no XP: that comes from the Daily Score).
   const xpAmount = xpForFocusMinutes(totalSecs / 60);
   const pinnedTask = taskOptions.find(t => t.id === pinnedId) || null;
   const activeGoals = getActiveGoals(goals);
@@ -57,7 +57,7 @@ const FocusMode = ({
       startedAt, durationSecs: totalSecs, xpAmount, intent,
       taskId: pinnedTask?.id, goalId, blockId: launch?.blockId, blockDate: launch?.blockDate, parked, debrief,
     });
-    if (!isLinked) onAwardXp(xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
+    if (!isLinked) onLogActivity(xpAmount, { source: 'pomodoro', label: `Focus: ${Math.floor(totalSecs / 60)}m` });
     onSessionComplete?.(session);
     return session;
   };
@@ -104,9 +104,7 @@ const FocusMode = ({
   const displaySecs = String(timeLeft % 60).padStart(2, '0');
   const progress = totalSecs > 0 ? (totalSecs - timeLeft) / totalSecs : 0;
   const R = 100, C = 2 * Math.PI * R;
-  const xpLine = isLinked
-    ? 'XP for these minutes comes from completing the block.'
-    : `+${xpAmount} XP`;
+  const summaryLine = `${Math.round(totalSecs / 60)} min focused`;
 
   return (
     <div className="focus-overlay">
@@ -187,21 +185,14 @@ const FocusMode = ({
         </div>
       )}
 
-      {/* Stat + XP */}
-      {isLinked ? (
-        <div className="focus-config">
-          <div className="focus-config-row focus-xp-earned-row">
-            <span className="focus-xp-earned-note">XP comes from completing the block</span>
-          </div>
+      {/* What this session counts toward */}
+      <div className="focus-config">
+        <div className="focus-config-row">
+          <span className="focus-counts-note">
+            {isLinked ? 'Completing the block counts toward today’s Daily Score' : 'Finishing tasks and blocks is what raises your Daily Score'}
+          </span>
         </div>
-      ) : (
-        <div className="focus-config">
-          <div className="focus-config-row focus-xp-earned-row">
-            <span className="focus-xp-earned">+{xpAmount} XP</span>
-            <span className="focus-xp-earned-note">earned · 1 XP / focused min</span>
-          </div>
-        </div>
-      )}
+      </div>
 
       {todayFocusMins > 0 && (
         <div className="focus-today-stats">
@@ -214,7 +205,7 @@ const FocusMode = ({
         <div className="focus-done-overlay">
           <FocusDebrief
             intent={intent.trim()}
-            xpLine={xpLine}
+            summaryLine={summaryLine}
             linkedBlock={linkedBlock}
             linkedTask={pinnedTask}
             onSave={saveSession}

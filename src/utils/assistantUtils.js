@@ -1,4 +1,3 @@
-import { xpCapForLevel } from './xpUtils';
 import { computeDailyScore, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD } from './scoreUtils';
 import { toDateKey, expandEventsForDates, isInstanceCompleted, getBlockOutcome } from './calendarUtils';
 import { getHabitStreak } from './habitUtils';
@@ -175,7 +174,7 @@ ${summarizeMemory(state.assistantMemory)}
 TODAY:
 ${summarizeToday(state)}
 
-CHARACTER: Level ${user.level} (${user.xp}/${xpCapForLevel(user.level)} XP)
+LEVEL: ${state.xp ? `Level ${state.xp.level} (${state.xp.into}/${state.xp.cap} XP, +${state.xp.todayXp} so far today). XP is the Daily Score banked: each day pays score × 10, 500 XP a level. Nothing else pays XP.` : 'unknown'}
 
 OPEN TASKS (ids in brackets):
 ${summarizeTasks(state.todos)}

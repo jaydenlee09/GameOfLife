@@ -337,25 +337,17 @@
   transform: scale(0.96);
 }
 
-/* ─── XP Pills ───────────────────────────────────────────────────────────── */
-.timer-xp-earned {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  background: var(--accent-wash);
-  border: 1px solid var(--accent);
+/* ─── What a session counts toward ───────────────────────────────────────── */
+.timer-counts {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--separator);
   border-radius: 12px;
   padding: 0.5rem 0.85rem;
 }
 
-.timer-xp-earned-val {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.timer-xp-earned-note {
+.timer-counts-note {
   font-size: 0.72rem;
+  line-height: 1.45;
   color: var(--text-secondary);
 }
 
@@ -569,7 +561,6 @@
 .timer-session-item:last-child { border-bottom: none; }
 .timer-session-dur  { font-weight: 500; color: var(--text-primary); min-width: 36px; }
 .timer-session-intent { flex: 1; min-width: 0; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.timer-session-xp   { color: var(--accent); font-weight: 600; min-width: 50px; }
 .timer-session-time { color: var(--text-tertiary); min-width: 55px; text-align: right; }
 
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */

@@ -15,7 +15,7 @@ export const ACHIEVEMENTS = [
   { id: 'tasks_50',  label: 'Task Master',     desc: 'Complete 50 tasks',  Icon: ClipboardList, tier: 'silver' },
   { id: 'tasks_100', label: 'Century',         desc: 'Complete 100 tasks', Icon: Award, tier: 'gold'   },
 
-  // XP milestones (lifetime positive XP)
+  // XP milestones (all-time XP: banked Daily Scores, see xpUtils)
   { id: 'xp_1000',  label: 'XP Initiate', desc: 'Earn 1,000 lifetime XP',  Icon: Zap, tier: 'bronze' },
   { id: 'xp_5000',  label: 'XP Adept',    desc: 'Earn 5,000 lifetime XP',  Icon: Zap, tier: 'silver' },
   { id: 'xp_10000', label: 'XP Master',   desc: 'Earn 10,000 lifetime XP', Icon: Zap, tier: 'gold'   },
@@ -74,12 +74,13 @@ const getCommitmentStreak = (commitmentArchive) => {
   return streak;
 };
 
-export const computeAchievementData = (user, habits, xpLog, pomodoroSessions, commitmentArchive, logs, goals = []) => ({
-  levelReached: user.level,
+// `xpStatus` is xpUtils.getXpStatus (level and all-time XP from banked Daily Scores).
+export const computeAchievementData = (user, xpStatus, habits, xpLog, pomodoroSessions, commitmentArchive, logs, goals = []) => ({
+  levelReached: xpStatus.level,
   // Prefer the monotonic counters on `user`; fall back to the (truncated) xpLog for
   // any state written before those counters existed.
   taskCount: user.lifetimeTaskCount ?? xpLog.filter(e => e.source === 'task').length,
-  lifetimeXp: user.lifetimeXp ?? xpLog.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0),
+  lifetimeXp: xpStatus.total,
   focusMinutes: pomodoroSessions.filter(s => s.completed).reduce((s, p) => s + Math.floor(p.durationSecs / 60), 0),
   bestHabitStreak: getBestHabitStreak(habits),
   commitmentStreak: getCommitmentStreak(commitmentArchive),

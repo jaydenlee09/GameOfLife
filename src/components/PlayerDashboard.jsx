@@ -5,6 +5,8 @@ import { getWeekVerdict, getScoreLeaks, getWeekDeltas } from '../utils/statsInsi
 import RANK_TIERS, { TIER_ICONS } from '../utils/rankMeta';
 import TrendChart from './stats/TrendChart';
 import ConnectedFeatureTiles from './stats/ConnectedFeatureTiles';
+import LevelCard from './stats/LevelCard';
+import { scoreColor } from '../utils/scoreUtils';
 import {
   CheckSquare, Flame, Swords, Handshake, Timer, Pin, HeartCrack, Zap, Sparkles, Target, Flag,
   ArrowRight, ArrowUp, ArrowDown, Minus, ChevronDown, Check, X, ThumbsUp,
@@ -33,7 +35,8 @@ const SOURCE_ICONS = {
 };
 
 // ─── Productivity Heatmap ─────────────────────────────────────────────────────
-const ProductivityHeatmap = ({ xpLog }) => {
+// One cell per day, colored by that day's Daily Score (its XP / 10).
+const ProductivityHeatmap = ({ xpSeries }) => {
   const [visibleWeeks, setVisibleWeeks] = useState(53);
 
   useEffect(() => {
@@ -48,10 +51,7 @@ const ProductivityHeatmap = ({ xpLog }) => {
   }, []);
 
   const cells = useMemo(() => {
-    const map = {};
-    for (const e of xpLog) {
-      if (e.amount > 0) map[e.date] = (map[e.date] || 0) + e.amount;
-    }
+    const map = Object.fromEntries(xpSeries.map(d => [d.dateKey, d.xp]));
     const today = new Date();
     const result = [];
     // Generate last 365 days
@@ -62,15 +62,9 @@ const ProductivityHeatmap = ({ xpLog }) => {
       result.push({ key, xp: map[key] || 0, date: d });
     }
     return result.slice(-(visibleWeeks * 7));
-  }, [xpLog, visibleWeeks]);
+  }, [xpSeries, visibleWeeks]);
 
-  const getColor = (xp) => {
-    if (xp === 0)   return '#2c2c2e';
-    if (xp < 50)    return 'rgba(56,189,248,0.3)';
-    if (xp < 150)   return 'rgba(56,189,248,0.55)';
-    if (xp < 300)   return 'rgba(56,189,248,0.8)';
-    return '#38bdf8';
-  };
+  const getColor = (xp) => (xp === 0 ? '#2c2c2e' : scoreColor(xp / 10));
 
   const [tooltip, setTooltip] = useState(null);
 
@@ -90,7 +84,7 @@ const ProductivityHeatmap = ({ xpLog }) => {
       {tooltip && (
         <div className="heatmap-tooltip">
           <strong>{tooltip.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
-          <span>{tooltip.xp > 0 ? `${tooltip.xp} XP` : 'No activity'}</span>
+          <span>{tooltip.xp > 0 ? `Score ${(tooltip.xp / 10).toFixed(1)} · ${tooltip.xp} XP` : 'No score'}</span>
         </div>
       )}
     </div>
@@ -105,16 +99,16 @@ const ActivityFeed = ({ xpLog }) => {
       {recent.length === 0 && <p className="activity-feed-empty">No activity yet. Complete tasks to see your log.</p>}
       {recent.map(e => {
         const Icon  = SOURCE_ICONS[e.source] || Zap;
-        const isPos = e.amount >= 0;
+        // Negative entries are undos (e.g. a habit unticked).
+        const undone = e.amount < 0;
         return (
           <div key={e.id} className="activity-feed-item">
             <span className="activity-feed-icon"><Icon size={16} /></span>
             <div className="activity-feed-body">
               {e.label && <span className="activity-feed-label">{e.label}</span>}
-              <span className="activity-feed-stat">XP</span>
+              {undone && <span className="activity-feed-stat">Undone</span>}
             </div>
             <div className="activity-feed-right">
-              <span className={`activity-feed-xp ${isPos ? 'pos' : 'neg'}`}>{isPos ? '+' : ''}{e.amount}</span>
               <span className="activity-feed-time">{relativeTime(e.ts)}</span>
             </div>
           </div>
@@ -271,7 +265,7 @@ const WeekDeltas = ({ deltas }) => (
 // Home covers "what do I do now"; everything archival lives in the closed "More".
 const PlayerDashboard = ({
   user, onUpdateName,
-  xpCap = 100,
+  xpStatus, xpSeries = [],
   commitmentArchive = [],
   xpLog = [], pomodoroSessions = [], habits = [], todos = [], logs = {},
   goals = [], healthLog = {}, noPhoneBlocks = [], calendarEvents = [],
@@ -309,6 +303,8 @@ const PlayerDashboard = ({
           <StrengthCard leaks={leaks} />
         </div>
 
+        {xpStatus && <LevelCard xpStatus={xpStatus} xpSeries={xpSeries} />}
+
         <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} calendarEvents={calendarEvents} />
 
         <WeekDeltas deltas={deltas} />
@@ -321,7 +317,7 @@ const PlayerDashboard = ({
         onClick={() => setMoreOpen((o) => !o)}
         aria-expanded={moreOpen}
       >
-        More <span className="stats-more-hint">character, features, activity, heatmap</span>
+        More <span className="stats-more-hint">name, features, activity, heatmap</span>
         <ChevronDown size={16} />
       </button>
 
@@ -334,15 +330,6 @@ const PlayerDashboard = ({
             ) : (
               <h2 className="profile-name" onClick={handleEditClick} title="Edit Name">{user.name}</h2>
             )}
-            <div className="level-bar-container">
-              <div className="level-bar-top">
-                <span className="level-text-left">Level {user.level}</span>
-                <span className="level-text-right">{user.xp}/{xpCap} XP</span>
-              </div>
-              <div className="level-progress-bar">
-                <div className="level-progress-fill" style={{ width: `${Math.min((user.xp / xpCap) * 100, 100)}%` }} />
-              </div>
-            </div>
           </div>
 
           <ConnectedFeatureTiles
@@ -358,7 +345,7 @@ const PlayerDashboard = ({
 
           <div className="dashboard-card heatmap-card">
             <h3 className="section-title">Productivity Heatmap: last 12 months</h3>
-            <ProductivityHeatmap xpLog={xpLog} />
+            <ProductivityHeatmap xpSeries={xpSeries} />
           </div>
         </div>
       )}

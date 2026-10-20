@@ -9,8 +9,9 @@ import { CalendarDays, X, ChevronDown, Target, PartyPopper } from 'lucide-react'
 import TasksPage from './components/TasksPage'
 import TimerPage from './components/TimerPage'
 import LevelUpModal from './components/LevelUpModal'
+import ScoreBumpToast from './components/ScoreBumpToast'
 import DailyLogPage from './components/DailyLogPage'
-import { xpCapForLevel } from './utils/xpUtils'
+import { updateXpBank, getXpStatus, getXpSeries, daysThatBuiltLevel } from './utils/xpUtils'
 import RANK_TIERS from './utils/rankMeta'
 import { computeRankStatus, computeDailyScore } from './utils/scoreUtils'
 import { hasEnoughForPatterns } from './utils/logPatterns'
@@ -23,6 +24,7 @@ import { subscribeWidgetSettings, publishWidgetSnapshot, syncWidgetTimezone } fr
 import { buildWidgetSnapshot, snapshotSignature } from './utils/widgetSnapshot'
 import FloatingAIBar from './components/FloatingAIBar'
 import useAssistant from './hooks/useAssistant'
+import useTodayKey from './hooks/useTodayKey'
 import { hasAssistantApiKey } from './utils/assistantUtils'
 import { EMPTY_CHECKINS, getDueCheckin, markCheckinDone, checkinPrompt, computeNudges, dismissNudge } from './utils/assistantTriggers'
 import { homeBriefFromMorning } from './utils/homeBrief'
@@ -161,17 +163,14 @@ function App() {
       level: 1,
       xp: 0,
     };
-    // Backfill monotonic lifetime counters from the (possibly truncated) xpLog once.
-    // After this they only ever grow, so they no longer decay as the 500-entry log rotates.
-    if (base.lifetimeXp === undefined || base.lifetimeTaskCount === undefined) {
+    // Backfill the monotonic lifetime task counter from the (possibly truncated) xpLog
+    // once. After this it only grows, so it no longer decays as the 500-entry log rotates.
+    // (`level`, `xp` and `lifetimeXp` are old per-action XP fields, now ignored: XP
+    // comes from banked Daily Scores, see xpUtils.)
+    if (base.lifetimeTaskCount === undefined) {
       const xpLogSaved = localStorage.getItem('gameOfLife_xpLog');
       const log = xpLogSaved ? JSON.parse(xpLogSaved) : [];
-      if (base.lifetimeXp === undefined) {
-        base.lifetimeXp = log.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
-      }
-      if (base.lifetimeTaskCount === undefined) {
-        base.lifetimeTaskCount = log.filter(e => e.source === 'task').length;
-      }
+      base.lifetimeTaskCount = log.filter(e => e.source === 'task').length;
     }
     return base;
   });
@@ -358,6 +357,10 @@ function App() {
   const [plannerDate, setPlannerDate] = useState(null);
   const [achievementToast, setAchievementToast] = useState(null);
   const [commitmentToast, setCommitmentToast] = useState(false);
+  const [scoreBump, setScoreBump] = useState(null);
+  // When cloud data last landed (initial load or a live update from another device),
+  // so a score change it causes isn't shown as something you just did.
+  const remoteAppliedAt = useRef(0);
 
   // ─── Daily Score ───────────────────────────────────────────────────────────────
   // Computed here (not inside Navbar) so the sidebar chip and any other consumer
@@ -368,7 +371,8 @@ function App() {
     () => ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
     [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents]
   );
-  const dailyScore = useMemo(() => computeDailyScore(scoreInputs), [scoreInputs]);
+  const todayKey = useTodayKey();
+  const dailyScore = useMemo(() => computeDailyScore(scoreInputs, todayKey), [scoreInputs, todayKey]);
 
   // ─── Rank ──────────────────────────────────────────────────────────────────────
   // Rank is a "maintain" system: it holds a tier only while the Daily Score keeps
@@ -381,6 +385,51 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog, calendarEvents]
   );
+
+  // ─── XP: the Daily Score, banked ──────────────────────────────────────────────
+  // Each finished day banks round(score × 10) XP in user.xpBank and today is live;
+  // level = total / 500 (see xpUtils). The bank shown is always up to date; it's
+  // only WRITTEN once the cloud load is done, since a setUser before then marks the
+  // user doc as edited here and keeps the cloud copy (with its bank) from loading.
+  const xpBank = useMemo(
+    () => updateXpBank(scoreInputs, user.xpBank, todayKey),
+    [scoreInputs, user.xpBank, todayKey]
+  );
+  const xpSeries = useMemo(() => getXpSeries(xpBank, todayKey, dailyScore.score), [xpBank, todayKey, dailyScore.score]);
+  const xpStatus = useMemo(() => getXpStatus(xpSeries), [xpSeries]);
+
+  useEffect(() => {
+    if (!cloudSyncReady || xpBank === user.xpBank) return;
+    setUser(prev => ({ ...prev, xpBank }));
+  }, [cloudSyncReady, xpBank, user.xpBank]);
+
+  // Level-up: celebrate a level the first time it's reached. `levelSeen` only goes
+  // up, so dipping below a level (unticking something) and back doesn't repeat it,
+  // and the first run after this change sets the baseline silently.
+  useEffect(() => {
+    if (!cloudSyncReady) return;
+    const seen = user.levelSeen;
+    if (seen != null && xpStatus.level <= seen) return;
+    setUser(prev => ({ ...prev, levelSeen: Math.max(prev.levelSeen ?? 0, xpStatus.level) }));
+    if (seen != null) setLevelUpModal({ level: xpStatus.level, days: daysThatBuiltLevel(xpSeries, xpStatus.level) });
+  }, [cloudSyncReady, xpStatus.level, user.levelSeen, xpSeries]);
+
+  // "+0.8 Daily Score" feedback when something you do raises today's score. Rises
+  // in quick succession merge into one toast; drops, new days and cloud data don't show.
+  const lastScore = useRef({ key: todayKey, score: dailyScore.score });
+  useEffect(() => {
+    const prev = lastScore.current;
+    lastScore.current = { key: todayKey, score: dailyScore.score };
+    if (!cloudSyncReady || prev.key !== todayKey) return;
+    const delta = Math.round((dailyScore.score - prev.score) * 10) / 10;
+    if (delta <= 0 || Date.now() - remoteAppliedAt.current < 2000) return;
+    setScoreBump(b => ({
+      id: Date.now(),
+      delta: Math.round(((b?.delta || 0) + delta) * 10) / 10,
+      score: dailyScore.score,
+    }));
+  }, [dailyScore.score, todayKey, cloudSyncReady]);
+  const dismissScoreBump = useCallback(() => setScoreBump(null), []);
 
   useEffect(() => {
     if (user.lastSeenRankTier == null) {
@@ -509,6 +558,7 @@ function App() {
       // keep the local edit); clear the set so it doesn't keep blocking live
       // updates for those keys for the rest of the session.
       touchedSinceLoadStart.current = new Set();
+      remoteAppliedAt.current = Date.now();
       // Signal that Firestore data is ready. The cloudSyncReady useEffect above
       // will set cloudSyncEnabled=true in the same commit cycle as the persist
       // effects for this load, ensuring no stale state can be written first.
@@ -556,6 +606,7 @@ function App() {
     // already ignores echoes of our own writes via firestoreService's
     // lastWrittenValue cache.
     const unsubscribe = subscribeToUserData(firebaseUser.uid, (key, value) => {
+      remoteAppliedAt.current = Date.now();
       keySetters.current[key]?.(value);
     });
     return unsubscribe;
@@ -617,7 +668,9 @@ function App() {
     return () => { cancelled = true; unsubscribe?.(); };
   }, [firebaseUser, cloudSyncReady]);
 
-  // ─── XP Logging ───────────────────────────────────────────────────────────────
+  // ─── Activity Log ─────────────────────────────────────────────────────────────
+  // The xpLog is the activity log: the Daily Score counts tasks from it, and the
+  // weekly stats count habits from it. Its `amount` no longer moves XP or level.
   // `ref` ties an event to the thing it paid for (a task's id). Before attributes were
   // removed a task logged one event per stat, so older entries may repeat a `ref`.
   // New events carry stat 'xp'; older ones keep the stat they were paid to.
@@ -637,51 +690,24 @@ function App() {
       const next = [event, ...prev];
       return next.length > 500 ? next.slice(0, 500) : next;
     });
-    // Keep monotonic lifetime counters (the xpLog itself is capped at 500 and rotates,
-    // so it can't be trusted for "lifetime" achievement thresholds).
-    if (amount > 0) {
-      setUser(prev => ({
-        ...prev,
-        lifetimeXp: (prev.lifetimeXp || 0) + amount,
-        lifetimeTaskCount: (prev.lifetimeTaskCount || 0) + (source === 'task' ? 1 : 0),
-      }));
+    // Keep a monotonic lifetime task count (the xpLog itself is capped at 500 and
+    // rotates, so it can't be trusted for "lifetime" achievement thresholds).
+    if (amount > 0 && source === 'task') {
+      setUser(prev => ({ ...prev, lifetimeTaskCount: (prev.lifetimeTaskCount || 0) + 1 }));
     }
   }, []);
 
   // ─── User / XP Functions ───────────────────────────────────────────────────────
   const updateName = (newName) => setUser(prev => ({ ...prev, name: newName }));
 
-  // awardXp is the single XP mutator: it credits global XP, handles level up/down,
-  // and logs the event. Every reward flows through this one path.
-  const awardXp = useCallback((amount, meta = {}) => {
+  // Every completion (task, habit, block, focus, goal…) is recorded here. It earns no
+  // XP by itself: XP is the day's Daily Score, banked (see the XP section above).
+  const logActivity = useCallback((amount, meta = {}) => {
     logXpEvent(amount, meta.source || 'manual', meta.label || '', meta);
-    setUser(prev => {
-      let currentXp = prev.xp + amount;
-      let currentLevel = prev.level;
-      let didLevelUp = false;
-      while (currentXp >= xpCapForLevel(currentLevel)) {
-        currentXp -= xpCapForLevel(currentLevel);
-        currentLevel++;
-        didLevelUp = true;
-      }
-      while (currentXp < 0 && currentLevel > 1) {
-        currentLevel--;
-        currentXp += xpCapForLevel(currentLevel);
-      }
-      if (currentLevel === 1 && currentXp < 0) currentXp = 0;
-      if (didLevelUp) {
-        setTimeout(() => setLevelUpModal({ newLevel: currentLevel }), 300);
-      }
-      return {
-        ...prev,
-        level: currentLevel,
-        xp: currentXp,
-      };
-    });
   }, [logXpEvent]);
 
-  // Toggle a habit for a given day, awarding/removing the same streak XP as the Tasks
-  // page (shared via habitUtils). Lets the daily check-in and the Tasks page stay in sync.
+  // Toggle a habit for a given day, logging/unlogging the same streak amount as the
+  // Tasks page (shared via habitUtils). Lets the daily check-in and the Tasks page stay in sync.
   const handleToggleHabitDay = useCallback((habitId, dateStr) => {
     const habit = habits.find(h => h.id === habitId);
     if (!habit) return;
@@ -689,13 +715,13 @@ function App() {
     if (history[dateStr]) {
       const xp = calcStreakXp(history, dateStr); // streak still includes this day
       delete history[dateStr];
-      awardXp(-xp, { source: 'habit', label: habit.name || habit.text });
+      logActivity(-xp, { source: 'habit', label: habit.name || habit.text });
     } else {
       history[dateStr] = true;
-      awardXp(calcStreakXp(history, dateStr), { source: 'habit', label: habit.name || habit.text });
+      logActivity(calcStreakXp(history, dateStr), { source: 'habit', label: habit.name || habit.text });
     }
     setHabits(prev => prev.map(h => h.id === habitId ? { ...h, history } : h));
-  }, [habits, awardXp]);
+  }, [habits, logActivity]);
 
   // ─── Pomodoro Session Callback ─────────────────────────────────────────────────
   const handleSessionComplete = useCallback((session) => {
@@ -761,7 +787,7 @@ function App() {
   const handleArchiveCommitmentResolve = (date, text, denied) => {
     if (!date) return;
     if (!denied) {
-      awardXp(10, { source: 'commitment', label: 'Commitment kept' });
+      logActivity(10, { source: 'commitment', label: 'Commitment kept' });
       setCommitmentToast(true);
       setTimeout(() => setCommitmentToast(false), 3200);
     }
@@ -771,7 +797,7 @@ function App() {
 
   // ─── Achievements Detection ────────────────────────────────────────────────────
   useEffect(() => {
-    const data = computeAchievementData(user, habits, xpLog, pomodoroSessions, commitmentArchive, logs, goals);
+    const data = computeAchievementData(user, xpStatus, habits, xpLog, pomodoroSessions, commitmentArchive, logs, goals);
     const current = checkAchievements(data);
     const newlyUnlocked = [];
     for (const id of Object.keys(current)) {
@@ -793,7 +819,7 @@ function App() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.level, xpLog.length, pomodoroSessions.length, commitmentArchive.length, goals]);
+  }, [xpStatus.level, xpStatus.total, xpLog.length, pomodoroSessions.length, commitmentArchive.length, goals]);
 
   // ─── Flush pending Firestore writes before page unload or backgrounding ───────
   // beforeunload alone misses mobile app-switches/backgrounding (notably iOS
@@ -860,7 +886,7 @@ function App() {
 
   const assistant = useAssistant({
     state: {
-      user, todos, habits, logs, healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog,
+      user, xp: xpStatus, xpSeries, todos, habits, logs, healthLog, foodPoints, pomodoroSessions, goals, weeklyReviews, xpLog,
       commitmentArchive, calendarEvents, noPhoneBlocks, calendarDayEvents, achievements, shop, brainDumpNotes,
       assistantMemory, assistantActivity, chatHistory,
     },
@@ -915,7 +941,7 @@ function App() {
   const checkInBlockInstance = (ev, status, reason = null) => {
     const res = checkInBlock(ev, status, { reason });
     if (!res) return null;
-    if (res.award) awardXp(res.award.amount, res.award);
+    if (res.award) logActivity(res.award.amount, res.award);
     setCalendarEvents(res.update);
     if (res.taskId != null) completeTaskById(res.taskId);
     return res.xp;
@@ -925,7 +951,7 @@ function App() {
   const completeTaskById = (taskId) => {
     const done = completeTask(todos.find(t => String(t.id) === String(taskId)));
     if (!done) return null;
-    if (done.award) awardXp(done.award.amount, done.award);
+    if (done.award) logActivity(done.award.amount, done.award);
     setTodos(done.update);
     return done.xp;
   };
@@ -1153,10 +1179,11 @@ function App() {
             todos={todos}
             habits={habits}
             logs={logs}
-            onAwardXp={awardXp}
+            onLogActivity={logActivity}
             setTodos={setTodos}
             setHabits={setHabits}
-            xpCap={xpCapForLevel(user.level)}
+            xpStatus={xpStatus}
+            xpSeries={xpSeries}
             commitmentArchive={commitmentArchive}
             xpLog={xpLog}
             pomodoroSessions={pomodoroSessions}
@@ -1165,13 +1192,14 @@ function App() {
             goals={goals}
             healthLog={healthLog}
             noPhoneBlocks={noPhoneBlocks}
+            calendarEvents={calendarEvents}
             onNavigate={handleNavigate}
           />
         );
       case 'tasks':
         return (
           <TasksPage
-            onAwardXp={awardXp}
+            onLogActivity={logActivity}
             todos={todos}
             setTodos={setTodos}
             xpLog={xpLog}
@@ -1204,7 +1232,6 @@ function App() {
             setFoodLog={setFoodLog}
             foodPoints={foodPoints}
             setFoodPoints={setFoodPoints}
-            onAwardXp={awardXp}
             logReviews={logReviews}
             onSubmitLog={assistant.reviewLog}
             reviewingDate={assistant.reviewingDate}
@@ -1218,7 +1245,7 @@ function App() {
         return (
           <TimerPage
             goals={goals}
-            onAwardXp={awardXp}
+            onLogActivity={logActivity}
             pomodoroSessions={pomodoroSessions}
             onSessionComplete={handleSessionComplete}
             onPark={parkThought}
@@ -1237,7 +1264,7 @@ function App() {
             setCalendarDayEvents={setCalendarDayEvents}
             quickEvents={quickEvents}
             setQuickEvents={setQuickEvents}
-            onAwardXp={awardXp}
+            onLogActivity={logActivity}
             todos={todos}
             logs={logs}
             onPlanDay={openPlanner}
@@ -1259,7 +1286,7 @@ function App() {
             setGoals={setGoals}
             todos={todos}
             setTodos={setTodos}
-            onAwardXp={awardXp}
+            onLogActivity={logActivity}
             habits={habits}
             setHabits={setHabits}
             pomodoroSessions={pomodoroSessions}
@@ -1277,6 +1304,7 @@ function App() {
             weeklyReviews={weeklyReviews}
             setWeeklyReviews={setWeeklyReviews}
             xpLog={xpLog}
+            xpSeries={xpSeries}
             pomodoroSessions={pomodoroSessions}
             habits={habits}
             todos={todos}
@@ -1286,7 +1314,7 @@ function App() {
             calendarEvents={calendarEvents}
             setGoals={setGoals}
             setTodos={setTodos}
-            onAwardXp={awardXp}
+            onLogActivity={logActivity}
             onRecalibrate={assistant.recalibrateGoals}
           />
         );
@@ -1307,7 +1335,7 @@ function App() {
           />
         );
       default:
-        return <PlayerDashboard user={user} onUpdateName={updateName} xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} commitmentArchive={commitmentArchive} rankStatus={rankStatus} goals={goals} healthLog={healthLog} noPhoneBlocks={noPhoneBlocks} calendarEvents={calendarEvents} onNavigate={handleNavigate} />;
+        return <PlayerDashboard user={user} onUpdateName={updateName} xpStatus={xpStatus} xpSeries={xpSeries} xpLog={xpLog} pomodoroSessions={pomodoroSessions} habits={habits} todos={todos} logs={logs} commitmentArchive={commitmentArchive} rankStatus={rankStatus} goals={goals} healthLog={healthLog} noPhoneBlocks={noPhoneBlocks} calendarEvents={calendarEvents} onNavigate={handleNavigate} />;
     }
   };
 
@@ -1317,9 +1345,7 @@ function App() {
         activePage={currentPage}
         onNavigate={handleNavigate}
         userEmail={user.name}
-        userLevel={user.level}
-        userXp={user.xp}
-        userXpCap={xpCapForLevel(user.level)}
+        xpStatus={xpStatus}
         rankStatus={rankStatus}
         dailyScore={dailyScore.score}
         scoreInputs={scoreInputs}
@@ -1363,7 +1389,7 @@ function App() {
       />
 
       {levelUpModal && (
-        <LevelUpModal newLevel={levelUpModal.newLevel} onClose={() => setLevelUpModal(null)} />
+        <LevelUpModal level={levelUpModal.level} days={levelUpModal.days} xpStatus={xpStatus} onClose={() => setLevelUpModal(null)} />
       )}
       {rankChangeModal && (
         <RankChangeModal tier={rankChangeModal.tier} direction={rankChangeModal.direction} streakDays={rankChangeModal.streakDays} onClose={() => setRankChangeModal(null)} />
@@ -1376,7 +1402,7 @@ function App() {
           key={focusLaunch ? `${focusLaunch.blockId ?? `task${focusLaunch.taskId}`}_${focusLaunch.blockDate}_${focusLaunch.goalId}` : 'free'}
           todos={todos}
           goals={goals}
-          onAwardXp={awardXp}
+          onLogActivity={logActivity}
           pomodoroSessions={pomodoroSessions}
           onSessionComplete={handleSessionComplete}
           onClose={closeFocusMode}
@@ -1416,9 +1442,13 @@ function App() {
           <span className="commitment-toast-icon"><PartyPopper size={26} /></span>
           <div className="commitment-toast-body">
             <span className="commitment-toast-title">Kept it!</span>
-            <span className="commitment-toast-label">+10 Discipline XP</span>
+            <span className="commitment-toast-label">Counted in today's Daily Score</span>
           </div>
         </div>
+      )}
+
+      {scoreBump && (
+        <ScoreBumpToast key={scoreBump.id} bump={scoreBump} xpStatus={xpStatus} onDone={dismissScoreBump} />
       )}
 
       {/* Home shows its own Now panel and weekly priority, so these popups skip it. */}

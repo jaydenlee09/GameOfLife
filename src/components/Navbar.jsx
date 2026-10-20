@@ -204,12 +204,15 @@ function ScoreRing({ score }) {
   );
 }
 
-// Score, rank and level on one row, the XP bar under it, then you.
-function SidebarFooter({ dailyScore, rankStatus, userLevel, userXp, userXpCap, userEmail, firebaseUser, onNavigate, onOpenDataModal, onSignOut }) {
-  const level = userLevel ?? 1;
-  const xp = userXp ?? 0;
-  const cap = userXpCap ?? 100;
-  const pct = cap ? Math.min((xp / cap) * 100, 100) : 0;
+// Score, rank and level on one row, the XP bar under it, then you. The bar shows
+// banked days in solid blue and today's live XP as a brighter segment on the end.
+function SidebarFooter({ dailyScore, rankStatus, xpStatus, userEmail, firebaseUser, onNavigate, onOpenDataModal, onSignOut }) {
+  const level = xpStatus?.level ?? 1;
+  const xp = xpStatus?.into ?? 0;
+  const cap = xpStatus?.cap ?? 500;
+  const todayXp = xpStatus?.todayXp ?? 0;
+  const pct = (n) => `${Math.min((n / cap) * 100, 100)}%`;
+  const bankedInLevel = xp - (xpStatus?.todayInLevel ?? 0);
   const score = Number.isFinite(dailyScore) ? dailyScore : 0;
   const tier = rankStatus?.tier;
   const RankIcon = tier ? TIER_ICONS[tier.icon] : null;
@@ -232,9 +235,10 @@ function SidebarFooter({ dailyScore, rankStatus, userLevel, userXp, userXpCap, u
         <span className="sidebar-level">LVL {level}</span>
       </button>
 
-      <div className="sidebar-xp" title={`${xp} / ${cap} XP to level ${level + 1}`}>
+      <div className="sidebar-xp" title={`Level ${level} · ${xp} / ${cap} XP · +${todayXp} from today so far (Daily Score × 10)`}>
         <div className="sidebar-xp-track">
-          <div className="sidebar-xp-fill" style={{ width: `${pct}%` }} />
+          <div className="sidebar-xp-fill" style={{ width: pct(bankedInLevel) }} />
+          <div className="sidebar-xp-today" style={{ left: pct(bankedInLevel), width: pct(xp - bankedInLevel) }} />
         </div>
         <span className="sidebar-xp-count">{xp}/{cap}</span>
       </div>
@@ -278,7 +282,7 @@ function SidebarFooter({ dailyScore, rankStatus, userLevel, userXp, userXpCap, u
 }
 
 const Navbar = ({
-  activePage, onNavigate, userEmail, userLevel, userXp, userXpCap, rankStatus, dailyScore,
+  activePage, onNavigate, userEmail, xpStatus, rankStatus, dailyScore,
   scoreInputs, todos, logReviews, weeklyReviews,
   paletteOpen, onOpenPalette, onClosePalette, commands,
   onOpenDataModal, isMobileMenuOpen, onMobileMenuToggle, onMobileMenuClose, firebaseUser, onSignOut,
@@ -312,9 +316,7 @@ const Navbar = ({
     <SidebarFooter
       dailyScore={dailyScore}
       rankStatus={rankStatus}
-      userLevel={userLevel}
-      userXp={userXp}
-      userXpCap={userXpCap}
+      xpStatus={xpStatus}
       userEmail={userEmail}
       firebaseUser={firebaseUser}
       onNavigate={onNavigate}

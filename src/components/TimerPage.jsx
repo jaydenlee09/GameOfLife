@@ -42,7 +42,7 @@ const relativeTime = (ts) => {
 
 
 // ─── Timer Page ───────────────────────────────────────────────────────────────
-const TimerPage = ({ goals = [], onAwardXp, pomodoroSessions = [], onSessionComplete, onPark, onComment, onCommentSaved }) => {
+const TimerPage = ({ goals = [], onLogActivity, pomodoroSessions = [], onSessionComplete, onPark, onComment, onCommentSaved }) => {
   const [sessionStartedAt, setSessionStartedAt] = useState(null);
   const [customMinutes, setCustomMinutes] = useState('');
   const [customSeconds, setCustomSeconds] = useState('');
@@ -57,7 +57,7 @@ const TimerPage = ({ goals = [], onAwardXp, pomodoroSessions = [], onSessionComp
   const { totalSecs: totalSeconds, timeLeft, isRunning, hasStarted, start, pause, reset, setDuration } =
     useCountdownTimer(25 * 60, () => setTimeout(() => { savedRef.current = false; setShowDebrief(true); }, 600));
 
-  // Reward is EARNED from the session length, not chosen — 1 XP per focused minute.
+  // Logged on the session and in the activity log (no XP: that comes from the Daily Score).
   const xpAmount = xpForFocusMinutes(totalSeconds / 60);
 
   // ── Derived session stats ────────────────────────────────────────────────
@@ -106,12 +106,12 @@ const TimerPage = ({ goals = [], onAwardXp, pomodoroSessions = [], onSessionComp
 
   const handleCustomKeyDown = (e) => { if (e.key === 'Enter') handleCustomApply(); };
 
-  // ── XP grant + session record (on debrief save or skip) ───────────────────
+  // ── Session record + activity log (on debrief save or skip) ──────────────
   const saveSession = (debrief) => {
     if (savedRef.current) return null;
     savedRef.current = true;
     const session = makeFocusSession({ startedAt: sessionStartedAt, durationSecs: totalSeconds, xpAmount, intent, goalId, parked, debrief });
-    onAwardXp(xpAmount, { source: 'pomodoro', label: `${Math.floor(totalSeconds / 60)}m focus session` });
+    onLogActivity(xpAmount, { source: 'pomodoro', label: `${Math.floor(totalSeconds / 60)}m focus session` });
     onSessionComplete?.(session);
     return session;
   };
@@ -227,10 +227,9 @@ const TimerPage = ({ goals = [], onAwardXp, pomodoroSessions = [], onSessionComp
           </div>
 
           <div className="timer-section">
-            <span className="timer-section-label">Reward</span>
-            <div className="timer-xp-earned">
-              <span className="timer-xp-earned-val">+{xpAmount} XP</span>
-              <span className="timer-xp-earned-note">earned · 1 XP per focused minute</span>
+            <span className="timer-section-label">Counts toward</span>
+            <div className="timer-counts">
+              <span className="timer-counts-note">Your Daily Score counts the tasks and time blocks a session helps you finish.</span>
             </div>
           </div>
         </div>
@@ -264,7 +263,6 @@ const TimerPage = ({ goals = [], onAwardXp, pomodoroSessions = [], onSessionComp
               <div key={s.id} className="timer-session-item">
                 <span className="timer-session-dur">{formatMins(Math.floor(s.durationSecs / 60))}</span>
                 <span className="timer-session-intent">{s.intent || 'Focus'}</span>
-                <span className="timer-session-xp">+{s.xpAmount} XP</span>
                 <span className="timer-session-time">{relativeTime(s.completedAt)}</span>
               </div>
             ))}
@@ -277,7 +275,7 @@ const TimerPage = ({ goals = [], onAwardXp, pomodoroSessions = [], onSessionComp
           <div className="modal-content timer-debrief-modal" onClick={(e) => e.stopPropagation()}>
             <FocusDebrief
               intent={intent.trim()}
-              xpLine={`+${xpAmount} XP`}
+              summaryLine={`${Math.round(totalSeconds / 60)} min focused`}
               onSave={saveSession}
               onComment={onComment}
               onCommentSaved={onCommentSaved}

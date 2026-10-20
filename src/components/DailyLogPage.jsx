@@ -288,7 +288,7 @@ const DailyLogPage = ({
   logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], setGoals, todos = [],
   pomodoroSessions = [], northStar, logPatterns,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
-  setFoodPoints, onAwardXp, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
+  setFoodPoints, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
   onExpandLesson, onAskAssistant, onNavigate, calendarEvents = [],
 }) => {
   const todayKey = getTodayKey();
@@ -481,7 +481,6 @@ const DailyLogPage = ({
             setFoodLog={setFoodLog}
             foodPoints={foodPoints}
             setFoodPoints={setFoodPoints}
-            onAwardXp={onAwardXp}
             goals={goals}
             setGoals={setGoals}
             todos={todos}

@@ -129,7 +129,7 @@ const Glance = ({ view, buckets, today, onSelect, onView }) => {
 };
 
 // ─── Tasks Page ───────────────────────────────────────────────────────────────
-const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStartFocus }) => {
+const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onStartFocus }) => {
   const today = todayKey();
   const wide = useMediaQuery(WIDE_QUERY);
   const [view, setView] = useState('today');
@@ -166,10 +166,10 @@ const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStart
     if (!p) return;
     clearTimeout(p.timer);
     pendingRef.current = null;
-    if (p.done.award) onAwardXp(p.done.award.amount, p.done.award);
+    if (p.done.award) onLogActivity(p.done.award.amount, p.done.award);
     setTodos(p.done.update);
     setPendingId(null);
-  }, [onAwardXp, setTodos]);
+  }, [onLogActivity, setTodos]);
 
   // Leaving the page or backgrounding the app pays out immediately, never drops it.
   useEffect(() => () => commitPending(), [commitPending]);
@@ -195,7 +195,7 @@ const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStart
     pendingRef.current = { id: task.id, done, timer: setTimeout(commitPending, UNDO_MS) };
     setPendingId(task.id);
     if (!wide && selectedId === task.id) setSelectedId(null);
-    showToast({ text: `Done${done.xp ? ` · +${done.xp} XP` : ''}`, sub: task.text, undo: cancelPending }, UNDO_MS);
+    showToast({ text: 'Done', sub: task.text, undo: cancelPending }, UNDO_MS);
   };
 
   // ── Edits ──
@@ -390,7 +390,7 @@ const TasksPage = ({ todos, setTodos, onAwardXp, xpLog = [], goals = [], onStart
       onToggleTop={toggleTop}
       onStartFocus={onStartFocus}
       onClose={() => setSelectedId(null)}
-      onAwardXp={onAwardXp}
+      onLogActivity={onLogActivity}
       onToast={showToast}
     />
   );

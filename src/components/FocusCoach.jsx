@@ -102,7 +102,7 @@ export function ParkThought({ onPark, count }) {
  * resolves { ok, comment, error }; `onCommentSaved(id, comment)` stores the reply.
  */
 export function FocusDebrief({
-  intent, xpLine, linkedBlock, linkedTask, onSave, onComment, onCommentSaved, onCompleteBlock, onCompleteTask, onClose,
+  intent, summaryLine, linkedBlock, linkedTask, onSave, onComment, onCommentSaved, onCompleteBlock, onCompleteTask, onClose,
 }) {
   // Snapshot what the session was linked to: completing the task removes it
   // from the list, and the result panel should still say what was done.
@@ -113,13 +113,14 @@ export function FocusDebrief({
   const [blockers, setBlockers] = useState([]);
   const [note, setNote] = useState('');
   const [comment, setComment] = useState({ status: 'idle' });
-  const [blockXp, setBlockXp] = useState(() => (block && getBlockOutcome(block)?.status === 'done' ? 0 : null));
-  const [taskXp, setTaskXp] = useState(null);
+  const [blockDone, setBlockDone] = useState(() => !!(block && getBlockOutcome(block)?.status === 'done'));
+  const [taskDone, setTaskDone] = useState(false);
 
   // A task block marked done completes its task too (App's check-in does both).
   const completeLinkedBlock = () => {
-    setBlockXp(onCompleteBlock() ?? 0);
-    if (task && String(block.plan?.taskId) === String(task.id)) setTaskXp((xp) => xp ?? 0);
+    onCompleteBlock();
+    setBlockDone(true);
+    if (task && String(block.plan?.taskId) === String(task.id)) setTaskDone(true);
   };
 
   const toggleBlocker = (id) => setBlockers((list) => (list.includes(id) ? list.filter((b) => b !== id) : [...list, id]));
@@ -187,19 +188,19 @@ export function FocusDebrief({
   return (
     <div className="fc-debrief">
       <h2 className="fc-title">Nice work</h2>
-      <p className="fc-xp">{xpLine}</p>
+      <p className="fc-xp">{summaryLine}</p>
 
       {(block || task) && (
         <div className="fc-links">
           {block && (
-            blockXp !== null
-              ? <p className="fc-linked-done"><Check size={14} /> Block completed{blockXp ? ` (+${blockXp} XP)` : ''}</p>
+            blockDone
+              ? <p className="fc-linked-done"><Check size={14} /> Block completed</p>
               : <button className="fc-btn fc-btn--link" onClick={completeLinkedBlock}><CalendarCheck size={14} /> Complete "{block.title}"</button>
           )}
           {task && (
-            taskXp !== null
-              ? <p className="fc-linked-done"><Check size={14} /> Task done{taskXp ? ` (+${taskXp} XP)` : ''}</p>
-              : <button className="fc-btn fc-btn--link" onClick={() => setTaskXp(onCompleteTask() ?? 0)}><ListChecks size={14} /> Mark "{task.text}" done</button>
+            taskDone
+              ? <p className="fc-linked-done"><Check size={14} /> Task done</p>
+              : <button className="fc-btn fc-btn--link" onClick={() => { onCompleteTask(); setTaskDone(true); }}><ListChecks size={14} /> Mark "{task.text}" done</button>
           )}
         </div>
       )}

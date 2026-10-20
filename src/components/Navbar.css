@@ -382,16 +382,24 @@
 .sidebar-level {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  transition: color var(--duration) var(--ease);
+  padding: 0.12rem 0.4rem;
+  border-radius: 99px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: var(--accent-wash);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease);
 }
 
-.sidebar-status:hover .sidebar-level,
 .sidebar-status:hover .sidebar-rank-name {
   color: var(--text-primary);
+}
+
+.sidebar-status:hover .sidebar-level {
+  border-color: var(--accent);
 }
 
 /* XP bar with its count at the end */
@@ -402,8 +410,9 @@
 }
 
 .sidebar-xp-track {
+  position: relative;
   flex: 1;
-  height: 3px;
+  height: 4px;
   background: var(--bg-elevated-2);
   border-radius: 99px;
   overflow: hidden;
@@ -411,9 +420,20 @@
 
 .sidebar-xp-fill {
   height: 100%;
-  border-radius: 99px;
-  background: var(--accent);
+  border-radius: 99px 0 0 99px;
+  background: var(--accent-pressed);
   transition: width 0.5s var(--ease);
+}
+
+/* Today's live XP, on the end of the banked fill */
+.sidebar-xp-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 0 99px 99px 0;
+  background: linear-gradient(90deg, var(--accent), #a5e4fc);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
+  transition: left 0.5s var(--ease), width 0.5s var(--ease);
 }
 
 .sidebar-xp-count {
