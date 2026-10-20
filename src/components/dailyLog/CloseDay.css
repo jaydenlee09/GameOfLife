@@ -1191,6 +1191,7 @@
   .cd-a-habits { grid-area: habits; }
   .cd-a-body { grid-area: body; }
   .cd-a-goals { grid-area: goals; }
+  .cd-a-experiment { grid-area: experiment; }
   .cd-a-patterns { grid-area: patterns; }
   .cd-a-wins { grid-area: wins; }
   .cd-a-improve { grid-area: improve; }
@@ -1225,13 +1226,14 @@
 
   /* Check in: mood + rating + habits on the left, the body check-in on the right */
   .cd-body--checkIn {
-    grid-template-rows: auto auto auto auto auto 1fr auto;
+    grid-template-rows: auto auto auto auto auto auto 1fr auto;
     grid-template-areas:
       "title title"
       "rate body"
       "feel body"
       "habits body"
       "goals body"
+      "experiment body"
       ". body"
       "nav nav";
   }

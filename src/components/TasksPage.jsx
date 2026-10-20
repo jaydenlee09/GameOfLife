@@ -223,8 +223,9 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
   };
 
   const move = (task, when) => {
-    // goalPeriodKey pinned old goal tasks to a week/month/year; a move frees them.
-    const fields = { ...whenFields(when, today), goalPeriodKey: null };
+    // goalPeriodKey pinned old goal tasks to a week/month/year, startsOn holds a Weekly
+    // Reset outcome until its week; a move frees both.
+    const fields = { ...whenFields(when, today), goalPeriodKey: null, startsOn: null };
     patch(task.id, fields);
     if (view === 'today' && when !== 'today') {
       const where = fields.timeFrame === 'today' ? dayLabel(fields.scheduledDate, today) : TIMEFRAME_LABELS[fields.timeFrame];

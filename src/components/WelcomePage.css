@@ -870,6 +870,14 @@ button.wp-move:hover {
   background: var(--accent);
 }
 
+.wp-why-count {
+  grid-area: bar;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
 /* Goals: up to three one-line goals under one key, each with its momentum. */
 .wp-why-goals {
   grid-area: text;
@@ -1312,8 +1320,10 @@ button.wp-move:hover {
     -webkit-line-clamp: 1;
   }
 
-  /* Goals stay (they're the point); the week priority line and a third goal give way. */
+  /* Goals stay (they're the point); the week priority line, the week's experiment
+     and a third goal give way. */
   .wp-why-row:nth-child(2),
+  .wp-why-row--exp,
   .wp-why-goal:nth-child(n + 3) {
     display: none;
   }

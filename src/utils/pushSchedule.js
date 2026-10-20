@@ -13,22 +13,23 @@ import { expandEventsForDates, isInstanceCompleted, getBlockStatus, blockRange }
 import { shiftDateKey } from './scoreUtils';
 import { isTop, todayQueue } from './taskUtils';
 import { getFocusGoals, getGoalEvents, QUIET_GOAL_DAYS } from './goalUtils';
+import { getResetDue } from './weeklyReset';
 
-export const PUSH_TYPES = ['morning', 'evening', 'streak', 'blocks', 'checkins', 'commitment', 'goals'];
+export const PUSH_TYPES = ['morning', 'evening', 'streak', 'blocks', 'checkins', 'commitment', 'goals', 'weekly'];
 
 export const DEFAULT_PUSH_SETTINGS = {
   enabled: false,
   timezone: null,
   appUrl: null,
   tokens: [],                  // [{ token, platform, addedAt }]
-  types: { morning: true, evening: true, streak: true, blocks: true, checkins: true, commitment: true, goals: true },
-  times: { morning: '07:30', commitment: '13:00', evening: '20:30', streak: '21:00', goals: '18:00' },
+  types: { morning: true, evening: true, streak: true, blocks: true, checkins: true, commitment: true, goals: true, weekly: true },
+  times: { morning: '07:30', commitment: '13:00', evening: '20:30', streak: '21:00', goals: '18:00', weekly: '19:00' },
   blockLeadMinutes: 20,        // generous: GitHub Actions ticks often run late
   testRequestedAt: null,       // set by "Send a test"; the next tick sends one
 };
 
 // How long after its set time a daily push may still go out (covers late ticks).
-const WINDOW_MINUTES = { morning: 180, commitment: 240, evening: 180, streak: 150, goals: 180 };
+const WINDOW_MINUTES = { morning: 180, commitment: 240, evening: 180, streak: 150, goals: 180, weekly: 240 };
 // A quiet goal is pushed on its 5th quiet day, then every 3rd day after, not nightly.
 const GOAL_QUIET_EVERY = 3;
 // A late tick that lands just after a block started still says so, rather than
@@ -139,28 +140,35 @@ export const decidePushes = (now, rawSettings, state, pushState = {}) => {
     }
   }
 
-  // Goals: Sunday gets the week's goal check; other days, a goal that's gone quiet
-  // (the same nudge the app shows), on day 5 and every 3rd day after.
-  if (on('goals') && inWindow('goals', settings, nowMin)) {
-    const focus = getFocusGoals(state.goals);
-    if (now.getDay() === 0 && focus.length && fresh(`goalsweek_${today}`)) {
-      const weekStart = shiftDateKey(today, -6);
-      const lines = focus.map((g) => {
-        const n = getGoalEvents(g, state).filter((e) => e.date >= weekStart && e.date <= today).length;
-        return `${g.title}: ${n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing'}`;
+  // Sunday evening: the Weekly Reset, with how the focus goals moved this week (the
+  // Reset recalibrates them). Same "due" rule as the in-app nudge; sent on Sunday only.
+  if (on('weekly') && now.getDay() === 0 && inWindow('weekly', settings, nowMin) && fresh(`weekly_${today}`) && getResetDue(state.weeklyReviews, now)) {
+    const weekStart = shiftDateKey(today, -6);
+    const lines = getFocusGoals(state.goals).map((g) => {
+      const n = getGoalEvents(g, state).filter((e) => e.date >= weekStart && e.date <= today).length;
+      return `${g.title}: ${n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing'}`;
+    });
+    pushes.push({
+      id: `weekly_${today}`,
+      type: 'weekly',
+      title: 'Your Weekly Reset',
+      body: `${lines.length ? `${lines.join(' · ')}. ` : ''}10 minutes to review your week and set up the next one.`,
+      page: 'review',
+    });
+  }
+
+  // Goals: a goal that's gone quiet (the same nudge the app shows), on day 5 and
+  // every 3rd day after. Sunday's goal recap is part of the Weekly Reset push.
+  if (on('goals') && now.getDay() !== 0 && inWindow('goals', settings, nowMin)) {
+    const quiet = nudges.filter((n) => n.id.startsWith('goal_') && (n.daysQuiet - QUIET_GOAL_DAYS) % GOAL_QUIET_EVERY === 0);
+    if (quiet.length && fresh(`goalquiet_${today}`)) {
+      pushes.push({
+        id: `goalquiet_${today}`,
+        type: 'goals',
+        title: quiet.length === 1 ? 'A goal has gone quiet' : `${quiet.length} goals have gone quiet`,
+        body: `${quiet[0].text}${quiet.length > 1 ? ` (+${quiet.length - 1} more)` : ''} One small step tonight counts.`,
+        page: 'goals',
       });
-      pushes.push({ id: `goalsweek_${today}`, type: 'goals', title: 'Your goals this week', body: `${lines.join(' · ')}. Tap to recalibrate next week in Weekly Review.`, page: 'review' });
-    } else if (now.getDay() !== 0) {
-      const quiet = nudges.filter((n) => n.id.startsWith('goal_') && (n.daysQuiet - QUIET_GOAL_DAYS) % GOAL_QUIET_EVERY === 0);
-      if (quiet.length && fresh(`goalquiet_${today}`)) {
-        pushes.push({
-          id: `goalquiet_${today}`,
-          type: 'goals',
-          title: quiet.length === 1 ? 'A goal has gone quiet' : `${quiet.length} goals have gone quiet`,
-          body: `${quiet[0].text}${quiet.length > 1 ? ` (+${quiet.length - 1} more)` : ''} One small step tonight counts.`,
-          page: 'goals',
-        });
-      }
     }
   }
 

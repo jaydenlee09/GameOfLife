@@ -289,7 +289,7 @@ const DailyLogPage = ({
   pomodoroSessions = [], northStar, logPatterns,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
   setFoodPoints, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
-  onExpandLesson, onAskAssistant, onNavigate, calendarEvents = [],
+  onExpandLesson, onAskAssistant, onNavigate, calendarEvents = [], weekExperiment = null,
 }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
@@ -469,6 +469,7 @@ const DailyLogPage = ({
             updateArrayField={updateArrayField}
             logs={logs}
             logReviews={logReviews}
+            experiment={weekExperiment}
             commitmentArchive={commitmentArchive}
             onResolveCommitment={onResolveCommitment}
             onCommitmentLocked={onCommitmentLocked}

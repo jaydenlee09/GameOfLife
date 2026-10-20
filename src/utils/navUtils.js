@@ -5,7 +5,7 @@
 import { toDateKey, getPlanDay } from './calendarUtils';
 import { todayQueue } from './taskUtils';
 import { getDayMode, getCloseDaySteps } from './homeUtils';
-import { getMondayKey } from './weekStatsUtils';
+import { getResetDue } from './weeklyReset';
 
 /** Alt+key → page. App's shortcut handler and the palette's hints both read this. */
 export const ALT_PAGE_KEYS = {
@@ -16,8 +16,6 @@ export const ALT_PAGE_KEYS = {
 /** The Alt key for a page, e.g. 'tasks' → '2', or null. */
 export const altKeyFor = (page) =>
   Object.keys(ALT_PAGE_KEYS).find((key) => ALT_PAGE_KEYS[key] === page) ?? null;
-
-const WEEKLY_REVIEW_FROM = 12; // Sunday noon, same as the assistant's weekly check-in
 
 const fmtTime = (h, m) => new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
@@ -41,7 +39,8 @@ export const getNavHints = ({ todos, calendarEvents, logs, logReviews, weeklyRev
     hints['daily-log'] = { dot: true };
   }
 
-  if (now.getDay() === 0 && now.getHours() >= WEEKLY_REVIEW_FROM && !weeklyReviews?.[getMondayKey(0)]?.completedAt) {
+  // Sunday evening (and Monday, if it slipped) until the Weekly Reset is locked in.
+  if (getResetDue(weeklyReviews, now)) {
     hints.review = { dot: true };
   }
 

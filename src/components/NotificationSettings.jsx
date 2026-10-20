@@ -11,7 +11,8 @@ const TYPE_ROWS = [
   { type: 'streak', label: 'Streak at risk', hint: 'If your score or a habit streak will break tonight', timeKey: 'streak', min: '18:00' },
   { type: 'blocks', label: 'Time block heads-up', hint: 'Before each time block and No Phone block' },
   { type: 'checkins', label: 'Block check-in', hint: 'When a time block ends: did you do it?' },
-  { type: 'goals', label: 'Goals check', hint: `When a focus goal has had nothing for ${QUIET_GOAL_DAYS}+ days, and a Sunday recap`, timeKey: 'goals' },
+  { type: 'goals', label: 'Goals check', hint: `When a focus goal has had nothing for ${QUIET_GOAL_DAYS}+ days`, timeKey: 'goals' },
+  { type: 'weekly', label: 'Weekly Reset', hint: 'Sunday evening, until your week is reviewed and planned', timeKey: 'weekly', min: '17:00' },
 ];
 
 /**

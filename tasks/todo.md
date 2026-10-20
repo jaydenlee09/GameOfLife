@@ -1,5 +1,39 @@
 # Todo
 
+## Done, uncommitted (2026-10-20): Weekly Review → guided "Weekly Reset"
+
+Problem (user): weekly review is a hassle, they have to think of everything themselves; wants it to
+review the week, plan the next one, and keep improving.
+User picked: full guided Reset (steps like Close the Day), AI proposes priority + 3 outcomes (+ tasks),
+one weekly experiment ticked daily in Close the Day, nudged Sunday evening.
+
+Record: weeklyReviews[reviewed Monday] keeps old fields; adds draft (AI, saved once), wins/blockers/
+lessons arrays, lastWeek {priority, outcomes, experiment verdict}, outcomes [{text, taskId}],
+experiment {text, why}. The plan made in week W's review runs in week W+1 (same as today's priority).
+
+- [x] utils/weeklyReset.js (pure): review week to open, active plan for a date, week score row /
+      leaks / deltas for any week, last plan's results (outcome tasks, experiment ticks + avg score on
+      done vs not-done days), Playbook (kept experiments), upcoming next week; AI draft (context,
+      schema, normalize, generate). statsInsights: leaks for explicit days.
+- [x] WeeklyReviewPage → Reset flow: Your week / Reflect / Goals (auto recalibrate) / Plan / Commit,
+      done view, "This week's plan" strip, past resets + Playbook sidebar. Old reviews still readable.
+- [x] Close the Day: "This week's experiment" did-it tick (entry.experiment) in Check in.
+- [x] Home Why tile: experiment row; priority readers (App popup, dayPlanner, assistant prompt,
+      get_weekly_reviews) use the active plan.
+- [x] Sunday-evening: 'weekly' push type (19:00, folds in the Sunday goal recap), nav dot + nudge from
+      17:00 (and Monday if unreviewed); retire the chat weekly check-in (the Reset replaces it).
+- [x] Verify: node checks, lint (json) diff, build, harness UI with faked Gemini, phone width.
+- Verified: node checks (week pick, active plan, due rule Sun 17:00/Mon, Playbook, ticks + score on done vs
+  skipped days, outcome tasks start Monday via `startsOn` and move from Upcoming to This week, seen-gated
+  step status, draft normalize/apply, weekly push/nudge/nav dot, legacy reviews), lint = HEAD baseline (37),
+  app + functions build, harness UI: late review (Tue) full flow → lock → Home row, Close the Day tick,
+  sidebar; Sunday 19:30 → "starts Monday", tasks start 10-26, pip; 375px no overflow; Home SE no clipping.
+- Found while testing: AI-prefilled steps counted as done (fixed with `seen`), long AI lines cut off
+  (growing fields), Reset squeezed to 416px beside the sidebar at 1024 (container queries), "next week"
+  copy on late reviews, experiment row showing where short phones hide the priority row.
+- Also: weekly chat check-in retired (Reset replaces it; Monday gets a normal morning check-in).
+
+
 ## Done, uncommitted (2026-10-20): XP = your Daily Score, banked
 
 Problem (user): XP/levels mean nothing and don't keep them on track; the Daily Score is accurate.

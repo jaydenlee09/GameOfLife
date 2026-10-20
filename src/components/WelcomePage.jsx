@@ -1,6 +1,6 @@
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
-  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical,
 } from 'lucide-react';
 import './WelcomePage.css';
 import { toDateKey, fmtRemaining, getPendingCheckIns } from '../utils/calendarUtils';
@@ -12,6 +12,7 @@ import {
   getDayMode, getNextUp, getYesterdayCommitment, getNextMove, getCloseDaySteps,
 } from '../utils/homeUtils';
 import { todayQueue } from '../utils/taskUtils';
+import { getExperimentTicks } from '../utils/weeklyReset';
 import { useNow } from '../hooks/useNow';
 
 const getGreeting = (hour) => {
@@ -372,7 +373,7 @@ function CommitmentTile({ commitment, onNavigate, onResolveCommitment }) {
   );
 }
 
-function WhyTile({ northStar, weekPriority, goals, goalData, now, onNavigate }) {
+function WhyTile({ northStar, weekPriority, experiment, goals, goalData, now, onNavigate }) {
   const vision = northStar?.vision?.trim();
   const focus = getFocusGoals(goals);
 
@@ -388,6 +389,14 @@ function WhyTile({ northStar, weekPriority, goals, goalData, now, onNavigate }) 
         <span className="wp-why-key">This week</span>
         <span className={`wp-why-text ${weekPriority ? '' : 'is-empty'}`}>{weekPriority || 'Set this week’s priority'}</span>
       </button>
+      {experiment && (
+        <button type="button" className="wp-why-row wp-why-row--exp" onClick={() => onNavigate('review')}>
+          <FlaskConical size={15} className="wp-why-icon" />
+          <span className="wp-why-key">Experiment</span>
+          <span className="wp-why-text">{experiment.text}</span>
+          <span className="wp-why-count" title="Days you did it this week">{experiment.done}/{experiment.days}</span>
+        </button>
+      )}
       {focus.length === 0 ? (
         <button type="button" className="wp-why-row" onClick={() => onNavigate('goals')}>
           <Flag size={15} className="wp-why-icon" />
@@ -429,6 +438,12 @@ function WhyTile({ northStar, weekPriority, goals, goalData, now, onNavigate }) 
   );
 }
 
+// "2/3": days you did this week's experiment, of the days so far.
+const countTicks = (logs, week, todayKey) => {
+  const ticks = getExperimentTicks(logs, week, todayKey);
+  return { done: ticks.done, days: ticks.days.length };
+};
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function WelcomePage({
   user,
@@ -437,6 +452,7 @@ export default function WelcomePage({
   noPhoneBlocks,
   calendarDayEvents,
   currentWeekPriority,
+  weekExperiment,
   logs,
   logReviews,
   commitmentArchive,
@@ -493,6 +509,7 @@ export default function WelcomePage({
           <WhyTile
             northStar={user?.northStar}
             weekPriority={currentWeekPriority}
+            experiment={weekExperiment ? { text: weekExperiment.text, ...countTicks(logs, weekExperiment.week, todayKey) } : null}
             goals={goals}
             goalData={{ todos, habits, pomodoroSessions, calendarEvents }}
             now={now}

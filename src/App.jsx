@@ -27,6 +27,7 @@ import useAssistant from './hooks/useAssistant'
 import useTodayKey from './hooks/useTodayKey'
 import { hasAssistantApiKey } from './utils/assistantUtils'
 import { EMPTY_CHECKINS, getDueCheckin, markCheckinDone, checkinPrompt, computeNudges, dismissNudge } from './utils/assistantTriggers'
+import { getActivePlan } from './utils/weeklyReset'
 import { homeBriefFromMorning } from './utils/homeBrief'
 import GoalsPage from './components/GoalsPage'
 import DataModal from './components/DataModal'
@@ -49,13 +50,6 @@ const PAGE_IDS = ['welcome', 'statistics', 'tasks', 'daily-log', 'timer', 'calen
 const getLocalDateKey = (offsetDays = 0) => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-};
-
-const getMondayKey = (offsetWeeks = 0) => {
-  const d = new Date();
-  const day = d.getDay();
-  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day) + offsetWeeks * 7);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
@@ -254,10 +248,6 @@ function App() {
   // Phones start with the small pill so the card doesn't cover the page.
   const [priorityPopupMinimized, setPriorityPopupMinimized] = useState(() => window.matchMedia('(max-width: 768px)').matches);
 
-  const currentWeekPriority = useMemo(() => {
-    const lastWeekKey = getMondayKey(-1);
-    return weeklyReviews[lastWeekKey]?.priority?.trim() || null;
-  }, [weeklyReviews]);
 
   // ─── Nearest Upcoming Event ────────────────────────────────────────────────────
   const nearestEvent = useMemo(() => {
@@ -373,6 +363,11 @@ function App() {
   );
   const todayKey = useTodayKey();
   const dailyScore = useMemo(() => computeDailyScore(scoreInputs, todayKey), [scoreInputs, todayKey]);
+
+  // The plan from last week's Reset: its priority shows on Home and in the priority
+  // card, its experiment gets a nightly tick in Close the Day.
+  const weekPlan = useMemo(() => getActivePlan(weeklyReviews, todayKey), [weeklyReviews, todayKey]);
+  const currentWeekPriority = weekPlan?.priority || null;
 
   // ─── Rank ──────────────────────────────────────────────────────────────────────
   // Rank is a "maintain" system: it holds a tier only while the Daily Score keeps
@@ -986,9 +981,9 @@ function App() {
     if (!due) return;
     const failedAt = checkinFailedAt.current[due.type];
     if (failedAt && clockTick - failedAt < 60 * 60 * 1000) return;
-    assistant.send(checkinPrompt(due.type, now), { hidden: true, kind: due.type, silent: true }).then((reply) => {
+    assistant.send(checkinPrompt(due.type), { hidden: true, kind: due.type, silent: true }).then((reply) => {
       if (reply) {
-        setAssistantCheckins(prev => markCheckinDone(prev, due, now));
+        setAssistantCheckins(prev => markCheckinDone(prev, due));
         // The morning briefing's first line doubles as Home's one-liner.
         const homeBrief = due.type === 'morning' ? homeBriefFromMorning(reply) : null;
         if (homeBrief) setUser(prev => ({ ...prev, homeBrief }));
@@ -1117,9 +1112,9 @@ function App() {
 
   const nudges = useMemo(
     () => (syncSettled
-      ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents }, assistantCheckins)
+      ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, weeklyReviews }, assistantCheckins)
       : []),
-    [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, assistantCheckins]
+    [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, weeklyReviews, assistantCheckins]
   );
   // A nudge that only sends you to the page you're already on is pointless, and the
   // Daily Log's Look back step already asks about yesterday's commitment.
@@ -1150,6 +1145,7 @@ function App() {
             noPhoneBlocks={noPhoneBlocks}
             calendarDayEvents={calendarDayEvents}
             currentWeekPriority={currentWeekPriority}
+            weekExperiment={weekPlan?.experiment ? { week: weekPlan.week, text: weekPlan.experiment.text } : null}
             logs={logs}
             logReviews={logReviews}
             commitmentArchive={commitmentArchive}
@@ -1233,6 +1229,7 @@ function App() {
             foodPoints={foodPoints}
             setFoodPoints={setFoodPoints}
             logReviews={logReviews}
+            weekExperiment={weekPlan?.experiment ? { week: weekPlan.week, text: weekPlan.experiment.text } : null}
             onSubmitLog={assistant.reviewLog}
             reviewingDate={assistant.reviewingDate}
             onOpenAssistant={openAssistant}
@@ -1303,6 +1300,12 @@ function App() {
           <WeeklyReviewPage
             weeklyReviews={weeklyReviews}
             setWeeklyReviews={setWeeklyReviews}
+            todayKey={todayKey}
+            commitmentArchive={commitmentArchive}
+            calendarDayEvents={calendarDayEvents}
+            logReviews={logReviews}
+            onDraft={assistant.draftWeek}
+            onNavigate={handleNavigate}
             xpLog={xpLog}
             xpSeries={xpSeries}
             pomodoroSessions={pomodoroSessions}

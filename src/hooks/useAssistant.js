@@ -9,6 +9,7 @@ import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
 import { generateLessonInsight } from '../utils/lessonInsight';
 import { generateGoalDraft, generateNextStep, generateUnstuck, generateRecalibration } from '../utils/goalCoach';
+import { generateResetDraft } from '../utils/weeklyReset';
 
 // Calls the app makes on its own (check-ins, nightly flags, sorting) yield to yours.
 const backgroundJson = asBackground(geminiGenerateJson);
@@ -299,12 +300,14 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
   const suggestNextStep = useCallback((goal, opts) => coach(generateNextStep, { goal }, 'step', opts), [coach]);
   const getUnstuck = useCallback((goal) => coach(generateUnstuck, { goal }, 'unstuck'), [coach]);
   const recalibrateGoals = useCallback(() => coach(generateRecalibration, {}, 'recalibration'), [coach]);
+  // Weekly Reset: drafts the week's reflection + next week's plan; the page saves it.
+  const draftWeek = useCallback((args) => coach(generateResetDraft, args, 'draft'), [coach]);
   // Calendar: sorts block titles no keyword matched into categories ({ [title]: id }).
   const sortBlockCategories = useCallback((titles) => coach(sortTitlesIntoCategories, { titles }, 'categories', { background: true }), [coach]);
 
   return {
     send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson,
-    draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, sortBlockCategories,
+    draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, draftWeek, sortBlockCategories,
     isLoading, error, clearError: () => setError(null),
   };
 }

@@ -7,22 +7,6 @@ export const getLocalDateKey = (offsetDays = 0) => {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
-export const getMondayKey = (offsetWeeks = 0) => {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1 - day) + offsetWeeks * 7;
-  d.setDate(d.getDate() + diff);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-};
-
-export const formatWeekRange = (mondayKey) => {
-  const mon = new Date(mondayKey + 'T00:00:00');
-  const sun = new Date(mon);
-  sun.setDate(sun.getDate() + 6);
-  const opts = { month: 'short', day: 'numeric' };
-  return `${mon.toLocaleDateString('en-US', opts)} – ${sun.toLocaleDateString('en-US', opts)}`;
-};
-
 export const getWeekDays = (mondayKey) => {
   const mon = new Date(mondayKey + 'T00:00:00');
   return Array.from({ length: 7 }, (_, i) => {

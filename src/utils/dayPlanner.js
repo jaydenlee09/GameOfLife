@@ -10,6 +10,7 @@ import { expandEventsForDates, toDateKey } from './calendarUtils';
 import { getGoalProgress, getActiveGoals, getGoalActivity, getNextStep, daysLeft, getGoalPace, paceLabel } from './goalUtils';
 import { getHabitStreak } from './habitUtils';
 import { shiftDateKey } from './scoreUtils';
+import { getActivePlan } from './weeklyReset';
 import { computeFocusInsights, describeBestWindows } from './focusInsights';
 import { CATEGORY_IDS, CATEGORY_GUIDE, isCategoryId, aiCategoryFields } from './blockCategories';
 
@@ -168,8 +169,6 @@ export const buildPlanContext = (state, { dateKey, settings, endTime, now = new 
   const free = computeFreeGaps({ dateKey, settings, endTime, now, calendarEvents: state.calendarEvents });
   const insights = computeFocusInsights(state.pomodoroSessions, now);
   const isToday = dateKey === toDateKey(now);
-  const reviews = state.weeklyReviews || {};
-  const latestReview = Object.keys(reviews).sort().pop();
   const durations = (state.pomodoroSessions || []).filter((s) => s.completed).slice(0, 20).map((s) => Math.round(s.durationSecs / 60)).sort((a, b) => a - b);
 
   return {
@@ -192,7 +191,8 @@ export const buildPlanContext = (state, { dateKey, settings, endTime, now = new 
       typicalSessionMinutes: durations.length ? durations[Math.floor(durations.length / 2)] : null,
     },
     northStar: state.user?.northStar?.vision || null,
-    weekPriority: latestReview ? reviews[latestReview]?.priority?.trim() || null : null,
+    // The priority from the Weekly Reset that covers the planned day's week.
+    weekPriority: getActivePlan(state.weeklyReviews, dateKey)?.priority || null,
     memory: (state.assistantMemory || []).filter((m) => m.kind === 'preference' || m.kind === 'pattern').map((m) => m.text).slice(0, 15),
   };
 };

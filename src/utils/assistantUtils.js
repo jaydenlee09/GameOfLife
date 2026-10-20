@@ -3,6 +3,7 @@ import { toDateKey, expandEventsForDates, isInstanceCompleted, getBlockOutcome }
 import { getHabitStreak } from './habitUtils';
 import { getActiveGoals, describeGoal } from './goalUtils';
 import { carriedDays, isTop, todayQueue } from './taskUtils';
+import { getActivePlan } from './weeklyReset';
 import { TOOL_DECLARATIONS, getTool, applyOpToState } from './assistantTools';
 
 export const MODEL = 'gemini-2.5-flash';
@@ -136,10 +137,19 @@ const summarizeRecentJournal = (logs, commitmentArchive) => {
   return lines.join('\n');
 };
 
-const summarizeWeekPriority = (weeklyReviews) => {
-  const keys = Object.keys(weeklyReviews || {}).sort();
-  const latest = keys.length ? weeklyReviews[keys[keys.length - 1]] : null;
-  return latest?.priority?.trim() ? `"${latest.priority.trim()}" (from the ${keys[keys.length - 1]} review)` : 'None set.';
+// The plan from the latest locked-in Weekly Reset that covers this week, plus next
+// week's once Sunday's Reset has set it.
+const summarizeWeekPlan = (weeklyReviews, todayKey = getLocalDateKey(0)) => {
+  const describe = (plan) => [
+    plan.priority ? `#1 priority: "${plan.priority}"` : null,
+    plan.outcomes.length ? `outcomes: ${plan.outcomes.map((o) => `"${o.text}"`).join(', ')}` : null,
+    plan.experiment ? `daily experiment: "${plan.experiment.text}"` : null,
+  ].filter(Boolean).join('; ');
+  const now = getActivePlan(weeklyReviews, todayKey);
+  const next = getActivePlan(weeklyReviews, shiftDateKey(todayKey, 7));
+  const lines = [now ? describe(now) : 'No plan set (they can run the Weekly Reset on the Weekly Review page).'];
+  if (next && next.week !== now?.week) lines.push(`Next week (already set): ${describe(next)}`);
+  return lines.join('\n');
 };
 
 /**
@@ -191,7 +201,7 @@ ${summarizeGoals(state)}
 DAILY LOG & COMMITMENT:
 ${summarizeRecentJournal(state.logs, state.commitmentArchive)}
 
-THIS WEEK'S #1 PRIORITY: ${summarizeWeekPriority(state.weeklyReviews)}
+THIS WEEK'S PLAN (Weekly Reset): ${summarizeWeekPlan(state.weeklyReviews)}
 
 HOW YOU WORK:
 - Look before you speak: if the snapshot above doesn't cover something (past days, health, journal history, score trend, focus time, brain dump, wishlist), call a read tool instead of guessing or saying you lack data. An empty CALENDAR day means nothing is scheduled.

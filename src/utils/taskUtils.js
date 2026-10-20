@@ -137,7 +137,8 @@ export const bucketTasks = (todos, today = getLocalDateKey(0)) => {
       if (isTop(t, today)) out.top.push(t);
       else if (carriedDays(t, today) > 0) out.carried.push(t);
       else out.today.push(t);
-    } else if (isDayTask(t)) {
+    } else if (isDayTask(t) || (t.startsOn && t.startsOn > today)) {
+      // A week/month task that starts later (a Weekly Reset outcome made on Sunday) waits in Upcoming.
       out.upcoming.push(t);
     } else if (out.later[t.timeFrame] && inCurrentPeriod(t, periodKeys)) {
       out.later[t.timeFrame].push(t);
@@ -157,6 +158,7 @@ export const bucketTasks = (todos, today = getLocalDateKey(0)) => {
 /** The future day an upcoming day-task lands on ('tomorrow' legacy → day after creation). */
 export const upcomingKey = (t) => {
   if (t.scheduledDate) return t.scheduledDate;
+  if (t.startsOn && !isDayTask(t)) return t.startsOn;
   if (t.timeFrame === 'tomorrow') {
     const created = createdAtOf(t);
     return created ? shiftDateKey(dateKeyOf(created), 1) : null;

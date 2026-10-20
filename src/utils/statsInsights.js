@@ -128,8 +128,11 @@ export const getScoreLeaks = (data, todayKey = getLocalDateKey(0)) => {
   const weekFinished = monday <= yesterday ? daysFrom(monday, 7).filter((k) => k <= yesterday) : [];
   const useWeek = weekFinished.length >= MIN_WEEK_DAYS;
   const dayKeys = useWeek ? weekFinished : daysFrom(shiftDateKey(yesterday, -(FALLBACK_DAYS - 1)), FALLBACK_DAYS);
-  const windowLabel = useWeek ? 'this week' : `in the last ${FALLBACK_DAYS} days`;
+  return getScoreLeaksForDays(data, dayKeys, useWeek ? 'this week' : `in the last ${FALLBACK_DAYS} days`);
+};
 
+/** The same leak math over any finished days (the Weekly Reset scores a whole past week). */
+export const getScoreLeaksForDays = (data, dayKeys, windowLabel) => {
   const scored = dayKeys.map((k) => scoreDay(data, k));
   const breakdowns = scored.map((s) => s.breakdown);
   const n = dayKeys.length;

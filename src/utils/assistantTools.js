@@ -431,7 +431,7 @@ const READ_TOOLS = [
   },
   {
     name: 'get_weekly_reviews',
-    description: 'The most recent Weekly Review entries (priority, improvements, what held them back, …), keyed by week-start Monday.',
+    description: 'The most recent Weekly Reviews, keyed by the Monday of the week reviewed: wins, blockers, lessons, how last week\'s plan went (lastWeek), and the plan for the FOLLOWING week (priority, outcomes, experiment). Older ones have wentWell / heldBack / improvements text.',
     parameters: OBJ({ count: I('How many recent reviews (default 2, max 8).') }),
     run: (args, { state }) => {
       const count = clamp(Math.round(toNumber(args?.count, 2)), 1, 8);
@@ -439,7 +439,8 @@ const READ_TOOLS = [
       return {
         reviews: Object.keys(reviews).sort().reverse().slice(0, count).map((week) => ({
           week,
-          ...Object.fromEntries(Object.entries(reviews[week] || {}).filter(([, v]) => typeof v === 'string' ? v.trim() : v != null)),
+          // The AI draft and goal-coach output are working data, not what they decided.
+          ...Object.fromEntries(Object.entries(reviews[week] || {}).filter(([k, v]) => k !== 'draft' && k !== 'goalCoach' && (typeof v === 'string' ? v.trim() : v != null))),
         })),
       };
     },

@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Moon, Plus, X, Trophy, TrendingUp, Lightbulb, PenLine, Target,
   Repeat, HeartPulse, MessageCircle, Sparkles, Shuffle, History, AlertTriangle, LoaderCircle, Lock, Pencil, Flame,
-  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck, Flag,
+  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck, Flag, FlaskConical,
 } from 'lucide-react';
 import EMOTIONS from '../../utils/logMeta';
 import {
@@ -18,6 +18,8 @@ import { getPendingCheckIns } from '../../utils/calendarUtils';
 import { computeDailyScore, computeStreak, scoreColor, shiftDateKey, STREAK_THRESHOLD } from '../../utils/scoreUtils';
 import { xpForScore } from '../../utils/xpUtils';
 import { entryHasContent, entryFingerprint } from '../../utils/logReview';
+import { getExperimentTicks } from '../../utils/weeklyReset';
+import { getMondayOf } from '../../utils/statsInsights';
 import HealthQuick from './HealthQuick';
 import HabitChecklist from './HabitChecklist';
 import LogReviewSection from './LogReview';
@@ -47,7 +49,7 @@ const formatTime = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'num
 // ─── Small pieces ─────────────────────────────────────────────────────────────
 
 // `area` names the block's slot in the monitor layout (CloseDay.css, >= 1400px).
-const Block = ({ Icon, title, hint, children, className = '', area }) => (
+export const Block = ({ Icon, title, hint, children, className = '', area }) => (
   <section className={`cd-block ${area ? `cd-a-${area} ` : ''}${className}`}>
     {title && (
       <header className="cd-block-head">
@@ -59,7 +61,7 @@ const Block = ({ Icon, title, hint, children, className = '', area }) => (
   </section>
 );
 
-const Segmented = ({ options, value, onChange, label }) => (
+export const Segmented = ({ options, value, onChange, label }) => (
   <div className="cd-seg" role="radiogroup" aria-label={label}>
     {options.map(o => (
       <button
@@ -239,7 +241,29 @@ const GoalCheckIn = ({ goals, setGoals, goalData, todayKey, now }) => {
   );
 };
 
-const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onToggleHabitDay, health, goalCheckIn }) => {
+/** This week's Reset experiment: one yes/no a night. Next Sunday's Reset reads the ticks. */
+const ExperimentCheck = ({ experiment, entry, updateField, logs, todayKey }) => {
+  const answer = entry.experiment?.week === experiment.week ? entry.experiment.done : null;
+  // Tonight's answer may not be in `logs` yet when it was just tapped, so count it from the entry.
+  const ticks = getExperimentTicks({ ...logs, [todayKey]: entry }, experiment.week, todayKey);
+  return (
+    <Block Icon={FlaskConical} title="This week’s experiment" hint={ticks.answered ? `${ticks.done} of ${ticks.days.length} days so far` : 'From your Weekly Reset'} area="experiment">
+      <p className="cd-quote">{experiment.text}</p>
+      <p className="cd-question">Did you do it today?</p>
+      <Segmented
+        label="Did you do this week's experiment today?"
+        value={answer === true ? 'yes' : answer === false ? 'no' : null}
+        onChange={(v) => updateField('experiment', { week: experiment.week, text: experiment.text, done: v === 'yes' })}
+        options={[
+          { value: 'yes', label: 'Did it', tone: 'success' },
+          { value: 'no', label: 'Not today', tone: 'neutral' },
+        ]}
+      />
+    </Block>
+  );
+};
+
+const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onToggleHabitDay, health, goalCheckIn, experiment, logs }) => {
   const emotions = entry.emotions || [];
   const toggleEmotion = (id) => updateField('emotions', emotions.includes(id) ? emotions.filter(e => e !== id) : [...emotions, id]);
   const habitsDone = habits.filter(h => h.history?.[todayKey]).length;
@@ -295,6 +319,8 @@ const CheckInStep = ({ entry, updateField, todayKey, habits, habitHandlers, onTo
           <GoalCheckIn todayKey={todayKey} {...goalCheckIn} />
         </Block>
       )}
+
+      {experiment && <ExperimentCheck experiment={experiment} entry={entry} updateField={updateField} logs={logs} todayKey={todayKey} />}
 
       <Block Icon={HeartPulse} title="Body" area="body">
         <HealthQuick todayKey={todayKey} {...health} />
@@ -669,6 +695,7 @@ const CloseDayFlow = ({
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints,
   goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
+  experiment,
 }) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
@@ -816,6 +843,8 @@ const CloseDayFlow = ({
                   onToggleHabitDay={onToggleHabitDay}
                   health={{ healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints }}
                   goalCheckIn={{ goals, setGoals, goalData: { todos, habits, pomodoroSessions, calendarEvents }, now }}
+                  experiment={experiment && experiment.week === getMondayOf(todayKey) ? experiment : null}
+                  logs={logs}
                 />
               )}
               {current === 'reflect' && (
