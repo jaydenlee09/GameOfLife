@@ -177,8 +177,9 @@ export const pickResurfacedLesson = (logs, todayKey) => {
 // ─── Tomorrow ─────────────────────────────────────────────────────────────────
 
 /**
- * Up to 3 commitment ideas: tonight's "improve" items, the focus goal's next
- * milestone, and tonight's pattern flags. Deduplicated, case-insensitively.
+ * Up to 3 commitment ideas: the "Help me improve" step (while it still matches
+ * tonight's notes), tonight's "improve" items, the focus goal's next milestone,
+ * and tonight's pattern flags. Deduplicated, case-insensitively.
  */
 export const getCommitmentSuggestions = ({ entry, goals, now, flags = [] }) => {
   const out = [];
@@ -186,6 +187,10 @@ export const getCommitmentSuggestions = ({ entry, goals, now, flags = [] }) => {
     const t = text?.trim();
     if (t && !out.some((s) => s.text.toLowerCase() === t.toLowerCase())) out.push({ source, text: t });
   };
+  const coach = entry?.improveCoach;
+  if (coach?.cue && coach?.action && coach.forText === clean(entry?.improve).join('\n')) {
+    add('coach', composeIfThen(coach.cue, coach.action));
+  }
   clean(entry?.improve).forEach((t) => add('improve', t));
   const goal = getFocusGoal(goals, now);
   if (goal) {

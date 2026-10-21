@@ -19,6 +19,7 @@ import { getLessons } from '../utils/closeDay';
 import CloseDayFlow from './dailyLog/CloseDayFlow';
 import LogReviewSection from './dailyLog/LogReview';
 import LessonInsight from './dailyLog/LessonInsight';
+import ImproveCoach from './dailyLog/ImproveCoach';
 
 // ─── Emotion Trend Chart ───────────────────────────────────────────────────────
 const EmotionTrend = ({ logs }) => {
@@ -289,7 +290,7 @@ const DailyLogPage = ({
   pomodoroSessions = [], northStar, logPatterns,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
   setFoodPoints, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
-  onExpandLesson, onAskAssistant, onNavigate, calendarEvents = [], weekExperiment = null,
+  onExpandLesson, onCoachImprove, onAskAssistant, onNavigate, calendarEvents = [], weekExperiment = null,
 }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
@@ -330,6 +331,17 @@ const DailyLogPage = ({
     onSave: saveLessonInsight,
     onAskAssistant,
   }), [onExpandLesson, saveLessonInsight, onAskAssistant]);
+
+  // "Help me improve" results, saved the same way (by the date they were asked for).
+  const saveImproveCoach = useCallback((dateKey, coach) => {
+    setLogs(prev => ({ ...prev, [dateKey]: { ...(prev[dateKey] || EMPTY_ENTRY()), improveCoach: coach } }));
+  }, [setLogs]);
+
+  const improveHandlers = useMemo(() => ({
+    onCoach: onCoachImprove,
+    onSave: saveImproveCoach,
+    onAskAssistant,
+  }), [onCoachImprove, saveImproveCoach, onAskAssistant]);
 
   // Ensure today's entry always exists
   useEffect(() => {
@@ -494,6 +506,7 @@ const DailyLogPage = ({
             onSubmitLog={onSubmitLog}
             onOpenAssistant={onOpenAssistant}
             lessonHandlers={lessonHandlers}
+            improveHandlers={improveHandlers}
             onNavigate={onNavigate}
           />
         ) : (
@@ -582,6 +595,8 @@ const DailyLogPage = ({
                     </div>
                   ))}
                 </div>
+                {/* Read-only here: its step was for the day after this one. */}
+                <ImproveCoach entry={currentEntry} onAskAssistant={onAskAssistant} />
               </div>
 
               {/* ── Nightly question ── */}

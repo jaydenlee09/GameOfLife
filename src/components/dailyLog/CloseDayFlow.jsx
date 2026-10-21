@@ -24,6 +24,7 @@ import HealthQuick from './HealthQuick';
 import HabitChecklist from './HabitChecklist';
 import LogReviewSection from './LogReview';
 import LessonInsight from './LessonInsight';
+import ImproveCoach from './ImproveCoach';
 import './CloseDay.css';
 
 const COMMIT_HOLD_DURATION = 3000;
@@ -382,7 +383,7 @@ const PatternCards = ({ flags, habitLeak, commitmentLocked, onMakeHabit, onUseFo
   );
 };
 
-const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, prompt, onShufflePrompt, patterns, lessonHandlers }) => {
+const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, prompt, onShufflePrompt, patterns, lessonHandlers, improveHandlers }) => {
   const [notesOpen, setNotesOpen] = useState(!!entry.notes?.trim());
   const resurfaced = useMemo(() => pickResurfacedLesson(logs, todayKey), [logs, todayKey]);
   const answer = entry.prompt?.answer || '';
@@ -406,6 +407,13 @@ const ReflectStep = ({ entry, updateField, updateArrayField, todayKey, logs, pro
           onChangeAt={(i, v) => updateArrayField('improve', i, v)}
           placeholders={['What would make tomorrow better?', 'Another…', 'One more…']}
           addLabel="Add another"
+        />
+        <ImproveCoach
+          dateKey={todayKey}
+          entry={entry}
+          {...improveHandlers}
+          onCommit={patterns.onUseForTomorrow}
+          commitmentLocked={patterns.commitmentLocked}
         />
       </Block>
 
@@ -486,7 +494,12 @@ const TomorrowStep = ({ entry, updateField, todayKey, commitmentLocked, suggesti
     }
   };
   const pickSuggestion = (s) => {
-    if (ifThen) setIfThenPart('action', lowerFirst(s));
+    // The coach's step is already a full if-then plan: take both halves.
+    const parsed = parseIfThen(s);
+    if (parsed) {
+      setIfThen(parsed);
+      setText(s);
+    } else if (ifThen) setIfThenPart('action', lowerFirst(s));
     else setText(s);
   };
 
@@ -497,7 +510,7 @@ const TomorrowStep = ({ entry, updateField, todayKey, commitmentLocked, suggesti
           <div className="cd-chips">
             {suggestions.map(s => (
               <button key={s.text} type="button" className="cd-chip" onClick={() => pickSuggestion(s.text)}>
-                {s.source === 'goal' ? <Target size={13} /> : s.source === 'pattern' ? <AlertTriangle size={13} /> : <TrendingUp size={13} />}
+                {s.source === 'coach' ? <Sparkles size={13} /> : s.source === 'goal' ? <Target size={13} /> : s.source === 'pattern' ? <AlertTriangle size={13} /> : <TrendingUp size={13} />}
                 {s.text}
               </button>
             ))}
@@ -694,7 +707,7 @@ const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints,
-  goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, onNavigate,
+  goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, improveHandlers, onNavigate,
   experiment,
 }) => {
   const reduceMotion = useReducedMotion();
@@ -858,6 +871,7 @@ const CloseDayFlow = ({
                   onShufflePrompt={shufflePrompt}
                   patterns={{ flags, habitLeak, commitmentLocked, onMakeHabit: habitHandlers.onAddHabit, onUseForTomorrow: applyToTomorrow }}
                   lessonHandlers={lessonHandlers}
+                  improveHandlers={improveHandlers}
                 />
               )}
               {current === 'tomorrow' && (

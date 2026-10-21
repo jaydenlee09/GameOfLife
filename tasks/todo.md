@@ -1,5 +1,29 @@
 # Todo
 
+## Done, pushed (2026-10-21): "Help me improve" coach on the Daily Log's improve section
+
+Problem (user): wants AI help on what they wrote under "what can I improve", plus one action step
+they can commit to for tomorrow.
+- [x] utils/improveCoach.js (pure, like lessonInsight.js): context = tonight's improve items, last 14
+      days of improve notes + whether they worked on them (loopCheck), today's rating/mood/sleep/energy,
+      tomorrow's calendar blocks, focus goal, North Star. Schema: focus, why, tips (2-3), step as
+      if-then (cue + action, small). Saved as `entry.improveCoach` tied to the improve text (stale on edit).
+- [x] useAssistant.coachImprove (foreground, tap-to-run) → App → DailyLogPage → CloseDayFlow.
+- [x] dailyLog/ImproveCoach.jsx under "One thing to improve" in Reflect: "Help me improve" button →
+      card (why, tips, tomorrow's step) with "Commit to this tomorrow" (fills Tomorrow as an if-then
+      and jumps there; disabled once locked), ask-a-follow-up chip, stale → Refresh.
+- [x] Tomorrow step "Ideas from tonight": the coach's step as the first chip (own icon).
+- [x] Past entries: saved coach card shown read-only under "To improve".
+- [x] Verify: node checks (context, normalize, stale, suggestions), lint (json) vs HEAD, build,
+      harness UI with faked Gemini (desktop + 375px), commit flow lands an if-then in Tomorrow.
+- Verified: node checks (context: history/loopCheck/tomorrow blocks/health; normalize strips "When"/"I will"/trailing
+  punctuation, keeps "I"; stale on edit; coach chip first only while fresh), lint (json) = HEAD (33), build, harness UI
+  1280 + 375: generate → card, commit → Tomorrow opens as if-then, chip from one-line mode switches to if-then, edit →
+  Refresh, forced failure → error then retry, locked → "already locked", past entry read-only, follow-up sends to
+  My Assistant, no overflow, no console errors.
+- Found while testing: a cue ending in "," rendered "goes off,, I will" (now strips trailing , ; : too).
+
+
 ## Done, uncommitted (2026-10-20): Calendar sidebar sections collapse, hint lines removed
 
 - [x] Each section header (Missed, Needs a time slot, Quick Time Blocks, Coming up) is a collapse toggle

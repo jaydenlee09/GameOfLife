@@ -8,6 +8,7 @@ import { sortTitlesIntoCategories } from '../utils/blockCategories';
 import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
 import { generateLessonInsight } from '../utils/lessonInsight';
+import { generateImproveCoach } from '../utils/improveCoach';
 import { generateGoalDraft, generateNextStep, generateUnstuck, generateRecalibration } from '../utils/goalCoach';
 import { generateResetDraft } from '../utils/weeklyReset';
 
@@ -285,6 +286,17 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     }
   }, []);
 
+  // ─── Daily Log "Help me improve" ────────────────────────────────────────────
+  /** Resolves { ok, coach } or { ok: false, error }. Writes nothing; the caller saves it on the entry. */
+  const coachImprove = useCallback(async (dateKey) => {
+    try {
+      const coach = await generateImproveCoach({ state: stateRef.current, dateKey, generate: geminiGenerateJson });
+      return { ok: true, coach };
+    } catch (err) {
+      return { ok: false, error: friendlyError(err) };
+    }
+  }, []);
+
   // ─── Goal coach ─────────────────────────────────────────────────────────────
   // Each resolves { ok, … } or { ok: false, error } and writes nothing: the Goals
   // page and Weekly Review show the suggestion and apply it only on a tap.
@@ -306,7 +318,7 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
   const sortBlockCategories = useCallback((titles) => coach(sortTitlesIntoCategories, { titles }, 'categories', { background: true }), [coach]);
 
   return {
-    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson,
+    send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson, coachImprove,
     draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, draftWeek, sortBlockCategories,
     isLoading, error, clearError: () => setError(null),
   };

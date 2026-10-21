@@ -1234,6 +1234,7 @@ function App() {
             reviewingDate={assistant.reviewingDate}
             onOpenAssistant={openAssistant}
             onExpandLesson={assistant.expandLesson}
+            onCoachImprove={assistant.coachImprove}
             onAskAssistant={askAssistant}
             onNavigate={handleNavigate}
           />
