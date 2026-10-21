@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles, Palette, CalendarPlus, Target, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, ListChecks, NotebookText, Repeat, Play, Sparkles, Palette, CalendarPlus, Target, ChevronDown } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
@@ -138,6 +138,27 @@ const formatLogDate = (dateKey) => {
 const isBonusTaskCompleted = (task, ev) => {
   if (ev.recurrence === 'none' || !ev.recurrence) return Boolean(task.completed);
   return task.completedDates?.includes(ev._instanceDate);
+};
+// Pixel heights of a block's parts (keep in sync with .cal-event-* in CalendarPage.css).
+const BLOCK_ROWS = {
+  head: 17,     // .cal-event-inner padding + title line
+  time: 16,
+  checkIn: 21,
+  task: { first: 4, row: 19, gap: 3 },  // .cal-event-bonus-list margin-top / row / gap
+  step: { first: 3, row: 17, gap: 2 },  // .cal-event-subevents
+};
+// How many tasks and steps fit under a block's title. Tasks get the room first
+// (they're what you tick off); steps take what's left. The rest shows on the
+// title's task badge and in the hover card, never as a half-clipped row.
+const fitBlockRows = (height, { time, checkIn, tasks, steps }) => {
+  let room = height - BLOCK_ROWS.head - (time ? BLOCK_ROWS.time : 0) - (checkIn ? BLOCK_ROWS.checkIn : 0);
+  const take = (count, { first, row, gap }) => {
+    const n = Math.max(0, Math.min(count, Math.floor((room - first + gap) / (row + gap))));
+    if (n) room -= first + n * row + (n - 1) * gap;
+    return n;
+  };
+  const shownTasks = take(tasks, BLOCK_ROWS.task);
+  return { shownTasks, shownSteps: take(steps, BLOCK_ROWS.step) };
 };
 // The check-in saved for this instance (not one derived from `completed`).
 const storedOutcome = (ev) => ((ev.recurrence === 'none' || !ev.recurrence) ? ev.outcome : ev.outcomes?.[ev._instanceDate]) || null;
@@ -1271,6 +1292,11 @@ export default function CalendarPage({
                   const status=rawStatus==='missed' && ev._instanceDate<PLAN_KEPT_START ? 'past' : rawStatus;
                   const dispStartH=Math.floor(startMin/60), dispStartM=startMin%60;
                   const dispEndH=Math.floor(endMin/60), dispEndM=endMin%60;
+                  const showTime=height>30, showCheckIn=status==='missed'&&height>=48;
+                  const blockTasks=(ev.bonusTasks||[]).map((task,taskIndex)=>normalizeBonusTask(task,taskIndex));
+                  const tasksDone=blockTasks.filter(task=>isBonusTaskCompleted(task,ev)).length;
+                  const subEvents=ev.subEvents||[];
+                  const {shownTasks,shownSteps}=fitBlockRows(height,{time:showTime,checkIn:showCheckIn,tasks:blockTasks.length,steps:subEvents.length});
                   return (
                     <div
                       key={`${ev.id}-${ev._instanceDate}-${ei}`}
@@ -1292,22 +1318,31 @@ export default function CalendarPage({
                         onClick={(e)=>e.stopPropagation()}
                       />
                       <div className="cal-event-inner">
-                        <div className="cal-event-title">{ev.plan?.id && <Sparkles size={9} className="cal-event-planned" aria-label="Planned by My Assistant" />}{ev.title}</div>
-                        {height>30&&<div className="cal-event-time">{fmtTime(dispStartH,dispStartM)} – {fmtTime(dispEndH,dispEndM)}</div>}
-                        {status==='missed'&&height>=48&&(
+                        <div className="cal-event-title">
+                          {ev.plan?.id && <Sparkles size={9} className="cal-event-planned" aria-label="Planned by My Assistant" />}
+                          {shownTasks<blockTasks.length&&(
+                            <span
+                              className={`cal-event-taskbadge ${tasksDone===blockTasks.length?'cal-event-taskbadge--done':''}`}
+                              title={`${blockTasks.length} task${blockTasks.length===1?'':'s'}, ${tasksDone} done`}
+                              aria-label={`${blockTasks.length} task${blockTasks.length===1?'':'s'}, ${tasksDone} done`}
+                            ><ListChecks size={9} strokeWidth={2.5} />{tasksDone}/{blockTasks.length}</span>
+                          )}
+                          <span className="cal-event-title-text">{ev.title}</span>
+                        </div>
+                        {showTime&&<div className="cal-event-time">{fmtTime(dispStartH,dispStartM)} – {fmtTime(dispEndH,dispEndM)}</div>}
+                        {showCheckIn&&(
                           <button type="button" className="cal-event-checkin" onClick={(e)=>openCheckIn(ev,e)} onMouseDown={(e)=>e.stopPropagation()}>Check in</button>
                         )}
-                        {height>60&&ev.subEvents?.length>0&&(
+                        {shownSteps>0&&(
                           <div className="cal-event-subevents">
-                            {ev.subEvents.map(se=>(
+                            {subEvents.slice(0,shownSteps).map(se=>(
                               <div key={se.id} className="cal-event-subevent">{se.title}</div>
                             ))}
                           </div>
                         )}
-                        {height>88&&ev.bonusTasks?.length>0&&(
+                        {shownTasks>0&&(
                           <div className="cal-event-bonus-list">
-                            {ev.bonusTasks.slice(0, height > 140 ? ev.bonusTasks.length : 2).map((task, taskIndex)=>{
-                              const normalizedTask = normalizeBonusTask(task, taskIndex);
+                            {blockTasks.slice(0,shownTasks).map((normalizedTask)=>{
                               const bonusDone = isBonusTaskCompleted(normalizedTask, ev);
                               return (
                                 <button
@@ -1315,7 +1350,7 @@ export default function CalendarPage({
                                   type="button"
                                   className={`cal-event-bonus ${bonusDone?'cal-event-bonus--done':''}`}
                                   onClick={(e)=>completeBonusTask(ev, normalizedTask, e)}
-                                  title={bonusDone ? `Uncheck bonus task: ${normalizedTask.title}` : `Complete bonus task: ${normalizedTask.title}`}
+                                  title={bonusDone ? `Uncheck task: ${normalizedTask.title}` : `Complete task: ${normalizedTask.title}`}
                                 >
                                   <span className="cal-event-bonus-check">{bonusDone ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={3} />}</span>
                                   <span className="cal-event-bonus-label">{normalizedTask.title}</span>
@@ -1613,7 +1648,7 @@ export default function CalendarPage({
 
   // ─── Time-Block Hover Detail Card ────────────────────────────────────────────
   // Everything a block is too short to show: full title, exact times, duration,
-  // sub-events, bonus tasks and — the one field the grid never renders
+  // sub-events, tasks and — the one field the grid never renders
   // anywhere else — the event's notes.
   const renderEventHoverCard = () => {
     if (!hoverCardVisible) return null;
@@ -1677,7 +1712,7 @@ export default function CalendarPage({
 
         {bonusTasks.length > 0 && (
           <div className="cal-hovercard-section">
-            <span className="cal-hovercard-label">Bonus tasks</span>
+            <span className="cal-hovercard-label">Tasks</span>
             <div className="cal-hovercard-list">
               {bonusTasks.slice(0, 6).map((task, taskIndex) => {
                 const normalizedTask = normalizeBonusTask(task, taskIndex);
@@ -1965,7 +2000,7 @@ export default function CalendarPage({
                 </div>
               </div>
               <div className="cal-field">
-                <label className="cal-label">Bonus Tasks</label>
+                <label className="cal-label">Tasks</label>
                 <div className="cal-bonus-list">
                   {(form.bonusTasks||[]).map((task, index)=>{
                     const normalizedTask = normalizeBonusTask(task, index);
@@ -2010,7 +2045,7 @@ export default function CalendarPage({
                       <Plus size={14} strokeWidth={3} />
                     </span>
                   </div>
-                  <button type="button" className="cal-btn cal-btn--ghost cal-bonus-add-btn" disabled={!newBonusTask.title.trim()} onClick={addBonusTask}>Add Bonus Task</button>
+                  <button type="button" className="cal-btn cal-btn--ghost cal-bonus-add-btn" disabled={!newBonusTask.title.trim()} onClick={addBonusTask}>Add Task</button>
                 </div>
               </div>
               <div className="cal-field">

@@ -477,12 +477,12 @@
 .cal-event:hover { filter: brightness(1.2); z-index: 3; }
 .cal-event:hover .cal-event-actions { opacity: 1; }
 .cal-event--done { opacity: 0.4; }
-.cal-event--done .cal-event-title { text-decoration: line-through; color: var(--text-tertiary); }
+.cal-event--done .cal-event-title-text { text-decoration: line-through; color: var(--text-tertiary); }
 /* Check-in states (see getBlockStatus). Missed = ended with no answer yet. */
 .cal-event--missed { border-left-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--bg-elevated-2)); }
 .cal-event--partly { opacity: 0.7; border-left-style: dashed; border-left-color: var(--warning); }
 .cal-event--skipped { opacity: 0.38; border-left-style: dashed; border-left-color: var(--text-tertiary); }
-.cal-event--skipped .cal-event-title { text-decoration: line-through; color: var(--text-tertiary); }
+.cal-event--skipped .cal-event-title-text { text-decoration: line-through; color: var(--text-tertiary); }
 .cal-event--now { box-shadow: var(--shadow-sm), 0 0 0 1px var(--ev-color, #38bdf8); }
 .cal-event-checkin {
   align-self: flex-start; flex-shrink: 0; margin-top: 3px; height: 18px; padding: 0 7px; border-radius: 999px;
@@ -492,7 +492,17 @@
 .cal-event-checkin:hover { background: var(--danger); color: #fff; }
 
 .cal-event-inner { padding: 2px 5px 1px; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-.cal-event-title { font-size: 0.7rem; font-weight: 500; color: var(--text-primary); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; }
+.cal-event-title { display: flex; align-items: center; min-width: 0; font-size: 0.7rem; font-weight: 500; color: var(--text-primary); line-height: 1.2; letter-spacing: 0; }
+.cal-event-title-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Tasks that didn't fit the block: count stays on the title row, left of the text so the
+   bottom-right action bar never covers it. */
+.cal-event-taskbadge {
+  display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; margin-right: 4px;
+  height: 12px; padding: 0 4px; border-radius: 999px;
+  background: var(--bg-elevated-3); color: var(--text-secondary);
+  font-size: 0.56rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.cal-event-taskbadge--done { background: var(--success-wash); color: var(--success); }
 .cal-event-time { font-size: 0.62rem; font-weight: 400; color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-event-subevents { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
 .cal-event-subevent {
