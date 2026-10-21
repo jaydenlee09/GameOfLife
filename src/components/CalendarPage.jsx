@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import './CalendarPage.css';
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles, Palette, CalendarPlus, Target } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, NotebookText, Repeat, Play, Sparkles, Palette, CalendarPlus, Target, ChevronDown } from 'lucide-react';
 import { xpForBlockMinutes } from '../utils/xpUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
@@ -17,7 +17,7 @@ import {
 import {
   findFreeSlot, getComingUp, templateCategoryLookup, getSlippedBlocks, handleSlippedBlock, rescheduledCopy, blockMinutes,
 } from '../utils/calendarSidebar';
-import { dayLabel } from '../utils/taskUtils';
+import { dayLabel, getUnscheduledTasks } from '../utils/taskUtils';
 import TodayStrip from './calendar/TodayStrip';
 import TaskTray from './calendar/TaskTray';
 import BlockCheckIn from './calendar/BlockCheckIn';
@@ -68,7 +68,13 @@ const writeFlag = (key, value) => {
   try { localStorage.setItem(key, String(value)); } catch { /* not persisted this time */ }
 };
 const SIDEBAR_OPEN_KEY = 'gameOfLife_calendarSidebarOpen';
-const UPCOMING_MIN_KEY = 'gameOfLife_calendarUpcomingMinimized';
+// Each sidebar section remembers whether it's collapsed. 'upcoming' keeps its older key.
+const SECTION_KEYS = {
+  missed: 'gameOfLife_calendarMissedCollapsed',
+  tasks: 'gameOfLife_calendarTasksCollapsed',
+  blocks: 'gameOfLife_calendarBlocksCollapsed',
+  upcoming: 'gameOfLife_calendarUpcomingMinimized',
+};
 
 const weekdayOfDateKey = (dateKey) => new Date(dateKey + 'T00:00:00').getDay();
 const getMondayOfWeek = (date) => {
@@ -253,7 +259,9 @@ export default function CalendarPage({
   const [editScope, setEditScope] = useState(null);
   const [deleteScope, setDeleteScope] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => readFlag(SIDEBAR_OPEN_KEY, true));
-  const [upcomingMinimized, setUpcomingMinimized] = useState(() => readFlag(UPCOMING_MIN_KEY, false));
+  const [collapsed, setCollapsed] = useState(() => Object.fromEntries(
+    Object.entries(SECTION_KEYS).map(([id, key]) => [id, readFlag(key, false)]),
+  ));
   const [sideNote, setSideNote] = useState(null); // { where: 'slip'|'tmpl', ok, text } after a sidebar one-tap
   const [nextEventMinimized, setNextEventMinimized] = useState(false);
   const [tmplModal, setTmplModal] = useState(null);
@@ -309,7 +317,9 @@ export default function CalendarPage({
   }, [view]);
 
   useEffect(() => { writeFlag(SIDEBAR_OPEN_KEY, sidebarOpen); }, [sidebarOpen]);
-  useEffect(() => { writeFlag(UPCOMING_MIN_KEY, upcomingMinimized); }, [upcomingMinimized]);
+  useEffect(() => {
+    Object.entries(SECTION_KEYS).forEach(([id, key]) => writeFlag(key, collapsed[id]));
+  }, [collapsed]);
 
   useEffect(() => {
     if (gridRef.current) {
@@ -1051,6 +1061,10 @@ export default function CalendarPage({
   const tmplCategoryOf = templateCategoryLookup(calendarEvents);
   const slipped = getSlippedBlocks(calendarEvents, new Date(nowMs));
   const comingUp = getComingUp({ dayEvents: calendarDayEvents, goals, now: new Date(nowMs) });
+  const unslottedCount = (() => {
+    const { top, rest, upcoming } = getUnscheduledTasks(todos, calendarEvents, todayKey);
+    return top.length + rest.length + upcoming.reduce((n, day) => n + day.tasks.length, 0);
+  })();
 
   const todosByDate = (() => {
     const map = {};
@@ -1445,6 +1459,29 @@ export default function CalendarPage({
     ? <p className={`cal-sidebar-note${sideNote.ok ? '' : ' cal-sidebar-note--warn'}`} role="status">{sideNote.text}</p>
     : null);
 
+  // A section's header doubles as its collapse toggle; a collapsed section still shows its count.
+  const renderSectionHeader = (id, title, count, extra = null) => {
+    const isCollapsed = collapsed[id];
+    return (
+      <div className="cal-sidebar-header">
+        <button
+          type="button"
+          className="cal-sidebar-section-toggle"
+          onClick={() => setCollapsed(c => ({ ...c, [id]: !c[id] }))}
+          aria-expanded={!isCollapsed}
+          title={isCollapsed ? 'Expand' : 'Collapse'}
+        >
+          <ChevronDown size={12} strokeWidth={3} className={`cal-sidebar-chevron${isCollapsed ? ' cal-sidebar-chevron--collapsed' : ''}`} />
+          <span className="cal-sidebar-title">{title}</span>
+          {count > 0 && (id === 'missed' || isCollapsed) && (
+            <span className={`cal-sidebar-count${id === 'missed' ? '' : ' cal-sidebar-count--quiet'}`}>{count}</span>
+          )}
+        </button>
+        {extra}
+      </div>
+    );
+  };
+
   const renderSidebar = () => (
     <>
       <button
@@ -1460,11 +1497,8 @@ export default function CalendarPage({
         <div className="cal-sidebar-content">
           {(slipped.length > 0 || sideNote?.where === 'slip') && (
             <>
-              <div className="cal-sidebar-header">
-                <span className="cal-sidebar-title">Missed</span>
-                {slipped.length > 0 && <span className="cal-sidebar-count">{slipped.length}</span>}
-              </div>
-              <p className="cal-sidebar-hint">Blocks that slipped today or yesterday</p>
+              {renderSectionHeader('missed', 'Missed', slipped.length)}
+              {!collapsed.missed && <>
               <ul className="cal-slip-list">
                 {slipped.map((ev) => {
                   const outcome = getBlockOutcome(ev);
@@ -1488,32 +1522,29 @@ export default function CalendarPage({
                 })}
               </ul>
               {renderSideNote('slip')}
+              </>}
               <div className="cal-sidebar-divider" />
             </>
           )}
 
-          <div className="cal-sidebar-header">
-            <span className="cal-sidebar-title">Needs a time slot</span>
-          </div>
-          <p className="cal-sidebar-hint">This week&rsquo;s tasks with no block yet</p>
-          <TaskTray
+          {renderSectionHeader('tasks', 'Needs a time slot', unslottedCount)}
+          {!collapsed.tasks && <TaskTray
             todos={todos}
             calendarEvents={calendarEvents}
             todayKey={todayKey}
             onDragStart={setDraggingTask}
             onDragEnd={handleDragEnd}
             onSchedule={scheduleTask}
-          />
+          />}
 
           <div className="cal-sidebar-divider" />
 
-          <div className="cal-sidebar-header">
-            <span className="cal-sidebar-title">Quick Time Blocks</span>
+          {renderSectionHeader('blocks', 'Quick Time Blocks', quickEvents.length, (
             <button className="cal-sidebar-add-btn" onClick={openTmplCreate} title="Add template" aria-label="Add template">
               <Plus size={14} strokeWidth={3} />
             </button>
-          </div>
-          <p className="cal-sidebar-hint">Drag onto the calendar, or tap <CalendarPlus size={11} className="cal-sidebar-hint-icon" aria-label="place" /> for today&rsquo;s next free slot</p>
+          ))}
+          {!collapsed.blocks && <>
           <div className="cal-sidebar-list">
             {quickEvents.map(tmpl=>(
               <div key={tmpl.id} className="cal-tmpl-card" style={{'--tmpl-color':categoryColor(tmplCategoryOf(tmpl), categoryColors)}}
@@ -1541,22 +1572,12 @@ export default function CalendarPage({
             {quickEvents.length===0&&<p className="cal-sidebar-empty">No templates yet.<br/>Click the + button to add one.</p>}
           </div>
           {renderSideNote('tmpl')}
+          </>}
 
           <div className="cal-sidebar-divider" />
 
-          <div className="cal-sidebar-header">
-            <span className="cal-sidebar-title">Coming up</span>
-            <button
-              className="cal-sidebar-minimize-btn"
-              onClick={() => setUpcomingMinimized(m => !m)}
-              title={upcomingMinimized ? 'Expand' : 'Minimize'}
-              aria-label={upcomingMinimized ? 'Expand coming up' : 'Minimize coming up'}
-            >
-              {upcomingMinimized ? <ChevronRight size={12} strokeWidth={3} /> : <ChevronLeft size={12} strokeWidth={3} style={{ transform: 'rotate(-90deg)' }} />}
-            </button>
-          </div>
-          {!upcomingMinimized && <p className="cal-sidebar-hint">Reminders, deadlines &amp; goals</p>}
-          {!upcomingMinimized && (
+          {renderSectionHeader('upcoming', 'Coming up', comingUp.length)}
+          {!collapsed.upcoming && (
             <div className="cal-sidebar-list cal-sidebar-list--events">
               {comingUp.map((item) => {
                 const isGoal = item.kind === 'goal';

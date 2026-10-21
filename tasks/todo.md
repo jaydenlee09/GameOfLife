@@ -1,5 +1,13 @@
 # Todo
 
+## Done, uncommitted (2026-10-20): Calendar sidebar sections collapse, hint lines removed
+
+- [x] Each section header (Missed, Needs a time slot, Quick Time Blocks, Coming up) is a collapse toggle
+      with a chevron; a collapsed section shows its count. State saved per section (Coming up keeps its old key).
+- [x] Grey hint lines under each title removed.
+- Verified: lint (json, 0 = HEAD), build, harness UI at 1280x800: collapse all four, aria-expanded + storage
+  update, state survives reload, + still opens New Template while collapsed, no console errors.
+
 ## Done, uncommitted (2026-10-20): Weekly Review → guided "Weekly Reset"
 
 Problem (user): weekly review is a hassle, they have to think of everything themselves; wants it to

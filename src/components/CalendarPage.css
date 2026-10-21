@@ -111,16 +111,18 @@
 .cal-sidebar-content::-webkit-scrollbar { width: 3px; }
 .cal-sidebar-content::-webkit-scrollbar-thumb { background: var(--separator-strong); border-radius: 2px; }
 
-.cal-sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.cal-sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 22px; margin-bottom: 8px; }
 .cal-sidebar-title { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; color: var(--text-secondary); }
 
-.cal-sidebar-minimize-btn {
-  width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--separator);
-  background: transparent; color: var(--text-tertiary); cursor: pointer;
-  display: flex; align-items: center; justify-content: center; padding: 0; transition: all var(--duration) var(--ease);
+.cal-sidebar-section-toggle {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 3px 4px; margin: 0 0 0 -4px;
+  border: none; border-radius: 6px; background: transparent; color: var(--text-tertiary); cursor: pointer; text-align: left;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
 }
-.cal-sidebar-minimize-btn:hover { background: var(--bg-elevated-3); color: var(--text-secondary); }
-.cal-sidebar-minimize-btn svg { display: block; }
+.cal-sidebar-section-toggle:hover { background: var(--bg-elevated-3); color: var(--text-secondary); }
+.cal-sidebar-section-toggle:hover .cal-sidebar-title { color: var(--text-primary); }
+.cal-sidebar-chevron { display: block; flex-shrink: 0; stroke: currentColor; fill: none; transition: transform var(--duration) var(--ease); }
+.cal-sidebar-chevron--collapsed { transform: rotate(-90deg); }
 
 .cal-sidebar-add-btn {
   width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.3);
@@ -131,12 +133,11 @@
 
 .cal-sidebar-add-btn svg { display: block; }
 
-.cal-sidebar-hint { font-size: 0.68rem; font-weight: 500; color: var(--text-tertiary); margin: 0 0 10px; line-height: 1.4; }
-.cal-sidebar-hint-icon { vertical-align: -2px; stroke: currentColor; fill: none; }
 .cal-sidebar-count {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
   font-size: 0.64rem; font-weight: 700; color: var(--warning); background: var(--warning-wash);
 }
+.cal-sidebar-count--quiet { color: var(--text-secondary); background: var(--bg-elevated-3); }
 
 /* Missed: slipped blocks, each with Reschedule + Let it go. */
 .cal-slip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; min-width: 0; }
