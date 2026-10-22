@@ -1,6 +1,6 @@
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
-  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical, Smartphone,
 } from 'lucide-react';
 import './WelcomePage.css';
 import { toDateKey, fmtRemaining, getPendingCheckIns } from '../utils/calendarUtils';
@@ -175,7 +175,7 @@ function NowPanel({ mode, now, nextUp, closeSteps, onNavigate, onPlanDay, onStar
 }
 
 // ── Daily Score + next best move ─────────────────────────────────────────────
-const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, plan: CalendarCheck, sleep: Moon, log: NotebookText, commitment: Handshake };
+const SCORE_CHIP_ICON = { habits: Repeat, tasks: CheckSquare, plan: CalendarCheck, sleep: Moon, screentime: Smartphone, log: NotebookText, commitment: Handshake };
 
 function ScoreCard({ scoreInputs, now, onNavigate }) {
   const { score, breakdown } = computeDailyScore(scoreInputs);

@@ -1,6 +1,6 @@
 // ─── Daily Score & Streak ─────────────────────────────────────────────────────
 // The Daily Score is the app's honest headline signal: a 0–10 number COMPUTED
-// from what the user actually did (habits/tasks/sleep/log/commitment). Unlike XP,
+// from what the user actually did (habits/tasks/sleep/screen time/log/commitment). Unlike XP,
 // it can't be self-assigned. It powers both the Home hero and the character sheet,
 // and — because every input is date-keyed — it can be computed for any past day,
 // which is what makes the streak possible.
@@ -27,7 +27,19 @@ export const shiftDateKey = (dateKey, offsetDays) => {
 // history (and the streak and rank built on it) never shifts under you.
 const WEIGHTS = { habits: 30, tasks: 30, sleep: 20, log: 10, commitment: 10 };
 const WEIGHTS_WITH_PLAN = { habits: 25, tasks: 25, plan: 10, sleep: 20, log: 10, commitment: 10 };
-export const scoreWeights = (dateKey) => (dateKey >= PLAN_KEPT_START ? WEIGHTS_WITH_PLAN : WEIGHTS);
+// From this day on, low screen time is worth 10% too (taken from habits and tasks).
+export const SCREENTIME_START = '2026-10-22';
+const WEIGHTS_WITH_SCREENTIME = { habits: 20, tasks: 20, plan: 10, sleep: 20, screentime: 10, log: 10, commitment: 10 };
+export const scoreWeights = (dateKey) => (
+  dateKey >= SCREENTIME_START ? WEIGHTS_WITH_SCREENTIME
+    : dateKey >= PLAN_KEPT_START ? WEIGHTS_WITH_PLAN
+      : WEIGHTS
+);
+
+// Full screen-time credit at or under this many hours; anything over (or not logged) is 0.
+export const SCREENTIME_MAX_HOURS = 1;
+// Full sleep credit at or over this many hours.
+export const SLEEP_MIN_HOURS = 9;
 
 const planLabel = (kept) => {
   if (!kept.total) return 'No blocks planned';
@@ -37,6 +49,14 @@ const planLabel = (kept) => {
     kept.partly ? `${kept.partly} partly` : null,
     kept.skipped ? `${kept.skipped} skipped${topReason ? ` (${topReason})` : ''}` : null,
   ].filter(Boolean).join(' · ');
+};
+
+// 1.25 -> "1h 15m", 0.5 -> "30m", 2 -> "2h".
+const formatHours = (h) => {
+  const total = Math.round(h * 60);
+  const hrs = Math.floor(total / 60);
+  const mins = total % 60;
+  return hrs && mins ? `${hrs}h ${mins}m` : hrs ? `${hrs}h` : `${mins}m`;
 };
 
 // Score for a single day. `inputs` is any object carrying { habits, xpLog, logs,
@@ -66,10 +86,15 @@ export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
   const kept        = weights.plan ? getPlanKept(calendarEvents, dateKey) : null;
   const planScore   = kept?.total ? (kept.credit / kept.total) * 10 : 0;
 
-  // Sleep: logged and over 9h = full score
+  // Sleep: logged and 9h or more = full score
   const sleepHours  = healthLog?.[dateKey]?.sleepHours;
   const sleepLogged = sleepHours != null;
-  const sleepScore  = sleepLogged && sleepHours > 9 ? 10 : 0;
+  const sleepScore  = sleepLogged && sleepHours >= SLEEP_MIN_HOURS ? 10 : 0;
+
+  // Screen time: logged and 1h or less = full score
+  const screenHours  = weights.screentime ? healthLog?.[dateKey]?.screentimeHours : null;
+  const screenLogged = screenHours != null;
+  const screenScore  = screenLogged && screenHours <= SCREENTIME_MAX_HOURS ? 10 : 0;
 
   // Daily log filled?
   const dayLog      = logs?.[dateKey];
@@ -80,7 +105,7 @@ export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
   const lastCommit  = commitmentArchive.find(a => a.date === prevKey);
   const commitScore = lastCommit?.denied === false || (lastCommit?.confirmedOn && lastCommit.denied !== true) ? 10 : 0;
 
-  const values = { habits: habitScore, tasks: taskScore, plan: planScore, sleep: sleepScore, log: logScore, commitment: commitScore };
+  const values = { habits: habitScore, tasks: taskScore, plan: planScore, sleep: sleepScore, screentime: screenScore, log: logScore, commitment: commitScore };
   const raw = Object.entries(weights).reduce((sum, [key, w]) => sum + values[key] * (w / 100), 0);
   const r1 = (n) => Math.round(n * 10) / 10;
   const breakdown = {
@@ -88,6 +113,7 @@ export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
     tasks:      { value: r1(taskScore),  weight: weights.tasks,  label: `${tasksDone} task${tasksDone !== 1 ? 's' : ''} done` },
     ...(kept ? { plan: { value: r1(planScore), weight: weights.plan, label: planLabel(kept), kept } } : {}),
     sleep:      { value: sleepScore, weight: weights.sleep, label: sleepLogged ? `${Math.round(sleepHours * 10) / 10}h sleep` : 'Sleep not logged' },
+    ...(weights.screentime ? { screentime: { value: screenScore, weight: weights.screentime, label: screenLogged ? `${formatHours(screenHours)} screen time` : 'Screen time not logged' } } : {}),
     log:        { value: logScore,   weight: weights.log,   label: logFilled ? 'Log filled' : 'Log empty' },
     commitment: {
       value: commitScore,

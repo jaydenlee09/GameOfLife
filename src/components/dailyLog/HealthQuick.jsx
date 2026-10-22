@@ -160,6 +160,7 @@ const HealthQuick = ({ todayKey, healthLog, setHealthLog, foodLog, setFoodLog, f
 
   const water = today.waterGlasses || 0;
 
+  const stLogged = today.screentimeHours != null;
   const stTotal = today.screentimeHours || 0;
   const stH = Math.floor(stTotal);
   const stM = Math.round((stTotal % 1) * 60);
@@ -237,10 +238,10 @@ const HealthQuick = ({ todayKey, healthLog, setHealthLog, foodLog, setFoodLog, f
             <button type="button" className="health-st-stepper" onClick={() => setScreentime(stH, stM >= 45 ? 0 : stM + 15)} aria-label="15 minutes more">+</button>
           </div>
         </div>
-        <span className="hq-hint" style={stTotal > 0 ? { color: stColor } : undefined}>
-          {stTotal > 0
+        <span className="hq-hint" style={stLogged ? { color: stColor } : undefined}>
+          {stLogged
             ? <>{SCREENTIME_LABELS[stStatus].Icon && React.createElement(SCREENTIME_LABELS[stStatus].Icon, { size: 11 })} {SCREENTIME_LABELS[stStatus].text}</>
-            : 'under 1h is ideal'}
+            : '1h or less counts'}
         </span>
       </div>
 
@@ -271,7 +272,7 @@ const HealthQuick = ({ todayKey, healthLog, setHealthLog, foodLog, setFoodLog, f
 
       <FoodTracker todayKey={todayKey} foodLog={foodLog} setFoodLog={setFoodLog} foodPoints={foodPoints} setFoodPoints={setFoodPoints} />
 
-      <p className="hq-note"><Sparkles size={12} /> Over 9h of sleep counts toward today’s Daily Score.</p>
+      <p className="hq-note"><Sparkles size={12} /> 9h+ of sleep and 1h or less of screen time count toward today’s Daily Score.</p>
     </div>
   );
 };

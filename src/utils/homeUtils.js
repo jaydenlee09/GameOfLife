@@ -105,9 +105,9 @@ export const getYesterdayCommitment = (logs, commitmentArchive, now) => {
 
 // Which move to suggest first when two are worth the same, by time of day.
 const MODE_ORDER = {
-  morning: ['sleep', 'commitment', 'plan', 'tasks', 'habits', 'log'],
-  day: ['plan', 'tasks', 'habits', 'commitment', 'sleep', 'log'],
-  evening: ['log', 'plan', 'habits', 'tasks', 'commitment', 'sleep'],
+  morning: ['sleep', 'commitment', 'plan', 'tasks', 'habits', 'log', 'screentime'],
+  day: ['plan', 'tasks', 'habits', 'commitment', 'sleep', 'log', 'screentime'],
+  evening: ['log', 'screentime', 'plan', 'habits', 'tasks', 'commitment', 'sleep'],
 };
 
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -129,6 +129,7 @@ export const getNextMove = (inputs, now) => {
   const habitsDone = (habits || []).filter((h) => h.history?.[todayKey]).length;
   const tasksDone = countTaskCompletions(xpLog || [], todayKey);
   const sleepLogged = healthLog?.[todayKey]?.sleepHours != null;
+  const screentimeLogged = healthLog?.[todayKey]?.screentimeHours != null;
   const entry = logs?.[todayKey];
   const logFilled = !!entry && ((entry.emotions?.length > 0) || entry.proud?.some((p) => p?.trim()));
   const commitment = getYesterdayCommitment(logs, commitmentArchive, now);
@@ -148,6 +149,10 @@ export const getNextMove = (inputs, now) => {
     }
   }
   if (!sleepLogged) moves.push({ key: 'sleep', text: 'Log your sleep (9h+ counts)', gain: round1(pts('sleep')), page: 'daily-log' });
+  // Screen time is a whole-day number, so it's only worth logging once the day is winding down.
+  if (weights.screentime && !screentimeLogged && getDayMode(now) === 'evening') {
+    moves.push({ key: 'screentime', text: 'Log today’s screen time (1h or less counts)', gain: round1(pts('screentime')), page: 'daily-log' });
+  }
   if (!logFilled) moves.push({ key: 'log', text: 'Fill in today’s Daily Log', gain: round1(pts('log')), page: 'daily-log' });
   if (commitment.isPending) moves.push({ key: 'commitment', text: 'Mark yesterday’s commitment', gain: round1(pts('commitment')), page: null });
 

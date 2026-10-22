@@ -230,6 +230,7 @@ export const SCORE_PARTS = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'plan', label: 'Plan kept' },
   { key: 'sleep', label: 'Sleep' },
+  { key: 'screentime', label: 'Screen time' },
   { key: 'log', label: 'Daily Log' },
   { key: 'commitment', label: 'Commitment' },
 ];
@@ -241,7 +242,7 @@ export const SCORE_PARTS = [
  * back tonight. The commitment's "fix" for a missed or absent one is about
  * tomorrow (lock tonight's), and says so.
  */
-export const explainScore = ({ breakdown, habitsTotal, sleepLogged, commitmentStatus, tonightLocked, planPending = 0 }) => {
+export const explainScore = ({ breakdown, habitsTotal, sleepLogged, screentimeLogged, commitmentStatus, tonightLocked, planPending = 0 }) => {
   // Days scored before "Plan kept" existed have no plan part.
   const rows = SCORE_PARTS.filter(({ key }) => breakdown[key]).map(({ key, label }) => {
     const part = breakdown[key];
@@ -267,8 +268,11 @@ export const explainScore = ({ breakdown, habitsTotal, sleepLogged, commitmentSt
         } else if (toCome > 0) note = `${toCome} block${toCome !== 1 ? 's' : ''} still to come today.`;
         else note = 'Partly counts half, skipped counts nothing.';
       } else if (key === 'sleep') {
-        if (sleepLogged) note = 'Only counts above 9 hours.';
+        if (sleepLogged) note = 'Only counts at 9 hours or more.';
         else fix = { label: 'Log last night’s sleep', step: 'checkIn' };
+      } else if (key === 'screentime') {
+        if (screentimeLogged) note = 'Only counts at 1 hour or less.';
+        else fix = { label: 'Log today’s screen time', step: 'checkIn' };
       } else if (key === 'log') {
         fix = { label: 'Add a mood or a win (+1)', step: 'checkIn' };
       } else if (key === 'commitment') {

@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Moon, Plus, X, Trophy, TrendingUp, Lightbulb, PenLine, Target,
   Repeat, HeartPulse, MessageCircle, Sparkles, Shuffle, History, AlertTriangle, LoaderCircle, Lock, Pencil, Flame,
-  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck, Flag, FlaskConical,
+  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck, Flag, FlaskConical, Smartphone,
 } from 'lucide-react';
 import EMOTIONS from '../../utils/logMeta';
 import {
@@ -559,7 +559,7 @@ const TomorrowStep = ({ entry, updateField, todayKey, commitmentLocked, suggesti
   );
 };
 
-const SCORE_PART_ICON = { habits: Repeat, tasks: CheckSquare, plan: CalendarCheck, sleep: Moon, log: NotebookText, commitment: Handshake };
+const SCORE_PART_ICON = { habits: Repeat, tasks: CheckSquare, plan: CalendarCheck, sleep: Moon, screentime: Smartphone, log: NotebookText, commitment: Handshake };
 
 /** Points earned vs possible for each part of the Daily Score, with tonight's fixes. */
 const ScoreBreakdown = ({ explained, score, streak, onFix }) => {
@@ -764,6 +764,7 @@ const CloseDayFlow = ({
     breakdown,
     habitsTotal: habits.length,
     sleepLogged: healthLog[todayKey]?.sleepHours != null,
+    screentimeLogged: healthLog[todayKey]?.screentimeHours != null,
     commitmentStatus: commitment.status,
     tonightLocked: commitmentLocked,
     planPending: getPendingCheckIns(calendarEvents, now).filter((ev) => ev._instanceDate === todayKey).length,

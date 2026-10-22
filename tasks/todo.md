@@ -1,5 +1,21 @@
 # Todo
 
+## Done, pushed (2026-10-22): Low screen time counts toward the Daily Score; sleep counts at 9h+
+
+Problem (user): low screen time should count toward the Daily Score, and sleep should count at 9 hours and above
+(it only counted *over* 9h, while Home already said "9h+ counts").
+- [x] scoreUtils: new `screentime` part from SCREENTIME_START = 2026-10-22 (earlier days keep their formula).
+      Weights: habits 20, tasks 20, plan 10, sleep 20, screen time 10, log 10, commitment 10. All or nothing:
+      logged and 1h or less = full, over 1h or not logged = 0 (user's choice). Sleep is now `>= 9`, applied to every day.
+- [x] Every map keyed by score parts: closeDay SCORE_PARTS + explainScore (note / "Log today's screen time" fix),
+      statsInsights SCORE_COMPONENTS + evidence, Home + CloseDayFlow icon maps (Smartphone), homeUtils next move
+      (evening only, since screen time is a whole-day number).
+- [x] HealthQuick: screen time hint shows its status once logged (so a logged 0h reads "Ideal"), note mentions both rules.
+- Verified: node checks (weights sum 100 for every era, 9.0h = full, 8.99h = 0, 0/1h screen = full, 1h15m = 0,
+  unlogged = 0, 10-21 has no screen part, explainScore rows, leaks), lint (json) 0 problems on all 7 files, build,
+  harness UI: Home chips at 375 + desktop (4.0 = habits 1 + sleep 2 + screen 1; 8.5h/2.5h → 1.0), Close the Day
+  breakdown shows "Screen time 45m 1.0/1", Statistics trend legend + no new console errors.
+
 ## Done, pushed (2026-10-21): "Help me improve" coach on the Daily Log's improve section
 
 Problem (user): wants AI help on what they wrote under "what can I improve", plus one action step
@@ -23,8 +39,26 @@ they can commit to for tomorrow.
   My Assistant, no overflow, no console errors.
 - Found while testing: a cue ending in "," rendered "goes off,, I will" (now strips trailing , ; : too).
 
+## Done, uncommitted (2026-10-21): Block tasks visible on short time blocks, "Bonus Tasks" → "Tasks"
 
-## Done, uncommitted (2026-10-20): Calendar sidebar sections collapse, hint lines removed
+Problem (user): a block's tasks only render when it's >88px (~1h25m), and only 2 show under ~2h10m
+with no "+more", so on shorter blocks you can't tell tasks were set.
+- [x] Fit rows to the block's real height (tasks get space first, steps take the rest) instead of
+      fixed 60/88/140px thresholds; nothing renders half-clipped.
+- [x] Task badge (checklist icon + done/total) at the start of the title row whenever any task is
+      hidden, so even a 15-min block shows it; left side so the hover/touch action bar never covers it.
+- [x] Rename user-facing "Bonus Tasks"/"bonus task" → "Tasks"/"task" (modal, add button, hover card,
+      tooltips). Stored field stays `bonusTasks`.
+- [x] Verify: lint (json, vs HEAD), build, harness at 15m/30m/45m/1h/1.5h/2h blocks with 0–4 tasks
+      ± steps, desktop + 390px, no clipped rows, badge counts right, toggle still works.
+- Verified: lint json 0/0 = HEAD, build ok, harness sweep of 180 blocks (15m–3h x 0–4 tasks x 0–2 steps,
+  missed + done states): no task/step row clipped, badge iff tasks hidden, count right; 1h block now shows
+  1 task (was 0). Tick from block updates badge 0/3→1/3 without opening the modal. Modal says Tasks /
+  Add Task, no "bonus" text on page. Week view (100px cols) and 390px phone: badge clear of the action bar.
+  Pre-existing, not touched: red Check in pill on 45-min missed blocks is clipped ~4px.
+
+
+## Done, pushed b49e47d (2026-10-20): Calendar sidebar sections collapse, hint lines removed
 
 - [x] Each section header (Missed, Needs a time slot, Quick Time Blocks, Coming up) is a collapse toggle
       with a chevron; a collapsed section shows its count. State saved per section (Coming up keeps its old key).

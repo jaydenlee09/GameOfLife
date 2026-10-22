@@ -12,6 +12,7 @@ export const SCORE_COMPONENTS = [
   { key: 'habits',     label: 'Habits',     color: '#3987e5', page: 'daily-log', fix: 'Open habits' },
   { key: 'tasks',      label: 'Tasks',      color: '#d95926', page: 'tasks',     fix: 'Open tasks' },
   { key: 'sleep',      label: 'Sleep',      color: '#199e70', page: 'daily-log', fix: 'Log sleep' },
+  { key: 'screentime', label: 'Screen time', color: '#2aa7b8', page: 'daily-log', fix: 'Log screen time' },
   { key: 'plan',       label: 'Plan kept',  color: '#8b6fd6', page: 'calendar',  fix: 'Open Calendar' },
   { key: 'log',        label: 'Daily Log',  color: '#c98500', page: 'daily-log', fix: 'Open Daily Log' },
   { key: 'commitment', label: 'Commitment', color: '#d55181', page: 'daily-log', fix: 'Set a commitment' },
@@ -89,7 +90,12 @@ const evidenceFor = (key, { full, n, dayKeys, data, breakdowns }) => {
       return `3+ tasks done on ${full} of ${n} days`;
     case 'sleep': {
       const unlogged = breakdowns.filter((b) => b.sleep.label === 'Sleep not logged').length;
-      const base = `Over 9h on ${full} of ${n} nights`;
+      const base = `9h+ on ${full} of ${n} nights`;
+      return unlogged > 0 ? `${base}, ${unlogged} not logged` : base;
+    }
+    case 'screentime': {
+      const unlogged = breakdowns.filter((b) => b.screentime?.label === 'Screen time not logged').length;
+      const base = `1h or less on ${full} of ${n} days`;
       return unlogged > 0 ? `${base}, ${unlogged} not logged` : base;
     }
     case 'plan': {
