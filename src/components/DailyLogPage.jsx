@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ChevronLeft, ChevronRight, X, Trophy, CheckSquare, MessageCircle,
-  TrendingUp, Lightbulb, PenLine, Target, Moon,
+  TrendingUp, Lightbulb, PenLine, Target, Moon, Sun, Check,
 } from 'lucide-react';
 import './DailyLogPage.css';
 import EMOTIONS from '../utils/logMeta';
@@ -16,7 +16,9 @@ import {
 import { entryHasContent } from '../utils/logReview';
 import { scoreColor } from '../utils/scoreUtils';
 import { getLessons } from '../utils/closeDay';
+import { defaultLogView, hasMorning, morningIfThen, WIN_RESULT_LABELS } from '../utils/morningJournal';
 import CloseDayFlow from './dailyLog/CloseDayFlow';
+import MorningFlow from './dailyLog/MorningFlow';
 import LogReviewSection from './dailyLog/LogReview';
 import LessonInsight from './dailyLog/LessonInsight';
 import ImproveCoach from './dailyLog/ImproveCoach';
@@ -286,14 +288,16 @@ const LessonsList = ({ logs, onOpen, lessonHandlers }) => {
 const LOOP_LABELS = { yes: 'Yes', partly: 'A little', no: 'Not that day' };
 
 const DailyLogPage = ({
-  logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], setGoals, todos = [],
-  pomodoroSessions = [], northStar, logPatterns,
+  logs, setLogs, onCommitmentLocked, commitmentArchive = [], onResolveCommitment, xpLog = [], goals = [], setGoals, todos = [], setTodos,
+  pomodoroSessions = [], northStar, logPatterns, weekPriority, onPlanDay, onStartFocus,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
   setFoodPoints, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
   onExpandLesson, onCoachImprove, onAskAssistant, onNavigate, calendarEvents = [], weekExperiment = null,
 }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
+  // Today's entry has two halves: the morning journal and the night's Close the Day.
+  const [todayView, setTodayView] = useState(() => defaultLogView(logs[todayKey], new Date()));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarTab, setSidebarTab] = useState('entries');
   const [detailHabit, setDetailHabit] = useState(null);
@@ -389,6 +393,26 @@ const DailyLogPage = ({
 
   const isToday = selectedDate === todayKey;
 
+  const modeSwitch = (
+    <div className="dl-mode" role="tablist" aria-label="Today’s journal">
+      {[
+        { key: 'morning', Icon: Sun, label: 'Morning', done: !!currentEntry.morning?.doneAt },
+        { key: 'night', Icon: Moon, label: 'Tonight', done: !!currentEntry.closedAt },
+      ].map(mode => (
+        <button
+          key={mode.key}
+          type="button"
+          role="tab"
+          aria-selected={todayView === mode.key}
+          className={`dl-mode-btn${todayView === mode.key ? ' active' : ''}`}
+          onClick={() => setTodayView(mode.key)}
+        >
+          <mode.Icon size={13} /> {mode.label}{mode.done && <Check size={12} strokeWidth={3} className="dl-mode-done" aria-label="done" />}
+        </button>
+      ))}
+    </div>
+  );
+
   const openEntry = (dateKey) => {
     setSelectedDate(dateKey);
     setSidebarTab('entries');
@@ -424,7 +448,7 @@ const DailyLogPage = ({
                     const isActive = dateKey === selectedDate;
                     const isEntryToday = dateKey === todayKey;
                     const entry = logs[dateKey] || EMPTY_ENTRY();
-                    const hasContent = entryHasContent(entry);
+                    const hasContent = entryHasContent(entry) || hasMorning(entry);
 
                     return (
                       <button
@@ -472,7 +496,28 @@ const DailyLogPage = ({
 
       {/* ── Right Panel ── */}
       <main className="log-main">
-        {isToday ? (
+        {isToday && todayView === 'morning' ? (
+          <MorningFlow
+            key={`morning-${todayKey}`}
+            todayKey={todayKey}
+            entry={currentEntry}
+            updateField={updateField}
+            logs={logs}
+            commitmentArchive={commitmentArchive}
+            healthLog={healthLog}
+            setHealthLog={setHealthLog}
+            todos={todos}
+            setTodos={setTodos}
+            goals={goals}
+            northStar={northStar}
+            weekPriority={weekPriority}
+            calendarEvents={calendarEvents}
+            onPlanDay={onPlanDay}
+            onStartFocus={onStartFocus}
+            onNavigate={onNavigate}
+            modeSwitch={modeSwitch}
+          />
+        ) : isToday ? (
           <CloseDayFlow
             key={todayKey}
             todayKey={todayKey}
@@ -508,6 +553,7 @@ const DailyLogPage = ({
             lessonHandlers={lessonHandlers}
             improveHandlers={improveHandlers}
             onNavigate={onNavigate}
+            modeSwitch={modeSwitch}
           />
         ) : (
           <>
@@ -535,6 +581,31 @@ const DailyLogPage = ({
                       Worked on “{currentEntry.loopCheck.text}”: <strong>{LOOP_LABELS[currentEntry.loopCheck.result]}</strong>
                     </span>
                   )}
+                </div>
+              )}
+
+              {/* ── Morning journal (read-only once the day has passed) ── */}
+              {hasMorning(currentEntry) && (
+                <div className="log-section log-section--wide">
+                  <h3 className="log-section-title"><Sun size={18} /> Morning</h3>
+                  <div className="log-morning">
+                    {currentEntry.morning.win?.trim() && (
+                      <p className="log-morning-row">
+                        <span className="log-morning-key">Win if I</span>
+                        <span>{currentEntry.morning.win.trim()}</span>
+                        {currentEntry.morning.result && <span className="log-past-chip"><strong>{WIN_RESULT_LABELS[currentEntry.morning.result]}</strong></span>}
+                      </p>
+                    )}
+                    {morningIfThen(currentEntry.morning) && (
+                      <p className="log-morning-row"><span className="log-morning-key">Plan</span><span>{morningIfThen(currentEntry.morning)}</span></p>
+                    )}
+                    {currentEntry.morning.identity?.trim() && (
+                      <p className="log-morning-row"><span className="log-morning-key">Being</span><span>Someone who {currentEntry.morning.identity.trim()}</span></p>
+                    )}
+                    {currentEntry.morning.energy > 0 && (
+                      <p className="log-morning-row"><span className="log-morning-key">Woke up</span><span>{currentEntry.morning.energy}/5 rested</span></p>
+                    )}
+                  </div>
                 </div>
               )}
 

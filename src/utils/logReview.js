@@ -10,6 +10,7 @@ import { getActiveGoals, describeGoal } from './goalUtils';
 import { getTool } from './assistantTools';
 import EMOTIONS from './logMeta';
 import { taskLabelsCompletedOn } from './taskUtils';
+import { describeMorning } from './morningJournal';
 
 // Reviews kept in the synced `gameOfLife_logReviews` key (one Firestore doc).
 export const LOG_REVIEW_LIMIT = 120;
@@ -83,6 +84,8 @@ export const buildReviewContext = (state, dateKey) => {
     name: state.user?.name || 'you',
     date: dateKey,
     entry: {
+      // What they planned this morning, to judge the day against.
+      morningJournal: describeMorning(entry),
       emotions: (entry.emotions || []).map(emotionLabel),
       proudOf: clean(entry.proud),
       wantsToImprove: clean(entry.improve),
@@ -147,6 +150,7 @@ RULES:
 - Speak to them as "you". Plain text only, no markdown. Each list item is one sentence, under 25 words.
 - Compare against the last 7 days where it adds insight (e.g. "third day this week under 7h sleep").
 - If what they wrote and the data disagree (e.g. proud of a workout, but none logged), point it out gently.
+- If entry.morningJournal is set, judge the day against it: did they do the thing they said would make today a win, and did their if-then plan hold?
 - This is a report. You cannot take actions, so don't offer to schedule or create anything.`;
 
 const toList = (value, max) => clean(value).slice(0, max);

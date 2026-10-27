@@ -5,6 +5,7 @@ import { getActiveGoals, describeGoal } from './goalUtils';
 import { carriedDays, isTop, todayQueue } from './taskUtils';
 import { getActivePlan } from './weeklyReset';
 import { TOOL_DECLARATIONS, getTool, applyOpToState } from './assistantTools';
+import { describeMorning } from './morningJournal';
 
 export const MODEL = 'gemini-2.5-flash';
 // Tool rounds per user message before the model is forced to answer in text.
@@ -126,6 +127,11 @@ const summarizeRecentJournal = (logs, commitmentArchive) => {
     if (e.improve?.some((p) => p?.trim())) parts.push(`wants to improve: ${e.improve.filter((p) => p?.trim()).join('; ')}`);
     lines.push(`${label}: ${parts.join(' | ') || 'entry started, mostly empty.'}`);
   });
+  // This morning's journal: hold advice and plans to it.
+  const morning = describeMorning(logs?.[today]);
+  lines.push(morning
+    ? `Today's morning journal (their own plan for today; hold them to it): ${morning}.`
+    : 'Today\'s morning journal: not written yet (it\'s on the Daily Log, about 3 minutes).');
   const record = (commitmentArchive || []).find((c) => c.date === yesterday);
   const commitmentText = logs?.[yesterday]?.commitment?.trim() || record?.text;
   if (commitmentText) {

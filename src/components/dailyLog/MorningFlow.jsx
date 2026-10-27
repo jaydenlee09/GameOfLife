@@ -1,0 +1,350 @@
+import React, { useState, useRef, useMemo } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import {
+  Check, ChevronLeft, ChevronRight, Sun, Moon, BatteryCharging, Handshake, Flag, Star, Plus,
+  Target, ShieldAlert, Compass, CalendarPlus, CalendarCheck, Play, Pencil, Lock, CheckSquare,
+} from 'lucide-react';
+import { Block } from './CloseDayFlow';
+import { SleepInput, EnergyPicker, ENERGY_LABELS } from './HealthQuick';
+import {
+  MORNING_STEP_KEYS, MORNING_STEP_META, getMorningStatus, getMorningStart,
+  getWinSuggestions, OBSTACLE_SUGGESTIONS, morningIfThen,
+} from '../../utils/morningJournal';
+import { getYesterdayCommitment } from '../../utils/homeUtils';
+import { expandEventsForDates } from '../../utils/calendarUtils';
+import { todayQueue, makeTask, TOP_LIMIT } from '../../utils/taskUtils';
+import './CloseDay.css';
+
+// "Start your day": the Daily Log's 3-step morning journal for today's entry.
+// Everything saves as you type into entry.morning (sleep into healthLog[today]).
+
+const MotionDiv = motion.div;
+const FINE_POINTER = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
+const SHOWN_TASKS = 6;
+
+const formatDayLabel = (dateKey) => {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+};
+
+const formatTime = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+const SUGGESTION_ICON = { week: Target, goal: Flag, task: Star };
+
+// ─── Steps ────────────────────────────────────────────────────────────────────
+
+const WakeStep = ({ morning, setMorning, todayKey, healthLog, setHealthLog, commitment }) => (
+  <>
+    <Block Icon={Moon} title="Last night’s sleep" hint="9h+ counts toward today’s score" area="sleep">
+      <SleepInput todayKey={todayKey} healthLog={healthLog} setHealthLog={setHealthLog} />
+    </Block>
+
+    <Block Icon={BatteryCharging} title="How rested do you feel?" area="rested">
+      <EnergyPicker value={morning.energy} onChange={(energy) => setMorning({ energy })} label="How rested do you feel" />
+      <span className="hq-hint mj-hint">{morning.energy ? ENERGY_LABELS[morning.energy] : '1 drained · 5 great'}</span>
+    </Block>
+
+    {commitment.status !== 'none' && (
+      <Block Icon={Handshake} title="Last night you promised" area="promise">
+        <p className="cd-quote">{commitment.text}</p>
+        {commitment.status === 'kept' && <p className="cd-status cd-status--success"><Check size={14} /> Already kept. Nice.</p>}
+        {commitment.status === 'missed' && <p className="cd-status cd-status--muted">Marked as missed. Today is a clean slate.</p>}
+        {commitment.status === 'pending' && <p className="cd-status cd-status--muted">Make room for it today. Tonight will ask if you kept it.</p>}
+      </Block>
+    )}
+  </>
+);
+
+/** Today's task list with a star per row for the Top 3, plus a quick add. */
+const TopThree = ({ todos, setTodos, todayKey }) => {
+  const [text, setText] = useState('');
+  const queue = todayQueue(todos, todayKey);
+  const topCount = queue.filter((t) => t.topDate === todayKey).length;
+  const full = topCount >= TOP_LIMIT;
+
+  const toggle = (task) => {
+    const on = task.topDate !== todayKey;
+    if (on && full) return;
+    setTodos((prev) => prev.map((t) => (t.id === task.id ? { ...t, topDate: on ? todayKey : null, topAt: on ? Date.now() : null } : t)));
+  };
+  const add = () => {
+    const value = text.trim();
+    if (!value) return;
+    setTodos((prev) => [...prev, makeTask({ text: value, top: !full }, todayKey)]);
+    setText('');
+  };
+
+  return (
+    <Block Icon={Star} title="Top 3 for today" hint={`${topCount}/${TOP_LIMIT} starred`} area="top3">
+      {queue.length > 0 ? (
+        <ul className="mj-tasks">
+          {queue.slice(0, SHOWN_TASKS).map((t) => {
+            const isTop = t.topDate === todayKey;
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  className={`mj-task${isTop ? ' is-top' : ''}`}
+                  aria-pressed={isTop}
+                  onClick={() => toggle(t)}
+                  disabled={!isTop && full}
+                  title={!isTop && full ? 'Top 3 is full. Unstar one to make room.' : undefined}
+                >
+                  <Star size={15} fill={isTop ? 'currentColor' : 'none'} className="mj-task-star" />
+                  <span className="mj-task-text">{t.text}</span>
+                </button>
+              </li>
+            );
+          })}
+          {queue.length > SHOWN_TASKS && <li className="mj-tasks-more">+{queue.length - SHOWN_TASKS} more on your Tasks page</li>}
+        </ul>
+      ) : (
+        <p className="cd-question mj-empty">Nothing on today’s list yet. Add what has to happen today.</p>
+      )}
+      <div className="mj-add">
+        <input
+          type="text"
+          className="cd-input"
+          value={text}
+          placeholder={full ? 'Add a task for today…' : 'Add a task (starred)…'}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+          aria-label="Add a task for today"
+        />
+        <button type="button" className="cd-btn" onClick={add} disabled={!text.trim()} aria-label="Add task"><Plus size={16} /></button>
+      </div>
+    </Block>
+  );
+};
+
+const FocusStep = ({ morning, setMorning, suggestions, todos, setTodos, todayKey }) => (
+  <>
+    <Block Icon={Flag} title="Today is a win if I…" hint="Just one thing" area="win">
+      <input
+        type="text"
+        className="cd-input cd-input--big"
+        value={morning.win || ''}
+        placeholder="finish the first draft of my essay"
+        onChange={(e) => setMorning({ win: e.target.value })}
+        autoFocus={!morning.win && FINE_POINTER}
+      />
+      {!morning.win?.trim() && suggestions.length > 0 && (
+        <div className="cd-chips mj-suggestions">
+          {suggestions.map((s) => {
+            const Icon = SUGGESTION_ICON[s.source];
+            return (
+              <button key={s.text} type="button" className="cd-chip" onClick={() => setMorning({ win: s.text })}>
+                <Icon size={13} /> {s.text}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Block>
+
+    <TopThree todos={todos} setTodos={setTodos} todayKey={todayKey} />
+  </>
+);
+
+const LockInStep = ({ morning, setMorning, northStar }) => {
+  const vision = northStar?.vision?.trim();
+  return (
+    <>
+      <Block Icon={ShieldAlert} title="What could knock you off track?" hint="Plan it now" area="obstacle">
+        <div className="cd-ifthen">
+          <label className="cd-ifthen-row">
+            <span>If</span>
+            <input type="text" className="cd-input" value={morning.obstacle || ''} placeholder="my phone pulls me in" onChange={(e) => setMorning({ obstacle: e.target.value })} autoFocus={!morning.obstacle && FINE_POINTER} />
+          </label>
+          {!morning.obstacle?.trim() && (
+            <div className="mj-pills">
+              {OBSTACLE_SUGGESTIONS.map((text) => (
+                <button key={text} type="button" className="mj-pill" onClick={() => setMorning({ obstacle: text })}>{text}</button>
+              ))}
+            </div>
+          )}
+          <label className="cd-ifthen-row">
+            <span>I will</span>
+            <input type="text" className="cd-input" value={morning.plan || ''} placeholder="put it in another room for an hour" onChange={(e) => setMorning({ plan: e.target.value })} />
+          </label>
+        </div>
+      </Block>
+
+      <Block Icon={Compass} title="Today I’ll be someone who…" area="identity">
+        {vision && <p className="cd-question mj-vision">Becoming: {vision}</p>}
+        <input
+          type="text"
+          className="cd-input"
+          value={morning.identity || ''}
+          placeholder="does the hard thing first"
+          onChange={(e) => setMorning({ identity: e.target.value })}
+        />
+      </Block>
+    </>
+  );
+};
+
+const LockedIn = ({ morning, todayKey, todos, plannedToday, onPlanDay, onStartFocus, onNavigate, onEdit }) => {
+  const top = todos.filter((t) => !t.completed && t.topDate === todayKey);
+  const ifThen = morningIfThen(morning);
+  return (
+    <div className="mj-locked">
+      <div className="cd-closed-hero cd-a-hero">
+        <span className="cd-closed-moon"><Sun size={28} /></span>
+        <h2 className="cd-title">Locked in.</h2>
+        <p className="cd-closed-sub">Set at {formatTime(morning.doneAt)}. You know what today is for. Go make it real.</p>
+      </div>
+
+      <Block Icon={Flag} title="Today is a win if I" area="mwin">
+        <p className="cd-quote">{morning.win?.trim() || '–'}</p>
+      </Block>
+
+      {(ifThen || morning.identity?.trim()) && (
+        <Block Icon={Lock} title="Your plan" area="mplan">
+          {ifThen && <p className="cd-quote cd-quote--small">{ifThen}.</p>}
+          {morning.identity?.trim() && <p className="cd-quote cd-quote--small">Today I’m someone who {morning.identity.trim()}.</p>}
+        </Block>
+      )}
+
+      {top.length > 0 && (
+        <Block Icon={CheckSquare} title="Top 3" area="mtop">
+          <ol className="mj-top-list">
+            {top.map((t) => <li key={t.id}>{t.text}</li>)}
+          </ol>
+        </Block>
+      )}
+
+      <div className="mj-actions cd-a-mactions">
+        {plannedToday ? (
+          <button type="button" className="cd-btn cd-btn--primary" onClick={() => onNavigate?.('calendar')}><CalendarCheck size={16} /> See today’s plan</button>
+        ) : (
+          <button type="button" className="cd-btn cd-btn--primary" onClick={onPlanDay}><CalendarPlus size={16} /> Plan my day</button>
+        )}
+        <button type="button" className="cd-btn" onClick={onStartFocus}><Play size={15} /> Start focus</button>
+      </div>
+
+      <button type="button" className="cd-btn cd-btn--ghost cd-edit-btn cd-a-edit" onClick={onEdit}>
+        <Pencil size={14} /> Edit this morning
+      </button>
+    </div>
+  );
+};
+
+// ─── Flow ─────────────────────────────────────────────────────────────────────
+
+const MorningFlow = ({
+  todayKey, entry, updateField, logs, commitmentArchive, healthLog, setHealthLog,
+  todos = [], setTodos, goals, northStar, weekPriority, calendarEvents,
+  onPlanDay, onStartFocus, onNavigate, modeSwitch,
+}) => {
+  const reduceMotion = useReducedMotion();
+  const rootRef = useRef(null);
+  const now = useMemo(() => new Date(), []);
+
+  const morning = entry.morning || {};
+  const setMorning = (fields) => updateField('morning', { ...(entry.morning || {}), ...fields });
+
+  const status = getMorningStatus(entry, healthLog[todayKey]?.sleepHours != null);
+  const [step, setStep] = useState(() => getMorningStart(entry, status));
+  const index = MORNING_STEP_KEYS.indexOf(step);
+
+  const commitment = getYesterdayCommitment(logs, commitmentArchive, now);
+  const suggestions = getWinSuggestions({ todos, goals, weekPriority, todayKey });
+  const plannedToday = expandEventsForDates(calendarEvents || [], [todayKey]).length > 0;
+
+  const scrollToTop = () => rootRef.current?.scrollIntoView({ block: 'start' });
+  const next = () => setStep(MORNING_STEP_KEYS[Math.min(index + 1, MORNING_STEP_KEYS.length - 1)]);
+  const back = () => setStep(MORNING_STEP_KEYS[Math.max(index - 1, 0)]);
+  const canLock = !!morning.win?.trim();
+  const lockIn = () => {
+    setMorning({ doneAt: Date.now() });
+    setStep('locked');
+  };
+
+  const motionProps = {
+    initial: { opacity: 0, y: reduceMotion ? 0 : 14 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: reduceMotion ? 0 : -8 },
+    transition: { duration: 0.24, ease: [0.25, 0.1, 0.25, 1] },
+  };
+
+  return (
+    <div className="cd cd--morning" ref={rootRef}>
+      <header className="cd-head">
+        <div className="cd-head-top">
+          <span className="cd-eyebrow"><Sun size={14} /> This morning · {formatDayLabel(todayKey)}</span>
+          {modeSwitch}
+        </div>
+        {step !== 'locked' && (
+          <nav className="cd-steps" aria-label="Morning journal steps">
+            {MORNING_STEP_KEYS.map((k, i) => (
+              <button
+                key={k}
+                type="button"
+                className={`cd-step${k === step ? ' current' : ''}${status[k] ? ' done' : ''}`}
+                onClick={() => setStep(k)}
+                aria-current={k === step ? 'step' : undefined}
+              >
+                <span className="cd-step-dot">{status[k] && k !== step ? <Check size={11} strokeWidth={3} /> : i + 1}</span>
+                <span className="cd-step-label">{MORNING_STEP_META[k].label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
+      </header>
+
+      <AnimatePresence mode="wait" initial={false} onExitComplete={scrollToTop}>
+        <MotionDiv key={step} className={`cd-body cd-body--m-${step}`} {...motionProps}>
+          {step === 'locked' ? (
+            <LockedIn
+              morning={morning}
+              todayKey={todayKey}
+              todos={todos}
+              plannedToday={plannedToday}
+              onPlanDay={onPlanDay}
+              onStartFocus={onStartFocus}
+              onNavigate={onNavigate}
+              onEdit={() => setStep(MORNING_STEP_KEYS[0])}
+            />
+          ) : (
+            <>
+              <h2 className="cd-title">{MORNING_STEP_META[step].title}</h2>
+
+              {step === 'wake' && (
+                <WakeStep morning={morning} setMorning={setMorning} todayKey={todayKey} healthLog={healthLog} setHealthLog={setHealthLog} commitment={commitment} />
+              )}
+              {step === 'focus' && (
+                <FocusStep morning={morning} setMorning={setMorning} suggestions={suggestions} todos={todos} setTodos={setTodos} todayKey={todayKey} />
+              )}
+              {step === 'lockIn' && (
+                <LockInStep morning={morning} setMorning={setMorning} northStar={northStar} />
+              )}
+
+              <footer className="cd-nav">
+                {index > 0
+                  ? <button type="button" className="cd-btn cd-btn--ghost" onClick={back}><ChevronLeft size={16} /> Back</button>
+                  : <span />}
+                {step === 'lockIn' ? (
+                  <button type="button" className="cd-btn cd-btn--primary" onClick={lockIn} disabled={!canLock} title={canLock ? undefined : 'Write today’s win first (step 2)'}>
+                    <Lock size={15} /> Lock in my day
+                  </button>
+                ) : (
+                  <button type="button" className="cd-btn cd-btn--primary" onClick={next}>
+                    {status[step] ? 'Next' : 'Skip for now'} <ChevronRight size={16} />
+                  </button>
+                )}
+              </footer>
+              {step === 'lockIn' && !canLock && (
+                <p className="cd-close-hint mj-lock-hint">
+                  Write today’s win first. <button type="button" className="cd-link" onClick={() => setStep('focus')}>Go to Focus</button>
+                </p>
+              )}
+            </>
+          )}
+        </MotionDiv>
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default MorningFlow;

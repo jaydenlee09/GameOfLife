@@ -49,8 +49,10 @@ export const getLookBack = ({ entry, logs, logReviews, todayKey, commitment }) =
   const answered = entry?.loopCheck?.text ? { from: entry.loopCheck.from, text: entry.loopCheck.text } : null;
   const carry = answered || getCarryForward(logs, todayKey);
   const focus = logReviews?.[shiftDateKey(todayKey, -1)]?.tomorrowFocus?.trim() || null;
+  // This morning's "Today is a win if I…" (Daily Log's morning journal).
+  const win = entry?.morning?.win?.trim() || null;
   const hasCommitment = commitment?.status && commitment.status !== 'none';
-  return { commitment, carry, focus, hasContent: !!(hasCommitment || carry || focus) };
+  return { commitment, carry, focus, win, hasContent: !!(hasCommitment || carry || focus || win) };
 };
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
@@ -64,7 +66,9 @@ export const isCommitmentLocked = (entry, commitmentArchive, dateKey) => {
 /** Which steps are done. Look back is done when nothing in it is still waiting on an answer. */
 export const getStepStatus = ({ entry, lookBack, commitmentLocked }) => ({
   lookBack: !lookBack.hasContent || (
-    lookBack.commitment?.status !== 'pending' && (!lookBack.carry || !!entry?.loopCheck?.result)
+    lookBack.commitment?.status !== 'pending'
+    && (!lookBack.carry || !!entry?.loopCheck?.result)
+    && (!lookBack.win || !!entry?.morning?.result)
   ),
   checkIn: (entry?.emotions?.length > 0) || entry?.dayRating > 0,
   reflect: clean(entry?.proud).length > 0,

@@ -1,6 +1,6 @@
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
-  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical, Smartphone,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical, Smartphone, Sun,
 } from 'lucide-react';
 import './WelcomePage.css';
 import { toDateKey, fmtRemaining, getPendingCheckIns } from '../utils/calendarUtils';
@@ -13,6 +13,7 @@ import {
 } from '../utils/homeUtils';
 import { todayQueue } from '../utils/taskUtils';
 import { getExperimentTicks } from '../utils/weeklyReset';
+import { getMorningStatus } from '../utils/morningJournal';
 import { useNow } from '../hooks/useNow';
 
 const getGreeting = (hour) => {
@@ -59,6 +60,17 @@ function BriefLine({ brief, loading, onRefresh }) {
   );
 }
 
+// This morning's "Today is a win if I…", once locked in. It replaces the AI line:
+// the user's own call on today beats a guess written before they made it.
+function WinLine({ win, onOpen }) {
+  return (
+    <button type="button" className="wp-brief wp-win" onClick={onOpen} title="Open this morning’s journal">
+      <Flag size={15} className="wp-brief-icon" aria-hidden="true" />
+      <p className="wp-brief-text"><span className="wp-win-key">Today is a win if I</span> {win}</p>
+    </button>
+  );
+}
+
 // ── Now panel ────────────────────────────────────────────────────────────────
 function NoPhoneBadge({ until, nowMs }) {
   return (
@@ -102,12 +114,37 @@ function CloseTheDay({ steps, current, nowMs, onNavigate, onStartFocusBlock }) {
   );
 }
 
-function NowPanel({ mode, now, nextUp, closeSteps, onNavigate, onPlanDay, onStartFocus, onStartFocusBlock }) {
+function StartTheDay({ morning, current, nowMs, onNavigate, onPlanDay, onStartFocusBlock }) {
+  return (
+    <section className="wp-now wp-now--open wp-now--morning" aria-label="Start your day">
+      <div className="wp-now-label">Start here{morning.doneCount > 0 ? ` · ${morning.doneCount}/3 done` : ''}</div>
+      {current && (
+        <button type="button" className="wp-now-mini" onClick={() => onStartFocusBlock(current.ev)}>
+          <Play size={12} /> <span className="wp-now-mini-text">Now: {current.label}</span>
+          <span className="wp-now-mini-meta">ends in {fmtRemaining(current.endMs, nowMs)}</span>
+        </button>
+      )}
+      <h2 className="wp-now-title">Set up your day</h2>
+      <p className="wp-now-meta">Log your sleep, pick today&rsquo;s win, plan for what could knock you off track. About 3 minutes.</p>
+      <div className="wp-now-actions">
+        <button type="button" className="wp-btn wp-btn--primary" onClick={() => onNavigate('daily-log')}>
+          <Sun size={15} /> {morning.doneCount > 0 ? 'Finish my morning' : 'Start my morning'}
+        </button>
+        <button type="button" className="wp-btn wp-btn--ghost" onClick={onPlanDay}><CalendarPlus size={14} /> Plan my day</button>
+      </div>
+    </section>
+  );
+}
+
+function NowPanel({ mode, now, nextUp, closeSteps, morning, onNavigate, onPlanDay, onStartFocus, onStartFocusBlock }) {
   const nowMs = now.getTime();
   const { current, next, nextIsToday, activeBlock, noPhoneActive, plannedToday } = nextUp;
 
   if (mode === 'evening') {
     return <CloseTheDay steps={closeSteps} current={current} nowMs={nowMs} onNavigate={onNavigate} onStartFocusBlock={onStartFocusBlock} />;
+  }
+  if (mode === 'morning' && !morning.done) {
+    return <StartTheDay morning={morning} current={current} nowMs={nowMs} onNavigate={onNavigate} onPlanDay={onPlanDay} onStartFocusBlock={onStartFocusBlock} />;
   }
 
   const badge = noPhoneActive && <NoPhoneBadge until={activeBlock?.endMs} nowMs={nowMs} />;
@@ -479,12 +516,21 @@ export default function WelcomePage({
   const scoreInputs = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents };
   const nextUp = getNextUp({ calendarEvents, noPhoneBlocks, calendarDayEvents, now });
   const todaysBrief = brief?.date === todayKey ? brief : null;
+  const todayEntry = logs?.[todayKey];
+  const morningStatus = getMorningStatus(todayEntry, healthLog?.[todayKey]?.sleepHours != null);
+  const morning = {
+    done: !!todayEntry?.morning?.doneAt,
+    doneCount: Object.values(morningStatus).filter(Boolean).length,
+  };
+  const todaysWin = morning.done ? todayEntry.morning.win?.trim() : '';
 
   return (
     <div className="wp-bg" data-mode={mode}>
       <div className="wp-layout">
         <TopBar name={user?.name} now={now} />
-        <BriefLine brief={todaysBrief} loading={briefLoading} onRefresh={onRefreshBrief} />
+        {todaysWin
+          ? <WinLine win={todaysWin} onOpen={() => onNavigate('daily-log')} />
+          : <BriefLine brief={todaysBrief} loading={briefLoading} onRefresh={onRefreshBrief} />}
         <CheckInCard calendarEvents={calendarEvents} now={now} todayKey={todayKey} onCheckInBlock={onCheckInBlock} onNavigate={onNavigate} />
 
         <div className="wp-grid">
@@ -493,6 +539,7 @@ export default function WelcomePage({
             now={now}
             nextUp={nextUp}
             closeSteps={getCloseDaySteps({ logs, logReviews }, now)}
+            morning={morning}
             onNavigate={onNavigate}
             onPlanDay={onPlanDay}
             onStartFocus={onStartFocus}

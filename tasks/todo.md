@@ -1,5 +1,38 @@
 # Todo
 
+## Done, uncommitted (2026-10-26): Morning journal, "Start your day"
+
+Problem (user): wants a morning journal on the site to set the day up for success, with last night's sleep
+logged in it. Short, but helpful and keeps them on track and locked in.
+Decisions (user, Q&A): lives on the Daily Log (Morning / Tonight switch for today) + Home; 3 quick steps;
+full accountability loop (Home, tonight's Look back, AI); no Daily Score change.
+- [x] utils/morningJournal.js (pure): steps wake/focus/lockIn, status, first open step, win suggestions,
+      AI summary line. Stored as `entry.morning` = { energy, win, obstacle, plan, identity, doneAt, result }.
+      Sleep stays in healthLog[today] (same field Close the Day uses, so the score sees it).
+- [x] dailyLog/MorningFlow.jsx: 1 Wake up (sleep bed/woke + rested 1-5 + last night's promise),
+      2 Focus ("Today is a win if I…" + suggestion chips + star Top 3 from today's list),
+      3 Lock in (obstacle → "when that happens, I will…" + "today I'll be someone who…") → Locked in card
+      with Plan my day / Start focus / Edit. SleepInput + EnergyPicker extracted from HealthQuick.
+- [x] DailyLogPage: Morning / Tonight switch for today (Morning by default in Home's morning window until done);
+      past entries show the morning read-only; sidebar dot counts a morning-only entry.
+- [x] Home: morning NowPanel "Set up your day" (steps + Start my morning) until done; once a win is set it
+      replaces the AI brief line at the top.
+- [x] Close the Day Look back: "This morning you said today is a win if you…" → Yes / A little / No (morning.result).
+- [x] AI: system prompt TODAY line, get_journal, nightly review context, Plan My Day context (win goes first),
+      morning check-in tells you to do the journal first if it isn't done.
+- [x] Verify: node checks, lint (json) vs HEAD, build, harness UI desktop + 375 (Home morning, flow, switch,
+      Look back, past entry), no console errors.
+- Verified: node checks (status/start step/default view at 3h/8h/12h, win suggestions order + dedupe + lowercasing,
+  if-then text, AI line; Look back shows win, pending until answered, commitment still blocks; system prompt both
+  states; get_journal; plan context todayWin), lint (json) = HEAD (33, all pre-existing), build, harness UI with fake
+  clock: Home 08:00 shows Set up your day → Log opens Morning; sleep 23:00→08:10 = 9.2h and score 0→2.0; goal step chip;
+  star 3 (rest disabled, saved to todos), quick add starred; Lock disabled without a win + "Go to Focus"; Locked card;
+  Home win line replaces AI brief; 21:00 Log opens Tonight with "Did you?" first, result saved without touching other
+  fields; past entry read-only morning; 375px no overflow on Home/all 4 screens; 1500px grids; Plan my day opens planner.
+- Changed while testing: dropped yesterday's "improve" item as an obstacle chip (reads wrong as "If less phone after
+  10pm gets in the way"); shortened block hints that squeezed titles; Home buttons kept on one row at 375px.
+- Not changed: the 07:30 push brief (fires before the journal); Daily Score weights.
+
 ## Done, pushed (2026-10-22): Low screen time counts toward the Daily Score; sleep counts at 9h+
 
 Problem (user): low screen time should count toward the Daily Score, and sleep should count at 9 hours and above

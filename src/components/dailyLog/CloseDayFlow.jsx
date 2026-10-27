@@ -157,9 +157,26 @@ const HoldToCommit = ({ disabled, onCommit }) => {
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
 const LookBackStep = ({ lookBack, entry, todayKey, updateField, onResolveCommitment }) => {
-  const { commitment, carry, focus } = lookBack;
+  const { commitment, carry, focus, win } = lookBack;
   return (
     <>
+      {win && (
+        <Block Icon={Flag} title="This morning you said today is a win if you" area="win">
+          <p className="cd-quote">{win}</p>
+          <p className="cd-question">Did you?</p>
+          <Segmented
+            label="Did you do this morning's win?"
+            value={entry.morning?.result || null}
+            onChange={result => updateField('morning', { ...entry.morning, result })}
+            options={[
+              { value: 'yes', label: 'Did it', tone: 'success' },
+              { value: 'partly', label: 'Partly', tone: 'warning' },
+              { value: 'no', label: 'Not today', tone: 'neutral' },
+            ]}
+          />
+        </Block>
+      )}
+
       {commitment.status !== 'none' && (
         <Block Icon={Target} title="Yesterday you committed to" area="commit">
           <p className="cd-quote">{commitment.text}</p>
@@ -708,7 +725,7 @@ const CloseDayFlow = ({
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints,
   goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, improveHandlers, onNavigate,
-  experiment,
+  experiment, modeSwitch,
 }) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
@@ -805,7 +822,10 @@ const CloseDayFlow = ({
   return (
     <div className="cd" ref={rootRef}>
       <header className="cd-head">
-        <span className="cd-eyebrow"><Moon size={14} /> Tonight · {formatDayLabel(todayKey)}</span>
+        <div className="cd-head-top">
+          <span className="cd-eyebrow"><Moon size={14} /> Tonight · {formatDayLabel(todayKey)}</span>
+          {modeSwitch}
+        </div>
         {current !== 'closed' && (
           <nav className="cd-steps" aria-label="Close the day steps">
             {steps.map((k, i) => (

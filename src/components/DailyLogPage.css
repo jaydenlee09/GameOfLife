@@ -1722,3 +1722,8 @@
   .log-form > .log-section--wide,
   .log-form > .log-review-section { grid-column: 1 / -1; }
 }
+
+/* Past entry: the morning journal, read-only */
+.log-morning { display: flex; flex-direction: column; gap: 0.45rem; }
+.log-morning-row { margin: 0; display: grid; grid-template-columns: 5rem minmax(0, 1fr) auto; align-items: baseline; column-gap: 0.6rem; font-size: 0.92rem; line-height: 1.45; color: var(--text-primary); }
+.log-morning-key { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }

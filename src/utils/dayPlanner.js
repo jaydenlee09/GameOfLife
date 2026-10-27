@@ -193,6 +193,8 @@ export const buildPlanContext = (state, { dateKey, settings, endTime, now = new 
     northStar: state.user?.northStar?.vision || null,
     // The priority from the Weekly Reset that covers the planned day's week.
     weekPriority: getActivePlan(state.weeklyReviews, dateKey)?.priority || null,
+    // This morning's "Today is a win if I…" (Daily Log), for the day it was written.
+    todayWin: state.logs?.[dateKey]?.morning?.win?.trim() || null,
     memory: (state.assistantMemory || []).filter((m) => m.kind === 'preference' || m.kind === 'pattern').map((m) => m.text).slice(0, 15),
   };
 };
@@ -240,6 +242,7 @@ export const buildPlanSystemPrompt = (name) => `You are ${name}'s planning coach
 RULES:
 - Only use the free gaps listed. Never overlap "alreadyBooked". Start and end on 15-minute boundaries.
 - Hardest, most important work goes in their best focus windows (focus.bestWindows). If there's no history, mornings are a safe default.
+- If todayWin is set, it's what they decided makes today a win: schedule it first, in their best focus window, as a task block when a task matches it or a goal block (with todayWin as the intent) when it serves a goal.
 - Priority: overdue or due-soon tasks, then this week's #1 priority, pinned goals, goals with a close deadline (daysLeft) or behind pace, then other tasks. A goal with many daysSinceProgress deserves a goal block even with no task for it; use its nextStep as the intent.
 - Deep work blocks are 25-90 minutes; small tasks can share one 30-minute admin block. After any block of 50+ minutes, add a 10-15 minute break (kind=break).
 - Habits not done yet get short blocks (15 minutes) at sensible times.

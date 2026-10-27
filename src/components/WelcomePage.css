@@ -136,6 +136,27 @@
   color: var(--accent);
 }
 
+/* This morning's win, in the brief line's slot */
+.wp-win {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--duration) var(--ease);
+}
+
+.wp-win:hover { border-color: rgba(56, 189, 248, 0.45); }
+
+.wp-win-key {
+  margin-right: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 /* ── Grid ─────────────────────────────────────────────────────────────────── */
 .wp-grid {
   display: grid;
@@ -1345,4 +1366,9 @@ button.wp-move:hover {
   .wp-bg[data-mode="evening"] .wp-tile--why {
     display: none;
   }
+}
+
+/* Morning "Set up your day": keep both buttons on one row on narrow phones */
+@media (max-width: 420px) {
+  .wp-now--morning .wp-btn--ghost svg { display: none; }
 }

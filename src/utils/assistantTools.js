@@ -25,6 +25,7 @@ import { getGoalProgress, getGoalActivity, getGoalStatus, getGoalPace, paceLabel
 import { ACHIEVEMENTS } from './achievementsMeta';
 import { CATEGORY_IDS, CATEGORY_GUIDE, aiCategoryFields } from './blockCategories';
 import { carriedDays, isTop } from './taskUtils';
+import { describeMorning } from './morningJournal';
 
 // How the user said a block went, when it wasn't simply done ("partly", "skipped: Distracted").
 const checkInOf = (ev) => {
@@ -318,7 +319,7 @@ const READ_TOOLS = [
   },
   {
     name: 'get_journal',
-    description: 'Daily Log journal entries (emotions, proud of, wants to improve, learned, commitment for tomorrow, 1-10 day rating, nightly question answer, whether they worked on the last improve item) for a date range (default last 7 days).',
+    description: 'Daily Log journal entries (morning journal: what makes the day a win, if-then plan, who they want to be that day, and whether they did the win; then the night: emotions, proud of, wants to improve, learned, commitment for tomorrow, 1-10 day rating, nightly question answer, whether they worked on the last improve item) for a date range (default last 7 days).',
     parameters: OBJ(DATE_RANGE),
     run: (args, { state }) => {
       const today = getLocalDateKey(0);
@@ -328,6 +329,7 @@ const READ_TOOLS = [
         const clean = (list) => (Array.isArray(list) ? list.filter((x) => x?.trim()) : []);
         return {
           date: key,
+          ...(describeMorning(e) ? { morningJournal: describeMorning(e) } : {}),
           ...(e.emotions?.length ? { emotions: e.emotions } : {}),
           ...(clean(e.proud).length ? { proud: clean(e.proud) } : {}),
           ...(clean(e.improve).length ? { improve: clean(e.improve) } : {}),

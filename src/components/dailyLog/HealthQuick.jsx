@@ -38,6 +38,62 @@ const sleepVerdict = (hours) => {
   return { tone: 'bad', label: 'Too little' };
 };
 
+/** Last night's bed → woke times; saves sleepHours with them so the Daily Score sees it. Also used by the morning journal. */
+export const SleepInput = ({ todayKey, healthLog, setHealthLog }) => {
+  const today = healthLog[todayKey] || {};
+  const bedtime = today.sleepBedtime || '';
+  const waketime = today.sleepWakeTime || '';
+  const setSleep = (bed, wake) => setHealthLog(prev => ({
+    ...prev,
+    [todayKey]: { ...(prev[todayKey] || {}), sleepBedtime: bed, sleepWakeTime: wake, sleepHours: calcSleepHours(bed, wake) },
+  }));
+  const sleepHours = calcSleepHours(bedtime, waketime);
+  const sleep = sleepHours !== null ? sleepVerdict(sleepHours) : null;
+  return (
+    <div className="hq-sleep-row">
+      <label className="hq-field">
+        <span className="hq-label">Bed</span>
+        <input type="time" className="health-input" value={bedtime} onChange={e => setSleep(e.target.value, waketime)} />
+      </label>
+      <ArrowRight size={14} className="hq-sleep-arrow" />
+      <label className="hq-field">
+        <span className="hq-label">Woke</span>
+        <input type="time" className="health-input" value={waketime} onChange={e => setSleep(bedtime, e.target.value)} />
+      </label>
+      {sleep && (
+        <span className={`hq-sleep-result hq-sleep-result--${sleep.tone}`}>
+          <strong>{sleepHours}h</strong> {sleep.label}
+        </span>
+      )}
+    </div>
+  );
+};
+
+/** 1-5 buttons with the shared energy colors. */
+export const EnergyPicker = ({ value, onChange, label = 'Energy level' }) => (
+  <div className="hq-energy-row" role="radiogroup" aria-label={label}>
+    {[1, 2, 3, 4, 5].map(val => {
+      const active = value === val;
+      return (
+        <button
+          key={val}
+          type="button"
+          role="radio"
+          aria-checked={active}
+          className={`hq-energy-btn${active ? ' active' : ''}`}
+          style={active ? { borderColor: ENERGY_COLORS[val], color: ENERGY_COLORS[val], background: `${ENERGY_COLORS[val]}18` } : {}}
+          onClick={() => onChange(val)}
+          title={ENERGY_LABELS[val]}
+        >
+          {val}
+        </button>
+      );
+    })}
+  </div>
+);
+
+export { ENERGY_LABELS };
+
 const FoodTracker = ({ todayKey, foodLog, setFoodLog, foodPoints, setFoodPoints }) => {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -144,12 +200,6 @@ const HealthQuick = ({ todayKey, healthLog, setHealthLog, foodLog, setFoodLog, f
 
   const patch = (fields) => setHealthLog(prev => ({ ...prev, [todayKey]: { ...(prev[todayKey] || {}), ...fields } }));
 
-  const bedtime = today.sleepBedtime || '';
-  const waketime = today.sleepWakeTime || '';
-  const setSleep = (bed, wake) => patch({ sleepBedtime: bed, sleepWakeTime: wake, sleepHours: calcSleepHours(bed, wake) });
-  const sleepHours = calcSleepHours(bedtime, waketime);
-  const sleep = sleepHours !== null ? sleepVerdict(sleepHours) : null;
-
   const workouts = today.workouts || [];
   const addWorkout = () => {
     const mins = parseInt(newWDur, 10);
@@ -172,45 +222,12 @@ const HealthQuick = ({ todayKey, healthLog, setHealthLog, foodLog, setFoodLog, f
     <div className="hq">
       <div className="hq-card hq-card--wide">
         <span className="hq-card-title"><Moon size={16} /> Last night’s sleep</span>
-        <div className="hq-sleep-row">
-          <label className="hq-field">
-            <span className="hq-label">Bed</span>
-            <input type="time" className="health-input" value={bedtime} onChange={e => setSleep(e.target.value, waketime)} />
-          </label>
-          <ArrowRight size={14} className="hq-sleep-arrow" />
-          <label className="hq-field">
-            <span className="hq-label">Woke</span>
-            <input type="time" className="health-input" value={waketime} onChange={e => setSleep(bedtime, e.target.value)} />
-          </label>
-          {sleep && (
-            <span className={`hq-sleep-result hq-sleep-result--${sleep.tone}`}>
-              <strong>{sleepHours}h</strong> {sleep.label}
-            </span>
-          )}
-        </div>
+        <SleepInput todayKey={todayKey} healthLog={healthLog} setHealthLog={setHealthLog} />
       </div>
 
       <div className="hq-card">
         <span className="hq-card-title"><Zap size={16} /> Energy</span>
-        <div className="hq-energy-row" role="radiogroup" aria-label="Energy level">
-          {[1, 2, 3, 4, 5].map(val => {
-            const active = today.energyLevel === val;
-            return (
-              <button
-                key={val}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                className={`hq-energy-btn${active ? ' active' : ''}`}
-                style={active ? { borderColor: ENERGY_COLORS[val], color: ENERGY_COLORS[val], background: `${ENERGY_COLORS[val]}18` } : {}}
-                onClick={() => patch({ energyLevel: val })}
-                title={ENERGY_LABELS[val]}
-              >
-                {val}
-              </button>
-            );
-          })}
-        </div>
+        <EnergyPicker value={today.energyLevel} onChange={val => patch({ energyLevel: val })} />
         <span className="hq-hint">{today.energyLevel ? ENERGY_LABELS[today.energyLevel] : '1 drained · 5 great'}</span>
       </div>
 

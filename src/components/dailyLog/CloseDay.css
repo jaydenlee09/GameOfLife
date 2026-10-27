@@ -1358,3 +1358,190 @@
   color: var(--text-tertiary);
   white-space: nowrap;
 }
+
+/* ─── Morning / Tonight switch (today's entry has two halves) ───── */
+.cd-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dl-mode {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--separator);
+}
+
+.dl-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  padding: 0.3rem 0.8rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.dl-mode-btn:hover { color: var(--text-secondary); }
+.dl-mode-btn.active { background: var(--bg-elevated-3); color: var(--text-primary); }
+.dl-mode-done { color: var(--accent); }
+
+/* ─── Morning journal (MorningFlow) ─────────────────────────────── */
+.mj-hint { display: block; margin-top: 0.45rem; }
+.mj-suggestions { margin-top: 0.7rem; }
+.mj-empty { margin: 0 0 0.6rem; }
+.mj-vision { margin: 0 0 0.6rem; font-size: 0.85rem; }
+.mj-lock-hint { margin-top: 0.25rem; }
+.mj-lock-hint .cd-link { margin-top: 0; }
+
+.mj-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; padding-left: calc(3.4rem + 0.7rem); }
+
+.mj-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 32px;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--separator);
+  background: var(--bg-elevated-1);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.mj-pill:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text-primary); }
+
+.mj-tasks { list-style: none; margin: 0 0 0.7rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+
+.mj-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 42px;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--separator);
+  background: var(--bg-elevated-1);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+
+.mj-task:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.mj-task:disabled { cursor: not-allowed; opacity: 0.55; }
+.mj-task-star { flex-shrink: 0; margin-top: 2px; color: var(--text-tertiary); }
+.mj-task-text { min-width: 0; overflow-wrap: anywhere; }
+.mj-task.is-top { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-wash); }
+.mj-task.is-top .mj-task-star { color: var(--accent); }
+.mj-tasks-more { font-size: 0.78rem; color: var(--text-tertiary); padding-left: 0.2rem; }
+
+.mj-add { display: flex; gap: 0.5rem; }
+.mj-add .cd-input { flex: 1; min-width: 0; }
+.mj-add .cd-btn { flex-shrink: 0; min-width: 46px; }
+
+.mj-locked { display: flex; flex-direction: column; gap: 0.9rem; }
+.mj-top-list { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; color: var(--text-primary); }
+.mj-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+.mj-actions .cd-btn { min-height: 46px; }
+
+@media (max-width: 560px) {
+  .mj-pills { padding-left: 0; }
+  .mj-actions .cd-btn { flex: 1 1 100%; }
+}
+
+@media (min-width: 1400px) {
+  .cd-a-win { grid-area: win; }
+  .cd-a-sleep { grid-area: sleep; }
+  .cd-a-rested { grid-area: rested; }
+  .cd-a-top3 { grid-area: top3; }
+  .cd-a-obstacle { grid-area: obstacle; }
+  .cd-a-identity { grid-area: identity; }
+  .cd-a-mwin { grid-area: mwin; }
+  .cd-a-mplan { grid-area: mplan; }
+  .cd-a-mtop { grid-area: mtop; }
+  .cd-a-mactions { grid-area: mactions; }
+
+  /* Look back with this morning's win on top */
+  .cd-body--lookBack:has(.cd-a-win) {
+    grid-template-areas:
+      "title title"
+      "win win"
+      "commit carry"
+      "focus focus"
+      "nav nav";
+  }
+
+  .cd-body--m-wake {
+    grid-template-areas:
+      "title title"
+      "sleep rested"
+      "promise promise"
+      "nav nav";
+  }
+  .cd-body--m-wake .cd-a-sleep,
+  .cd-body--m-wake .cd-a-rested { align-self: stretch; }
+
+  .cd-body--m-focus {
+    grid-template-areas:
+      "title title"
+      "win top3"
+      "nav nav";
+  }
+
+  .cd-body--m-lockIn {
+    grid-template-areas:
+      "title title"
+      "obstacle identity"
+      "nav nav"
+      "hint hint";
+  }
+  .cd-body--m-lockIn .cd-a-obstacle,
+  .cd-body--m-lockIn .cd-a-identity { align-self: stretch; }
+  .cd-body--m-lockIn > .mj-lock-hint { grid-area: hint; }
+
+  .cd-body--m-locked { display: block; }
+  .mj-locked {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.25rem;
+    row-gap: 0.9rem;
+    align-items: start;
+    grid-template-rows: auto auto auto 1fr auto auto;
+    grid-template-areas:
+      "hero hero"
+      "mwin mtop"
+      "mplan mtop"
+      ". mtop"
+      "mactions mactions"
+      "edit edit";
+  }
+  .mj-locked:not(:has(.cd-a-mtop)) {
+    grid-template-rows: none;
+    grid-template-areas:
+      "hero hero"
+      "mwin mplan"
+      "mactions mactions"
+      "edit edit";
+  }
+  .mj-locked:not(:has(.cd-a-mtop)) > .cd-block { align-self: stretch; }
+  .mj-locked:not(:has(.cd-a-mtop)):not(:has(.cd-a-mplan)) .cd-a-mwin { grid-column: 1 / -1; }
+}

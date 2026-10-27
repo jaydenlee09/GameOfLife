@@ -1216,9 +1216,13 @@ function App() {
             goals={goals}
             setGoals={setGoals}
             todos={todos}
+            setTodos={setTodos}
             pomodoroSessions={pomodoroSessions}
             northStar={user.northStar}
             logPatterns={user.logPatterns}
+            weekPriority={currentWeekPriority}
+            onPlanDay={() => openPlanner()}
+            onStartFocus={() => setFocusModeOpen(true)}
             habits={habits}
             setHabits={setHabits}
             onToggleHabitDay={handleToggleHabitDay}
