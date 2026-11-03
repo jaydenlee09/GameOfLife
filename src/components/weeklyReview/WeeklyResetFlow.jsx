@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, X, Plus, Sparkles, LoaderCircle, RotateCcw, CalendarRange, TrendingDown,
   Trophy, BarChart3, Target, ListChecks, FlaskConical, CalendarClock, Construction, Lightbulb, CalendarCheck,
-  Pencil, Flag, ArrowUpRight, ArrowDownRight,
+  Pencil, Flag, ArrowUpRight, ArrowDownRight, Sun, Compass,
 } from 'lucide-react';
 import { Block, Segmented } from '../dailyLog/CloseDayFlow';
 import ResetGoals from './ResetGoals';
@@ -12,6 +12,7 @@ import {
   getComingUp, nextWeekOf, weekDays, formatWeekRange, applyDraft, tidyList,
 } from '../../utils/weeklyReset';
 import { getMondayOf } from '../../utils/statsInsights';
+import { getWeekMornings, getMorningPatterns, getPatternLines } from '../../utils/morningJournal';
 import { scoreColor } from '../../utils/scoreUtils';
 import '../dailyLog/CloseDay.css';
 
@@ -101,7 +102,7 @@ export const TickDots = ({ days }) => (
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
-const WeekStep = ({ reviewKey, scores, insights, headline, lastPlan, answers, setAnswer }) => {
+const WeekStep = ({ reviewKey, scores, insights, headline, lastPlan, answers, setAnswer, mornings, patternLines, identityRead }) => {
   const { leaks, deltas } = insights;
   return (
     <>
@@ -128,6 +129,37 @@ const WeekStep = ({ reviewKey, scores, insights, headline, lastPlan, answers, se
       {headline && (
         <Block Icon={Sparkles} title="Your assistant’s read" className="cd-block--quiet">
           <p className="cd-quote cd-quote--small">{headline}</p>
+        </Block>
+      )}
+
+      {mornings.written > 0 && (
+        <Block Icon={Sun} title="Your mornings" hint={`${mornings.written} of 7 journaled`}>
+          {(mornings.wins.days > 0 || mornings.plans.cameUp > 0) && (
+            <p className="wr-avg">
+              {mornings.wins.days > 0 && <>Did your win on <strong>{mornings.wins.did}</strong> of {mornings.wins.days} days</>}
+              {mornings.wins.days > 0 && mornings.plans.cameUp > 0 && ' · '}
+              {mornings.plans.cameUp > 0 && <>if-then held <strong>{mornings.plans.held}</strong> of {mornings.plans.cameUp} times</>}
+            </p>
+          )}
+          {mornings.identities.length > 0 && (
+            <>
+              <p className="cd-question">Who you said you’d be</p>
+              <ul className="mj-patterns">
+                {mornings.identities.slice(0, 4).map((i) => (
+                  <li key={i.text}><Compass size={13} /> Someone who {i.text}: {i.days} day{i.days === 1 ? '' : 's'}, did the win on {i.didWin}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {identityRead && <p className="cd-quote cd-quote--small mj-identity-read">{identityRead}</p>}
+          {patternLines.length > 0 && (
+            <>
+              <p className="cd-question">Last 4 weeks</p>
+              <ul className="mj-patterns">
+                {patternLines.map((line) => <li key={line}><BarChart3 size={13} /> {line}</li>)}
+              </ul>
+            </>
+          )}
         </Block>
       )}
 
@@ -423,6 +455,8 @@ const WeeklyResetFlow = ({
   const insights = useMemo(() => getWeekInsights(data, reviewKey, todayKey), [data, reviewKey, todayKey]);
   const lastPlan = useMemo(() => getPlanResults(data, weeklyReviews, reviewKey, todayKey), [data, weeklyReviews, reviewKey, todayKey]);
   const comingUp = useMemo(() => getComingUp({ calendarEvents: data.calendarEvents, calendarDayEvents, goals: data.goals }, planWeek), [data, calendarDayEvents, planWeek]);
+  const mornings = useMemo(() => getWeekMornings(data.logs, weekDays(reviewKey)), [data.logs, reviewKey]);
+  const patternLines = useMemo(() => getPatternLines(getMorningPatterns(data.logs, data.healthLog, todayKey)), [data.logs, data.healthLog, todayKey]);
   const weekLessons = useMemo(() => weekDays(reviewKey)
     .map((date) => ({ date, text: data.logs?.[date]?.learned?.trim() }))
     .filter((l) => l.text), [data.logs, reviewKey]);
@@ -516,7 +550,7 @@ const WeeklyResetFlow = ({
             <>
               <h2 className="cd-title">{title}</h2>
               {step === 'week' && (
-                <WeekStep reviewKey={reviewKey} scores={scores} insights={insights} headline={review.draft?.headline} lastPlan={lastPlan} answers={answers} setAnswer={setAnswer} />
+                <WeekStep reviewKey={reviewKey} scores={scores} insights={insights} headline={review.draft?.headline} lastPlan={lastPlan} answers={answers} setAnswer={setAnswer} mornings={mornings} patternLines={patternLines} identityRead={review.draft?.identityRead} />
               )}
               {step === 'reflect' && <ReflectStep review={review} update={update} draftUi={draftUi} weekLessons={weekLessons} />}
               {step === 'goals' && <ResetGoals reviewKey={reviewKey} review={review} updateReview={updateReview} onNavigate={onNavigate} {...goalProps} />}

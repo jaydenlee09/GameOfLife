@@ -14,22 +14,23 @@ import { shiftDateKey } from './scoreUtils';
 import { isTop, todayQueue } from './taskUtils';
 import { getFocusGoals, getGoalEvents, QUIET_GOAL_DAYS } from './goalUtils';
 import { getResetDue } from './weeklyReset';
+import { morningIfThen } from './morningJournal';
 
-export const PUSH_TYPES = ['morning', 'evening', 'streak', 'blocks', 'checkins', 'commitment', 'goals', 'weekly'];
+export const PUSH_TYPES = ['morning', 'win', 'evening', 'streak', 'blocks', 'checkins', 'commitment', 'goals', 'weekly'];
 
 export const DEFAULT_PUSH_SETTINGS = {
   enabled: false,
   timezone: null,
   appUrl: null,
   tokens: [],                  // [{ token, platform, addedAt }]
-  types: { morning: true, evening: true, streak: true, blocks: true, checkins: true, commitment: true, goals: true, weekly: true },
-  times: { morning: '07:30', commitment: '13:00', evening: '20:30', streak: '21:00', goals: '18:00', weekly: '19:00' },
+  types: { morning: true, win: true, evening: true, streak: true, blocks: true, checkins: true, commitment: true, goals: true, weekly: true },
+  times: { morning: '07:30', win: '12:30', commitment: '13:00', evening: '20:30', streak: '21:00', goals: '18:00', weekly: '19:00' },
   blockLeadMinutes: 20,        // generous: GitHub Actions ticks often run late
   testRequestedAt: null,       // set by "Send a test"; the next tick sends one
 };
 
 // How long after its set time a daily push may still go out (covers late ticks).
-const WINDOW_MINUTES = { morning: 180, commitment: 240, evening: 180, streak: 150, goals: 180, weekly: 240 };
+const WINDOW_MINUTES = { morning: 180, win: 240, commitment: 240, evening: 180, streak: 150, goals: 180, weekly: 240 };
 // A quiet goal is pushed on its 5th quiet day, then every 3rd day after, not nightly.
 const GOAL_QUIET_EVERY = 3;
 // A late tick that lands just after a block started still says so, rather than
@@ -102,6 +103,20 @@ export const decidePushes = (now, rawSettings, state, pushState = {}) => {
 
   if (on('morning') && inWindow('morning', settings, nowMin) && fresh(`morning_${today}`)) {
     pushes.push({ id: `morning_${today}`, type: 'morning', ai: true, title: 'Your morning brief', body: morningFallbackBody(state, today), page: 'assistant' });
+  }
+
+  // Midday: the win you locked in this morning, while there's still time for it.
+  // No model call; the "Off track?" button it opens on Home is the AI part.
+  const morningEntry = state.logs?.[today]?.morning;
+  if (on('win') && inWindow('win', settings, nowMin) && fresh(`win_${today}`) && morningEntry?.doneAt && morningEntry.win?.trim() && !morningEntry.result) {
+    const ifThen = morningIfThen(morningEntry);
+    pushes.push({
+      id: `win_${today}`,
+      type: 'win',
+      title: 'Still on for today’s win?',
+      body: `Today is a win if you ${morningEntry.win.trim()}.${ifThen ? ` ${ifThen}.` : ''} Off track? Tap for one next step.`,
+      page: 'welcome',
+    });
   }
 
   // Streak / habit / commitment pushes reuse the in-app nudge rules verbatim, so a

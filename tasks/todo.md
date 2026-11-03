@@ -1710,3 +1710,23 @@ Sir picked only idea 7 (skipped 5 "week by category" and 6 "mini month").
 - [x] `sidebarOpen` / `upcomingMinimized` read + written via try/catch `readFlag`/`writeFlag` in CalendarPage.jsx (keys `gameOfLife_calendarSidebarOpen`, `gameOfLife_calendarUpcomingMinimized`; local only, not synced)
 - [x] Harness check: defaults with empty storage, both survive reload, garbage values fall back to defaults, no overflow in the 220px sidebar with heavy data
 - [x] Lint JSON 0 messages before and after; build passes. Not committed.
+
+---
+
+## 2026-11-03: AI in the morning journal ("stay on track")
+
+Sir picked all four parts. The AI challenges the plan; sir still writes it. Nothing here touches the Daily Score or XP.
+
+- [x] `src/utils/morningCoach.js` (pure, generate injected): coach read, win check, back-on-track step
+- [x] `morningJournal.js`: `planHeld`, `getMorningPatterns` (counts in code, day-by-day, min 3 per side), `getWeekMornings`, coach chips
+- [x] Part 1, coach read: runs once a morning on reaching Focus (background gate), saved as `morning.coach`; read + patterns card, win chips, one-tap if-then on Lock in
+- [x] Part 2, win check: on Lock in; vague/too big gets feedback + rewrite with free time computed in code; Use this / Keep mine; never blocks; same win isn't checked twice; `morning.winCheck`
+- [x] Part 3, push: new `win` type (default 12:30, settings row), only if locked in and not answered
+- [x] Part 3, Home: "Off track?" beside the win line; one 10-minute step + Start focus; `morning.rescue`
+- [x] Part 4, night: Look back "Did your if-then hold?" (`morning.planHeld`), past-entry chip, AI context
+- [x] Part 4, week: Weekly Reset "Your mornings" card (counts + identities) + AI `identityRead` in the draft
+- [x] All saves after an await merge into the latest entry (never the render's copy), so a late AI reply can't overwrite typing
+- [x] Verify: node unit checks with faked Gemini, lint before/after, app + functions builds, harness at 390 + 1280
+
+**Verified:** 13 node unit groups with faked Gemini (exact pattern counts, normalizers, win check, rescue, Look back status, push rules); lint 37 messages, same as before; app and functions builds pass. In the app harness with stubbed Gemini at 375 and 1024: coach runs once in StrictMode, late reply doesn't overwrite typing, Use this / Keep mine / tap to lock in now, same win isn't rechecked, Gemini failure still locks and Try again recovers, Off track? through a 10-minute focus with the step as intent, Look back answers save, Reset's Your mornings counts match the seed. Fixed from testing: "Never came up" clipped at phone width; raw JSON in AI errors.
+**Not verified:** real Gemini output (local key is still invalid), a real iPhone push, the whole-step animation in the hidden pane (no frames there), and the no-API-key path by hand.

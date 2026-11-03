@@ -3,8 +3,9 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Moon, Plus, X, Trophy, TrendingUp, Lightbulb, PenLine, Target,
   Repeat, HeartPulse, MessageCircle, Sparkles, Shuffle, History, AlertTriangle, LoaderCircle, Lock, Pencil, Flame,
-  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck, Flag, FlaskConical, Smartphone,
+  CheckSquare, NotebookText, Handshake, PieChart, CalendarCheck, Flag, FlaskConical, Smartphone, ShieldAlert,
 } from 'lucide-react';
+import { PLAN_HELD_LABELS } from '../../utils/morningJournal';
 import EMOTIONS from '../../utils/logMeta';
 import {
   STEP_META, getLookBack, getSteps, getStepStatus, getFirstOpenStep, isCommitmentLocked,
@@ -157,7 +158,26 @@ const HoldToCommit = ({ disabled, onCommit }) => {
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
 const LookBackStep = ({ lookBack, entry, todayKey, updateField, onResolveCommitment }) => {
-  const { commitment, carry, focus, win } = lookBack;
+  const { commitment, carry, focus, win, ifThen } = lookBack;
+  const planCheck = ifThen && (
+    <>
+      <p className="cd-quote cd-quote--small">{ifThen}.</p>
+      <p className="cd-question">Did your plan hold?</p>
+      <div className="mj-plan-seg">
+        <Segmented
+          label="Did this morning's if-then plan hold?"
+          value={entry.morning?.planHeld || null}
+          onChange={planHeld => updateField('morning', { ...entry.morning, planHeld })}
+          options={[
+            { value: 'yes', label: PLAN_HELD_LABELS.yes, tone: 'success' },
+            { value: 'partly', label: PLAN_HELD_LABELS.partly, tone: 'warning' },
+            { value: 'no', label: PLAN_HELD_LABELS.no, tone: 'neutral' },
+            { value: 'none', label: PLAN_HELD_LABELS.none, tone: 'neutral' },
+          ]}
+        />
+      </div>
+    </>
+  );
   return (
     <>
       {win && (
@@ -174,7 +194,11 @@ const LookBackStep = ({ lookBack, entry, todayKey, updateField, onResolveCommitm
               { value: 'no', label: 'Not today', tone: 'neutral' },
             ]}
           />
+          {planCheck && <div className="mj-plan-check">{planCheck}</div>}
         </Block>
+      )}
+      {!win && planCheck && (
+        <Block Icon={ShieldAlert} title="This morning you planned" area="win">{planCheck}</Block>
       )}
 
       {commitment.status !== 'none' && (

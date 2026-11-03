@@ -29,6 +29,7 @@ import { hasAssistantApiKey } from './utils/assistantUtils'
 import { EMPTY_CHECKINS, getDueCheckin, markCheckinDone, checkinPrompt, computeNudges, dismissNudge } from './utils/assistantTriggers'
 import { getActivePlan } from './utils/weeklyReset'
 import { homeBriefFromMorning } from './utils/homeBrief'
+import { RESCUE_MINUTES } from './utils/morningCoach'
 import GoalsPage from './components/GoalsPage'
 import DataModal from './components/DataModal'
 import WeeklyReviewPage from './components/WeeklyReviewPage'
@@ -921,6 +922,11 @@ function App() {
     setFocusModeOpen(true);
   }, []);
 
+  // Home's "Off track?" step: a short session on just that step.
+  const startFocusOnStep = useCallback((step) => {
+    setFocusLaunch({ intent: step, durationSecs: RESCUE_MINUTES * 60 });
+    setFocusModeOpen(true);
+  }, []);
   const closeFocusMode = useCallback(() => { setFocusModeOpen(false); setFocusLaunch(null); }, []);
 
   // Parked thoughts become Brain Dump notes, laid out like the agent's own notes.
@@ -1065,6 +1071,18 @@ function App() {
   // its own model call only runs when there's no morning check-in to wait for
   // (after the morning window, or that check-in failed). Failures retry after an hour.
   const [briefLoading, setBriefLoading] = useState(false);
+  // The morning coach (morningCoach.js). Saves merge into the latest entry, because
+  // a reply can land after you've typed more: the journal's own copy would be stale.
+  const { coachMorning, checkWin, backOnTrack } = assistant;
+  const morningAi = useMemo(() => (hasAssistantApiKey() ? {
+    coach: (dateKey, opts) => coachMorning({ dateKey, weekPriority: currentWeekPriority, logReviews }, opts),
+    checkWin: (dateKey, win) => checkWin({ dateKey, win }),
+    backOnTrack: (dateKey) => backOnTrack({ dateKey }),
+  } : null), [coachMorning, checkWin, backOnTrack, currentWeekPriority, logReviews]);
+  const saveMorning = useCallback((dateKey, fields) => {
+    setLogs(prev => ({ ...prev, [dateKey]: { ...prev[dateKey], morning: { ...prev[dateKey]?.morning, ...fields } } }));
+  }, []);
+
   const briefInFlight = useRef(false);
   const briefFailedAt = useRef(0);
   const runHomeBrief = useCallback(async (manual = false) => {
@@ -1165,6 +1183,9 @@ function App() {
             onStartFocus={() => setFocusModeOpen(true)}
             onStartFocusBlock={startFocusFromBlock}
             onCheckInBlock={checkInBlockInstance}
+            morningAi={morningAi}
+            onSaveMorning={saveMorning}
+            onStartFocusStep={startFocusOnStep}
           />
         );
       case 'statistics':
@@ -1239,6 +1260,8 @@ function App() {
             onOpenAssistant={openAssistant}
             onExpandLesson={assistant.expandLesson}
             onCoachImprove={assistant.coachImprove}
+            morningAi={morningAi}
+            onSaveMorning={saveMorning}
             onAskAssistant={askAssistant}
             onNavigate={handleNavigate}
           />

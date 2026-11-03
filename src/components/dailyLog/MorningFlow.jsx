@@ -1,14 +1,15 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Sun, Moon, BatteryCharging, Handshake, Flag, Star, Plus,
-  Target, ShieldAlert, Compass, CalendarPlus, CalendarCheck, Play, Pencil, Lock, CheckSquare,
+  Target, ShieldAlert, Compass, CalendarPlus, CalendarCheck, Play, Pencil, Lock, CheckSquare, Sparkles, LoaderCircle,
 } from 'lucide-react';
 import { Block } from './CloseDayFlow';
+import { CoachRead, WinCheckCard } from './MorningCoach';
 import { SleepInput, EnergyPicker, ENERGY_LABELS } from './HealthQuick';
 import {
   MORNING_STEP_KEYS, MORNING_STEP_META, getMorningStatus, getMorningStart,
-  getWinSuggestions, OBSTACLE_SUGGESTIONS, morningIfThen,
+  getWinSuggestions, OBSTACLE_SUGGESTIONS, morningIfThen, getMorningPatterns, getPatternLines,
 } from '../../utils/morningJournal';
 import { getYesterdayCommitment } from '../../utils/homeUtils';
 import { expandEventsForDates } from '../../utils/calendarUtils';
@@ -27,9 +28,10 @@ const formatDayLabel = (dateKey) => {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 };
 
+const nowMs = () => Date.now();
 const formatTime = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-const SUGGESTION_ICON = { week: Target, goal: Flag, task: Star };
+const SUGGESTION_ICON = { coach: Sparkles, week: Target, goal: Flag, task: Star };
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
 
@@ -117,8 +119,10 @@ const TopThree = ({ todos, setTodos, todayKey }) => {
   );
 };
 
-const FocusStep = ({ morning, setMorning, suggestions, todos, setTodos, todayKey }) => (
+const FocusStep = ({ morning, setMorning, suggestions, todos, setTodos, todayKey, coachRead }) => (
   <>
+    {coachRead}
+
     <Block Icon={Flag} title="Today is a win if I…" hint="Just one thing" area="win">
       <input
         type="text"
@@ -148,9 +152,15 @@ const FocusStep = ({ morning, setMorning, suggestions, todos, setTodos, todayKey
 
 const LockInStep = ({ morning, setMorning, northStar }) => {
   const vision = northStar?.vision?.trim();
+  const coachPlan = !morning.obstacle?.trim() && !morning.plan?.trim() ? morningIfThen(morning.coach) : '';
   return (
     <>
       <Block Icon={ShieldAlert} title="What could knock you off track?" hint="Plan it now" area="obstacle">
+        {coachPlan && (
+          <button type="button" className="cd-chip mj-coach-plan" onClick={() => setMorning({ obstacle: morning.coach.obstacle, plan: morning.coach.plan })}>
+            <Sparkles size={13} /> <span>{coachPlan}</span>
+          </button>
+        )}
         <div className="cd-ifthen">
           <label className="cd-ifthen-row">
             <span>If</span>
@@ -235,7 +245,7 @@ const LockedIn = ({ morning, todayKey, todos, plannedToday, onPlanDay, onStartFo
 const MorningFlow = ({
   todayKey, entry, updateField, logs, commitmentArchive, healthLog, setHealthLog,
   todos = [], setTodos, goals, northStar, weekPriority, calendarEvents,
-  onPlanDay, onStartFocus, onNavigate, modeSwitch,
+  onPlanDay, onStartFocus, onNavigate, modeSwitch, ai = null, saveMorning,
 }) => {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef(null);
@@ -249,16 +259,67 @@ const MorningFlow = ({
   const index = MORNING_STEP_KEYS.indexOf(step);
 
   const commitment = getYesterdayCommitment(logs, commitmentArchive, now);
-  const suggestions = getWinSuggestions({ todos, goals, weekPriority, todayKey });
+  const suggestions = getWinSuggestions({ todos, goals, weekPriority, todayKey, coachOptions: morning.coach?.winOptions });
+  const patternLines = useMemo(() => getPatternLines(getMorningPatterns(logs, healthLog, todayKey)), [logs, healthLog, todayKey]);
   const plannedToday = expandEventsForDates(calendarEvents || [], [todayKey]).length > 0;
 
+  // The coach's read: once per morning, as soon as you reach the part it helps with.
+  const [coachError, setCoachError] = useState(null);
+  const coachTried = useRef(false);
+  const runCoach = useCallback(async (opts) => {
+    const result = await ai.coach(todayKey, opts);
+    if (result.ok) saveMorning(todayKey, { coach: result.coach });
+    else setCoachError(result.error);
+  }, [ai, saveMorning, todayKey]);
+  const coachDue = !!ai && !morning.coach && !morning.doneAt && (step === 'focus' || step === 'lockIn');
+  useEffect(() => {
+    if (!coachDue || coachTried.current) return;
+    coachTried.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state only changes once the reply lands
+    runCoach({ background: true });
+  }, [coachDue, runCoach]);
+  const retryCoach = () => {
+    setCoachError(null);
+    runCoach();
+  };
+
+  // Lock in checks the win first. Leaving the step or tapping "Lock in now" drops the reply.
+  const [checking, setChecking] = useState(false);
+  const [check, setCheck] = useState(null);
+  const checkRun = useRef(0);
+
   const scrollToTop = () => rootRef.current?.scrollIntoView({ block: 'start' });
-  const next = () => setStep(MORNING_STEP_KEYS[Math.min(index + 1, MORNING_STEP_KEYS.length - 1)]);
-  const back = () => setStep(MORNING_STEP_KEYS[Math.max(index - 1, 0)]);
+  const goTo = (key) => {
+    checkRun.current += 1;
+    setChecking(false);
+    setCheck(null);
+    setStep(key);
+  };
+  const next = () => goTo(MORNING_STEP_KEYS[Math.min(index + 1, MORNING_STEP_KEYS.length - 1)]);
+  const back = () => goTo(MORNING_STEP_KEYS[Math.max(index - 1, 0)]);
   const canLock = !!morning.win?.trim();
-  const lockIn = () => {
-    setMorning({ doneAt: Date.now() });
-    setStep('locked');
+  const finishLock = (fields) => {
+    saveMorning(todayKey, { ...fields, doneAt: nowMs() });
+    goTo('locked');
+  };
+  const lockIn = async () => {
+    const win = morning.win.trim();
+    if (!ai || morning.winCheck?.forWin === win) {
+      finishLock();
+      return;
+    }
+    checkRun.current += 1;
+    const run = checkRun.current;
+    setChecking(true);
+    const result = await ai.checkWin(todayKey, win);
+    if (run !== checkRun.current) return;
+    setChecking(false);
+    if (!result.ok || result.check.verdict === 'clear') {
+      finishLock(result.ok ? { winCheck: result.check } : undefined);
+      return;
+    }
+    saveMorning(todayKey, { winCheck: result.check });
+    setCheck(result.check);
   };
 
   const motionProps = {
@@ -282,7 +343,7 @@ const MorningFlow = ({
                 key={k}
                 type="button"
                 className={`cd-step${k === step ? ' current' : ''}${status[k] ? ' done' : ''}`}
-                onClick={() => setStep(k)}
+                onClick={() => goTo(k)}
                 aria-current={k === step ? 'step' : undefined}
               >
                 <span className="cd-step-dot">{status[k] && k !== step ? <Check size={11} strokeWidth={3} /> : i + 1}</span>
@@ -304,7 +365,7 @@ const MorningFlow = ({
               onPlanDay={onPlanDay}
               onStartFocus={onStartFocus}
               onNavigate={onNavigate}
-              onEdit={() => setStep(MORNING_STEP_KEYS[0])}
+              onEdit={() => goTo(MORNING_STEP_KEYS[0])}
             />
           ) : (
             <>
@@ -314,17 +375,36 @@ const MorningFlow = ({
                 <WakeStep morning={morning} setMorning={setMorning} todayKey={todayKey} healthLog={healthLog} setHealthLog={setHealthLog} commitment={commitment} />
               )}
               {step === 'focus' && (
-                <FocusStep morning={morning} setMorning={setMorning} suggestions={suggestions} todos={todos} setTodos={setTodos} todayKey={todayKey} />
+                <FocusStep
+                  morning={morning}
+                  setMorning={setMorning}
+                  suggestions={suggestions}
+                  todos={todos}
+                  setTodos={setTodos}
+                  todayKey={todayKey}
+                  coachRead={<CoachRead coach={morning.coach} loading={coachDue && !coachError} error={coachError} onRetry={retryCoach} patternLines={patternLines} />}
+                />
               )}
               {step === 'lockIn' && (
                 <LockInStep morning={morning} setMorning={setMorning} northStar={northStar} />
               )}
 
+              {check ? (
+                <WinCheckCard
+                  check={check}
+                  onUseRewrite={() => finishLock({ win: check.rewrite, winCheck: { ...check, forWin: check.rewrite } })}
+                  onKeep={() => finishLock()}
+                />
+              ) : (
               <footer className="cd-nav">
                 {index > 0
                   ? <button type="button" className="cd-btn cd-btn--ghost" onClick={back}><ChevronLeft size={16} /> Back</button>
                   : <span />}
-                {step === 'lockIn' ? (
+                {step === 'lockIn' && checking ? (
+                  <button type="button" className="cd-btn cd-btn--primary" onClick={() => finishLock()} aria-busy="true">
+                    <LoaderCircle size={15} className="log-review-spin" /> Checking… tap to lock in now
+                  </button>
+                ) : step === 'lockIn' ? (
                   <button type="button" className="cd-btn cd-btn--primary" onClick={lockIn} disabled={!canLock} title={canLock ? undefined : 'Write today’s win first (step 2)'}>
                     <Lock size={15} /> Lock in my day
                   </button>
@@ -334,9 +414,10 @@ const MorningFlow = ({
                   </button>
                 )}
               </footer>
+              )}
               {step === 'lockIn' && !canLock && (
                 <p className="cd-close-hint mj-lock-hint">
-                  Write today’s win first. <button type="button" className="cd-link" onClick={() => setStep('focus')}>Go to Focus</button>
+                  Write today’s win first. <button type="button" className="cd-link" onClick={() => goTo('focus')}>Go to Focus</button>
                 </p>
               )}
             </>

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
   Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical, Smartphone, Sun,
@@ -14,6 +15,7 @@ import {
 import { todayQueue } from '../utils/taskUtils';
 import { getExperimentTicks } from '../utils/weeklyReset';
 import { getMorningStatus } from '../utils/morningJournal';
+import { RESCUE_MINUTES } from '../utils/morningCoach';
 import { useNow } from '../hooks/useNow';
 
 const getGreeting = (hour) => {
@@ -68,6 +70,53 @@ function WinLine({ win, onOpen }) {
       <Flag size={15} className="wp-brief-icon" aria-hidden="true" />
       <p className="wp-brief-text"><span className="wp-win-key">Today is a win if I</span> {win}</p>
     </button>
+  );
+}
+
+// "Off track?" beside the win: one small next step, on tap only.
+function TodaysWin({ win, morning, todayKey, ai, onSave, onOpen, onStartFocusStep }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const rescue = morning.rescue?.forWin === win && !morning.rescue.dismissed ? morning.rescue : null;
+
+  const ask = async () => {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    const result = await ai.backOnTrack(todayKey);
+    setLoading(false);
+    if (result.ok) onSave(todayKey, { rescue: result.rescue });
+    else setError(result.error);
+  };
+
+  return (
+    <div className="wp-today-win">
+      <div className="wp-win-row">
+        <WinLine win={win} onOpen={onOpen} />
+        {ai && !morning.result && !rescue && (
+          <button type="button" className="wp-offtrack" onClick={ask} disabled={loading} aria-busy={loading}>
+            {loading ? <><RotateCw size={13} className="wp-spin" /> Thinking…</> : 'Off track?'}
+          </button>
+        )}
+      </div>
+      {error && <p className="wp-rescue-error" role="alert">{error}</p>}
+      {rescue && (
+        <section className="wp-rescue" aria-label="Your next step">
+          <div className="wp-rescue-head">
+            <span className="wp-now-label">Your next {RESCUE_MINUTES} minutes</span>
+            <button type="button" className="wp-rescue-close" onClick={() => onSave(todayKey, { rescue: { ...morning.rescue, dismissed: true } })} aria-label="Dismiss"><X size={14} /></button>
+          </div>
+          <p className="wp-rescue-step">{rescue.step}</p>
+          {rescue.note && <p className="wp-rescue-note">{rescue.note}</p>}
+          <div className="wp-rescue-actions">
+            <button type="button" className="wp-btn wp-btn--primary" onClick={() => onStartFocusStep(rescue.step)}><Play size={14} /> Start {RESCUE_MINUTES}-min focus</button>
+            <button type="button" className="wp-btn wp-btn--ghost" onClick={ask} disabled={loading} aria-busy={loading}>
+              {loading ? <><RotateCw size={13} className="wp-spin" /> Thinking…</> : 'Something smaller'}
+            </button>
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -508,6 +557,9 @@ export default function WelcomePage({
   onPlanDay,
   onStartFocus,
   onStartFocusBlock,
+  morningAi,
+  onSaveMorning,
+  onStartFocusStep,
   onCheckInBlock,
 }) {
   const now = useNow(30000);
@@ -529,7 +581,7 @@ export default function WelcomePage({
       <div className="wp-layout">
         <TopBar name={user?.name} now={now} />
         {todaysWin
-          ? <WinLine win={todaysWin} onOpen={() => onNavigate('daily-log')} />
+          ? <TodaysWin win={todaysWin} morning={todayEntry.morning} todayKey={todayKey} ai={morningAi} onSave={onSaveMorning} onOpen={() => onNavigate('daily-log')} onStartFocusStep={onStartFocusStep} />
           : <BriefLine brief={todaysBrief} loading={briefLoading} onRefresh={onRefreshBrief} />}
         <CheckInCard calendarEvents={calendarEvents} now={now} todayKey={todayKey} onCheckInBlock={onCheckInBlock} onNavigate={onNavigate} />
 

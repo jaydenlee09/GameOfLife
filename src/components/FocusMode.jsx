@@ -30,7 +30,7 @@ const FocusMode = ({
   const isLinked = launch?.blockId != null;
 
   // A block or goal launch works on what it says; a free session suggests today's first task.
-  const [pinnedId, setPinnedId]   = useState(launchedTask?.id ?? (isLinked || launch?.goalId != null ? null : todayTasks[0]?.id ?? null));
+  const [pinnedId, setPinnedId]   = useState(launchedTask?.id ?? (isLinked || launch?.goalId != null || launch?.intent ? null : todayTasks[0]?.id ?? null));
   const [showDone, setShowDone]   = useState(false);
   const [startedAt, setStartedAt] = useState(null);
   const [showTaskPicker, setShowTaskPicker] = useState(false);

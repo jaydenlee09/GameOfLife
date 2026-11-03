@@ -9,6 +9,7 @@ import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
 import { generateLessonInsight } from '../utils/lessonInsight';
 import { generateImproveCoach } from '../utils/improveCoach';
+import { generateMorningCoach, generateWinCheck, generateRescue } from '../utils/morningCoach';
 import { generateGoalDraft, generateNextStep, generateUnstuck, generateRecalibration } from '../utils/goalCoach';
 import { generateResetDraft } from '../utils/weeklyReset';
 
@@ -34,6 +35,8 @@ const friendlyError = (err) => {
   if (/429|RESOURCE_EXHAUSTED|quota/i.test(message)) {
     return "Gemini's free-tier rate limit was hit. Wait a minute and try again.";
   }
+  // The SDK passes other server errors through as raw JSON.
+  if (message.trim().startsWith('{')) return 'Gemini had a problem on its end. Try again in a moment.';
   return message;
 };
 
@@ -314,12 +317,23 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
   const recalibrateGoals = useCallback(() => coach(generateRecalibration, {}, 'recalibration'), [coach]);
   // Weekly Reset: drafts the week's reflection + next week's plan; the page saves it.
   const draftWeek = useCallback((args) => coach(generateResetDraft, args, 'draft'), [coach]);
+  // Morning journal: one coach read at a time, even if the journal is reopened while it's on its way.
+  const morningCoachInFlight = useRef(null);
+  const coachMorning = useCallback((args, opts) => {
+    if (!morningCoachInFlight.current) {
+      morningCoachInFlight.current = coach(generateMorningCoach, args, 'coach', opts)
+        .finally(() => { morningCoachInFlight.current = null; });
+    }
+    return morningCoachInFlight.current;
+  }, [coach]);
+  const checkWin = useCallback((args) => coach(generateWinCheck, args, 'check'), [coach]);
+  const backOnTrack = useCallback((args) => coach(generateRescue, args, 'rescue'), [coach]);
   // Calendar: sorts block titles no keyword matched into categories ({ [title]: id }).
   const sortBlockCategories = useCallback((titles) => coach(sortTitlesIntoCategories, { titles }, 'categories', { background: true }), [coach]);
 
   return {
     send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson, coachImprove,
-    draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, draftWeek, sortBlockCategories,
+    coachMorning, checkWin, backOnTrack, draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, draftWeek, sortBlockCategories,
     isLoading, error, clearError: () => setError(null),
   };
 }

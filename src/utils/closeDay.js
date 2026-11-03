@@ -12,6 +12,7 @@
 
 import { shiftDateKey } from './scoreUtils';
 import { getFocusGoal } from './goalUtils';
+import { morningIfThen } from './morningJournal';
 
 export const STEP_KEYS = ['lookBack', 'checkIn', 'reflect', 'tomorrow', 'finish'];
 
@@ -51,8 +52,9 @@ export const getLookBack = ({ entry, logs, logReviews, todayKey, commitment }) =
   const focus = logReviews?.[shiftDateKey(todayKey, -1)]?.tomorrowFocus?.trim() || null;
   // This morning's "Today is a win if I…" (Daily Log's morning journal).
   const win = entry?.morning?.win?.trim() || null;
+  const ifThen = morningIfThen(entry?.morning) || null;
   const hasCommitment = commitment?.status && commitment.status !== 'none';
-  return { commitment, carry, focus, win, hasContent: !!(hasCommitment || carry || focus || win) };
+  return { commitment, carry, focus, win, ifThen, hasContent: !!(hasCommitment || carry || focus || win || ifThen) };
 };
 
 // ─── Steps ────────────────────────────────────────────────────────────────────
@@ -69,6 +71,7 @@ export const getStepStatus = ({ entry, lookBack, commitmentLocked }) => ({
     lookBack.commitment?.status !== 'pending'
     && (!lookBack.carry || !!entry?.loopCheck?.result)
     && (!lookBack.win || !!entry?.morning?.result)
+    && (!lookBack.ifThen || !!entry?.morning?.planHeld)
   ),
   checkIn: (entry?.emotions?.length > 0) || entry?.dayRating > 0,
   reflect: clean(entry?.proud).length > 0,

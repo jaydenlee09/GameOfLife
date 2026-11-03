@@ -16,7 +16,7 @@ import {
 import { entryHasContent } from '../utils/logReview';
 import { scoreColor } from '../utils/scoreUtils';
 import { getLessons } from '../utils/closeDay';
-import { defaultLogView, hasMorning, morningIfThen, WIN_RESULT_LABELS } from '../utils/morningJournal';
+import { defaultLogView, hasMorning, morningIfThen, WIN_RESULT_LABELS, PLAN_HELD_LABELS } from '../utils/morningJournal';
 import CloseDayFlow from './dailyLog/CloseDayFlow';
 import MorningFlow from './dailyLog/MorningFlow';
 import LogReviewSection from './dailyLog/LogReview';
@@ -292,7 +292,7 @@ const DailyLogPage = ({
   pomodoroSessions = [], northStar, logPatterns, weekPriority, onPlanDay, onStartFocus,
   habits = [], setHabits, onToggleHabitDay, healthLog = {}, setHealthLog, foodLog = {}, setFoodLog, foodPoints = { balance: 0 },
   setFoodPoints, logReviews = {}, onSubmitLog, reviewingDate = null, onOpenAssistant,
-  onExpandLesson, onCoachImprove, onAskAssistant, onNavigate, calendarEvents = [], weekExperiment = null,
+  onExpandLesson, onCoachImprove, morningAi, onSaveMorning, onAskAssistant, onNavigate, calendarEvents = [], weekExperiment = null,
 }) => {
   const todayKey = getTodayKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
@@ -516,6 +516,8 @@ const DailyLogPage = ({
             onStartFocus={onStartFocus}
             onNavigate={onNavigate}
             modeSwitch={modeSwitch}
+            ai={morningAi}
+            saveMorning={onSaveMorning}
           />
         ) : isToday ? (
           <CloseDayFlow
@@ -597,7 +599,7 @@ const DailyLogPage = ({
                       </p>
                     )}
                     {morningIfThen(currentEntry.morning) && (
-                      <p className="log-morning-row"><span className="log-morning-key">Plan</span><span>{morningIfThen(currentEntry.morning)}</span></p>
+                      <p className="log-morning-row"><span className="log-morning-key">Plan</span><span>{morningIfThen(currentEntry.morning)}</span>{currentEntry.morning.planHeld && <span className="log-past-chip"><strong>{PLAN_HELD_LABELS[currentEntry.morning.planHeld]}</strong></span>}</p>
                     )}
                     {currentEntry.morning.identity?.trim() && (
                       <p className="log-morning-row"><span className="log-morning-key">Being</span><span>Someone who {currentEntry.morning.identity.trim()}</span></p>

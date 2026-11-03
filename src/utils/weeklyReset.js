@@ -25,6 +25,7 @@ import { computeDailyScore, getEarliestActivityKey, shiftDateKey, STREAK_THRESHO
 import { getMondayOf, getScoreLeaksForDays, getWeekDeltas } from './statsInsights';
 import { getActiveGoals, getFocusGoals, describeGoal, getGoalActivity } from './goalUtils';
 import { makeTask } from './taskUtils';
+import { getWeekMornings, morningIfThen, WIN_RESULT_LABELS, PLAN_HELD_LABELS } from './morningJournal';
 import EMOTIONS from './logMeta';
 
 // Sunday from this hour (and Monday, for a week left unreviewed) the app starts asking.
@@ -336,6 +337,19 @@ export const buildResetContext = (state, reviewKey, todayKey, now = new Date()) 
       };
       return Object.fromEntries(Object.entries(entry).filter(([, v]) => (Array.isArray(v) ? v.length : v != null)));
     }).filter(Boolean),
+    mornings: {
+      ...getWeekMornings(data.logs, days),
+      days: days.map((k) => {
+        const m = data.logs[k]?.morning;
+        if (!m?.win?.trim() && !m?.identity?.trim()) return null;
+        return {
+          day: dayName(k),
+          ...(m.win?.trim() ? { todayIsAWinIf: cut(m.win, 120), result: WIN_RESULT_LABELS[m.result] || 'not answered' } : {}),
+          ...(morningIfThen(m) ? { ifThen: cut(morningIfThen(m), 140), ifThenResult: PLAN_HELD_LABELS[m.planHeld] || 'not answered' } : {}),
+          ...(m.identity?.trim() ? { saidTheyWouldBeSomeoneWho: cut(m.identity, 100) } : {}),
+        };
+      }).filter(Boolean),
+    },
     commitments: (() => {
       const recs = data.commitmentArchive.filter((c) => days.includes(c.date));
       return { kept: recs.filter((c) => c.confirmedOn).length, missed: recs.filter((c) => c.denied === true).length };
@@ -376,9 +390,10 @@ export const RESET_SCHEMA = {
     outcomes: LIST('Exactly 3 concrete, checkable results for next week, each starting with a verb, max 80 characters. Doable alongside what is coming up.'),
     experimentText: STR('ONE small daily behavior to try every day next week, aimed at the biggest leak or blocker. Yes/no checkable each night, starts with a verb, max 80 characters. E.g. "Phone charges outside the bedroom by 10:30pm".'),
     experimentWhy: STR('One sentence: which leak or blocker it targets, with the number. Max 25 words.'),
+    identityRead: STR('Compare who they said they would be each morning (mornings.days, saidTheyWouldBeSomeoneWho) with what they actually did that day, and tie it to their North Star if one is set. Honest, with the counts, max 40 words. Empty when they wrote no morning identity this week.'),
   },
   required: ['headline', 'wins', 'blockers', 'lessons', 'priority', 'priorityWhy', 'outcomes', 'experimentText', 'experimentWhy'],
-  propertyOrdering: ['headline', 'wins', 'blockers', 'lessons', 'priority', 'priorityWhy', 'outcomes', 'experimentText', 'experimentWhy'],
+  propertyOrdering: ['headline', 'wins', 'blockers', 'lessons', 'priority', 'priorityWhy', 'outcomes', 'experimentText', 'experimentWhy', 'identityRead'],
 };
 
 export const buildResetSystemPrompt = (name) => `You are ${name}'s personal coach inside their self-improvement app "APEX". It's their Weekly Reset: you draft the week's review and next week's plan so they only have to edit it, not write it from scratch.
@@ -405,6 +420,7 @@ export const normalizeResetDraft = (raw) => {
     priorityWhy: cut(data.priorityWhy, 200),
     outcomes: list(data.outcomes, 3, 90),
     experiment: cut(data.experimentText, 90) ? { text: cut(data.experimentText, 90), why: cut(data.experimentWhy, 200) } : null,
+    identityRead: cut(data.identityRead, 300),
   };
   if (!draft.headline || !draft.priority) throw new Error('The draft came back incomplete. Try again.');
   return draft;
