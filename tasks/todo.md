@@ -1,5 +1,30 @@
 # Todo
 
+## Done, uncommitted (2026-11-09): Morning "What could knock you off track?" + if-then reminders
+
+Problem (user): the Lock in step's if-then and its AI suggestion are weak; the AI suggestion isn't in
+"If…, I will…" form (it asked for a noun and wrapped it as "If ___ gets in the way", giving lines like
+"If I get distracted gets in the way"); and they forget their plan during the day.
+Decisions (user, Q&A): 3 AI options; reminders on Home under the win + a push at the risky time; AI also
+checks a plan they write themselves on Lock in.
+- [x] morningJournal: "If" half is a moment clause (`ifMoment: true` on new entries → "If X, I will Y"; old
+      entries keep "If X gets in the way"); moment pills; `remindAt`; `getPastPlans` (own plans that Held, 28 days).
+- [x] morningCoach: `generateIfThenOptions` (3 full pairs + likely time still ahead today, tied to today's win and
+      history, saved as `morning.ifThenOptions` keyed by win); coach read no longer writes obstacle/plan; win check
+      also checks a plan you wrote yourself (`winCheck.plan`), never one you picked; a kept win isn't re-questioned.
+- [x] MorningFlow Lock in: AI options (picked state) + Held before + Or write your own + "Remind me at";
+      check card covers win and/or plan; Locked card shows reminder time.
+- [x] Home: plan row under the win (full width, never clamped) until tonight's "Did your plan hold?".
+      Push: new `ifthen` type at `remindAt` (60-min window, not once planHeld) + settings row.
+- Verified: node checks (format/legacy/cleaning, past plans, picked detection, AI normalizers incl. past-time drop,
+  plan check, generate w/ fake model, push timing/window/dedupe/off), lint (json) = HEAD (27, all App.jsx),
+  build, harness UI 1300 + 375 + 320x568: options load, pick fills + reminder, own vague plan → check card →
+  sharper plan used + locked, picked plan re-locks with 0 AI calls, error + retry, Home plan row unclipped,
+  no h-scroll, no console errors on a fresh load.
+- Changed while testing: Home plan first sat inside the win card and got clamped to "…I…" on phones; moved to
+  its own unclamped row.
+- Not verified: real Gemini output (only a fake model); the push only goes live once pushed to main.
+
 ## Done, uncommitted (2026-11-09): Task tags with colors
 
 Problem (user): attach tags to tasks to organize them, and change a tag's color.

@@ -5,13 +5,18 @@
 // Saved on today's entry as `entry.morning` (all fields optional):
 //   energy    1-5, how rested you woke up (the night's Body card has its own energy)
 //   win       "Today is a win if I…" — the one thing that makes today count
-//   obstacle  what's most likely to knock you off track
+//   obstacle  the "If…" half: what's most likely to knock you off track. With
+//             `ifMoment` (every entry written since 2026-11-09) it's the moment
+//             itself ("I reach for my phone") and reads "If ___, I will ___";
+//             older entries hold a noun ("My phone") read "If ___ gets in the way".
 //   plan      what you'll do when it happens (the "I will…" half of an if-then)
+//   ifMoment  true when `obstacle` is a moment clause (see above)
+//   remindAt  'HH:MM' or '': when to push the if-then to you (pushSchedule.js)
 //   identity  "Today I'll be someone who…"
 //   doneAt    ms timestamp of "Lock in my day"
 //   result    'yes' | 'partly' | 'no' — tonight's Look back answer about `win`
 //   planHeld  'yes' | 'partly' | 'no' | 'none' — tonight's answer about the if-then
-//   coach, winCheck, rescue — what the AI said (morningCoach.js)
+//   coach, ifThenOptions, winCheck, rescue — what the AI said (morningCoach.js)
 // Last night's sleep isn't stored here: it goes to healthLog[today] like the
 // night routine's sleep card, so the Daily Score sees it either way.
 
@@ -83,14 +88,55 @@ export const getWinSuggestions = ({ todos = [], goals = [], weekPriority, todayK
   return out.slice(0, coachOptions.length ? 4 : 3);
 };
 
-/** One-tap answers for "What could knock me off track?" (they read as "If ___ gets in the way"). */
-export const OBSTACLE_SUGGESTIONS = ['My phone', 'Feeling tired', 'Putting it off', 'Losing focus after lunch'];
+/** One-tap answers for "If…": the moment, not the thing ("If I reach for my phone, I will…"). */
+export const MOMENT_SUGGESTIONS = ['I reach for my phone', 'I feel tired or low', 'I want to put it off', 'I lose focus after lunch'];
 
-/** "When my phone buzzes, I will…" style if-then line, or '' while either half is empty. */
+const noEndPunctuation = (s) => s.replace(/[\s.,;:!]+$/, '').trim();
+
+/** The "If" half as it reads after "If": no leading "if"/"when", no trailing comma, no "I will…" half pasted in. */
+export const cleanMoment = (text) => noEndPunctuation(trim(text)
+  .replace(/^(if|when|whenever)\s+/i, '')
+  .replace(/,?\s*(then\s+)?i(\s+will|'ll)\s+.*$/i, ''));
+
+/** The "I will" half as it reads after "I will". */
+export const cleanPlan = (text) => noEndPunctuation(trim(text).replace(/^(then\s+)?i(\s+will|'ll)\s+/i, ''));
+
+/** "If I reach for my phone, I will put it in the other room", or '' while either half is empty. */
 export const morningIfThen = (morning) => {
-  const obstacle = trim(morning?.obstacle);
-  const plan = trim(morning?.plan);
-  return obstacle && plan ? `If ${lowerFirst(obstacle)} gets in the way, I will ${lowerFirst(plan)}` : '';
+  const obstacle = morning?.ifMoment ? cleanMoment(morning?.obstacle) : trim(morning?.obstacle);
+  const plan = morning?.ifMoment ? cleanPlan(morning?.plan) : trim(morning?.plan);
+  if (!obstacle || !plan) return '';
+  return morning.ifMoment
+    ? `If ${lowerFirst(obstacle)}, I will ${lowerFirst(plan)}`
+    : `If ${lowerFirst(obstacle)} gets in the way, I will ${lowerFirst(plan)}`;
+};
+
+/** 'HH:MM' → "3:00 PM", or '' when it isn't a time. */
+export const formatRemindAt = (hhmm) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || '');
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return '';
+  return new Date(2000, 0, 1, Number(m[1]), Number(m[2])).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+
+const pairKey = (when, then) => `${cleanMoment(when).toLowerCase()}|${cleanPlan(then).toLowerCase()}`;
+
+/** True when today's if-then is exactly one of `pairs` ({ when, then }), i.e. picked, not written. */
+export const isPickedPlan = (morning, pairs = []) => {
+  if (!morning?.ifMoment || !trim(morning.obstacle) || !trim(morning.plan)) return false;
+  const key = pairKey(morning.obstacle, morning.plan);
+  return pairs.some((p) => pairKey(p.when, p.then) === key);
+};
+
+/** Your own if-thens that held ("Held" tonight) in the last 4 weeks, newest first, no repeats. */
+export const getPastPlans = (logs, todayKey, limit = 2) => {
+  const out = [];
+  for (let i = 1; i <= PATTERN_DAYS && out.length < limit; i += 1) {
+    const m = logs?.[shiftDateKey(todayKey, -i)]?.morning;
+    if (!m?.ifMoment || m.planHeld !== 'yes' || !morningIfThen(m)) continue;
+    const pair = { when: cleanMoment(m.obstacle), then: cleanPlan(m.plan) };
+    if (!out.some((p) => pairKey(p.when, p.then) === pairKey(pair.when, pair.then))) out.push(pair);
+  }
+  return out;
 };
 
 /** One line for the AI's context, or null when the morning journal is empty. */
@@ -99,8 +145,10 @@ export const describeMorning = (entry) => {
   const m = entry.morning;
   const parts = [];
   if (trim(m.win)) parts.push(`today is a win if they ${trim(m.win)}${m.result ? ` (tonight they said: ${WIN_RESULT_LABELS[m.result]})` : ''}`);
-  if (morningIfThen(m)) parts.push(`if-then plan: "${morningIfThen(m)}"${m.planHeld ? ` (tonight they said: ${PLAN_HELD_LABELS[m.planHeld]})` : ''}`);
-  else if (trim(m.obstacle)) parts.push(`expects "${trim(m.obstacle)}" to get in the way`);
+  if (morningIfThen(m)) {
+    const remind = formatRemindAt(m.remindAt);
+    parts.push(`if-then plan: "${morningIfThen(m)}"${remind ? ` (reminder at ${remind})` : ''}${m.planHeld ? ` (tonight they said: ${PLAN_HELD_LABELS[m.planHeld]})` : ''}`);
+  } else if (trim(m.obstacle)) parts.push(m.ifMoment ? `expects trouble when ${cleanMoment(m.obstacle)}` : `expects "${trim(m.obstacle)}" to get in the way`);
   if (trim(m.identity)) parts.push(`today they'll be someone who ${trim(m.identity)}`);
   if (m.energy > 0) parts.push(`woke up ${m.energy}/5 rested`);
   if (m.rescue?.count > 0) parts.push(`tapped "Off track?" ${m.rescue.count} time${m.rescue.count === 1 ? '' : 's'}`);
@@ -129,8 +177,9 @@ export const getMorningPatterns = (logs, healthLog, todayKey) => {
 
   const obstacles = new Map();
   rows.filter((m) => trim(m.obstacle)).forEach((m) => {
-    const key = trim(m.obstacle).toLowerCase();
-    const o = obstacles.get(key) || { text: trim(m.obstacle), times: 0 };
+    const text = m.ifMoment ? cleanMoment(m.obstacle) : trim(m.obstacle);
+    const key = text.toLowerCase();
+    const o = obstacles.get(key) || { text, times: 0 };
     obstacles.set(key, { ...o, times: o.times + 1 });
   });
 
@@ -158,7 +207,7 @@ export const getPatternLines = (p) => {
     lines.push(`Waking up rested (4-5) you did it ${p.rested.did} of ${p.rested.days} days; otherwise, ${p.tired.did} of ${p.tired.days}.`);
   }
   if (p.plans.cameUp >= MIN_SPLIT_DAYS) lines.push(`Your if-then held ${p.plans.held} of the ${p.plans.cameUp} times it came up.`);
-  if (p.topObstacle?.times >= MIN_SPLIT_DAYS) lines.push(`You planned around “${lowerFirst(p.topObstacle.text)}” ${p.topObstacle.times} times.`);
+  if (p.topObstacle?.times >= MIN_SPLIT_DAYS) lines.push(`“${lowerFirst(p.topObstacle.text)}” came up in your if-then ${p.topObstacle.times} times.`);
   return lines;
 };
 

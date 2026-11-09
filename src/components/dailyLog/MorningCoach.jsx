@@ -32,21 +32,43 @@ export const CoachRead = ({ coach, loading, error, onRetry, patternLines = [] })
   );
 };
 
-/** Shown instead of the Lock in button when the win is vague or too big. It never blocks: both buttons lock in. */
-export const WinCheckCard = ({ check, onUseRewrite, onKeep }) => (
-  <section className="li li-card mj-wincheck" role="status">
-    <span className="li-kicker"><Sparkles size={13} /> Before you lock in</span>
-    <p className="li-text">{check.feedback}</p>
-    {check.verdict === 'too_big' && check.freeMinutes != null && (
-      <span className="li-label">About {formatFree(check.freeMinutes)} free left today</span>
-    )}
-    <div className="ic-step">
-      <span className="li-label">Today is a win if I</span>
-      <p className="ic-step-text">{check.rewrite}</p>
-    </div>
-    <div className="mj-wincheck-actions">
-      <button type="button" className="cd-btn cd-btn--primary" onClick={onUseRewrite}><Check size={15} /> Use this and lock in</button>
-      <button type="button" className="cd-btn" onClick={onKeep}><Lock size={14} /> Keep mine and lock in</button>
-    </div>
-  </section>
-);
+/**
+ * Shown instead of the Lock in button when the win is vague or too big, or the
+ * if-then you wrote is vague. It never blocks: both buttons lock in.
+ */
+export const WinCheckCard = ({ check, onUseRewrite, onKeep }) => {
+  const winFlag = check.verdict !== 'clear';
+  const planFlag = check.plan?.verdict === 'vague';
+  return (
+    <section className="li li-card mj-wincheck" role="status">
+      <span className="li-kicker"><Sparkles size={13} /> Before you lock in</span>
+      {winFlag && (
+        <>
+          <p className="li-text">{check.feedback}</p>
+          {check.verdict === 'too_big' && check.freeMinutes != null && (
+            <span className="li-label">About {formatFree(check.freeMinutes)} free left today</span>
+          )}
+          <div className="ic-step">
+            <span className="li-label">Today is a win if I</span>
+            <p className="ic-step-text">{check.rewrite}</p>
+          </div>
+        </>
+      )}
+      {planFlag && (
+        <>
+          <p className="li-text">{check.plan.feedback}</p>
+          <div className="ic-step">
+            <span className="li-label">Sharper plan</span>
+            <p className="ic-step-text">If {check.plan.when}, I will {check.plan.then}.</p>
+          </div>
+        </>
+      )}
+      <div className="mj-wincheck-actions">
+        <button type="button" className="cd-btn cd-btn--primary" onClick={onUseRewrite}>
+          <Check size={15} /> {winFlag && planFlag ? 'Use both and lock in' : 'Use this and lock in'}
+        </button>
+        <button type="button" className="cd-btn" onClick={onKeep}><Lock size={14} /> Keep mine and lock in</button>
+      </div>
+    </section>
+  );
+};

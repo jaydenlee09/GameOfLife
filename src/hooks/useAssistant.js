@@ -9,7 +9,7 @@ import { generateFocusComment } from '../utils/focusCoach';
 import { generateLogPatterns } from '../utils/logPatterns';
 import { generateLessonInsight } from '../utils/lessonInsight';
 import { generateImproveCoach } from '../utils/improveCoach';
-import { generateMorningCoach, generateWinCheck, generateRescue } from '../utils/morningCoach';
+import { generateMorningCoach, generateIfThenOptions, generateWinCheck, generateRescue } from '../utils/morningCoach';
 import { generateGoalDraft, generateNextStep, generateUnstuck, generateRecalibration } from '../utils/goalCoach';
 import { generateResetDraft } from '../utils/weeklyReset';
 
@@ -326,6 +326,7 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
     }
     return morningCoachInFlight.current;
   }, [coach]);
+  const suggestIfThens = useCallback((args) => coach(generateIfThenOptions, args, 'ifThens'), [coach]);
   const checkWin = useCallback((args) => coach(generateWinCheck, args, 'check'), [coach]);
   const backOnTrack = useCallback((args) => coach(generateRescue, args, 'rescue'), [coach]);
   // Calendar: sorts block titles no keyword matched into categories ({ [title]: id }).
@@ -333,7 +334,7 @@ export default function useAssistant({ state, setters, setChatHistory, setActivi
 
   return {
     send, approve, reject, undo, reviewLog, reviewingDate, planDay, applyPlan, commentOnFocus, briefHome, findLogPatterns, expandLesson, coachImprove,
-    coachMorning, checkWin, backOnTrack, draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, draftWeek, sortBlockCategories,
+    coachMorning, suggestIfThens, checkWin, backOnTrack, draftGoal, suggestNextStep, getUnstuck, recalibrateGoals, draftWeek, sortBlockCategories,
     isLoading, error, clearError: () => setError(null),
   };
 }

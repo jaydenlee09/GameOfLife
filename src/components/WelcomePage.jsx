@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Clock, PhoneOff, Bell, CheckSquare, Target, Flag, Compass, ArrowRight, Play, CalendarPlus,
-  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical, Smartphone, Sun,
+  Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical, Smartphone, Sun, ShieldCheck,
 } from 'lucide-react';
 import './WelcomePage.css';
 import { toDateKey, fmtRemaining, getPendingCheckIns } from '../utils/calendarUtils';
@@ -14,7 +14,7 @@ import {
 } from '../utils/homeUtils';
 import { todayQueue } from '../utils/taskUtils';
 import { getExperimentTicks } from '../utils/weeklyReset';
-import { getMorningStatus } from '../utils/morningJournal';
+import { getMorningStatus, morningIfThen, formatRemindAt } from '../utils/morningJournal';
 import { RESCUE_MINUTES } from '../utils/morningCoach';
 import { useNow } from '../hooks/useNow';
 
@@ -73,6 +73,22 @@ function WinLine({ win, onOpen }) {
   );
 }
 
+// This morning's if-then, under the win until tonight asks whether it held, so
+// it's in front of you when the moment comes. Never cut short: the "I will" half is the point.
+function PlanLine({ morning, onOpen }) {
+  const ifThen = !morning.planHeld ? morningIfThen(morning) : '';
+  if (!ifThen) return null;
+  const remind = formatRemindAt(morning.remindAt);
+  return (
+    <button type="button" className="wp-brief wp-win wp-plan" onClick={onOpen} title="Open this morning’s journal">
+      <ShieldCheck size={15} className="wp-brief-icon" aria-hidden="true" />
+      <p className="wp-brief-text">
+        <span className="wp-win-key">Plan</span> {ifThen}.{remind && <span className="wp-plan-at"> · {remind}</span>}
+      </p>
+    </button>
+  );
+}
+
 // "Off track?" beside the win: one small next step, on tap only.
 function TodaysWin({ win, morning, todayKey, ai, onSave, onOpen, onStartFocusStep }) {
   const [loading, setLoading] = useState(false);
@@ -99,6 +115,7 @@ function TodaysWin({ win, morning, todayKey, ai, onSave, onOpen, onStartFocusSte
           </button>
         )}
       </div>
+      <PlanLine morning={morning} onOpen={onOpen} />
       {error && <p className="wp-rescue-error" role="alert">{error}</p>}
       {rescue && (
         <section className="wp-rescue" aria-label="Your next step">

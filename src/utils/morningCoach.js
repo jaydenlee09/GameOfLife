@@ -1,10 +1,13 @@
 // ─── Daily Log: the morning coach ─────────────────────────────────────────────
-// Three small tool-free structured-JSON calls around the morning journal, so none
-// of them can change anything by itself. You still write the plan; the coach
+// Small tool-free structured-JSON calls around the morning journal, so none of
+// them can change anything by itself. You still write the plan; the coach
 // challenges it. Saved on `entry.morning` by the caller:
-//   coach     { read, winOptions, obstacle, plan, generatedAt }   once per morning
-//   winCheck  { forWin, verdict, feedback, rewrite, freeMinutes, at }   on Lock in
-//   rescue    { forWin, note, step, count, at, dismissed }   on "Off track?" from Home
+//   coach          { read, winOptions, generatedAt }   once per morning (older ones also
+//                  carry obstacle/plan, which nothing reads any more)
+//   ifThenOptions  { forWin, options: [{ when, then, at }], at }   on reaching Lock in, per win
+//   winCheck       { forWin, verdict, feedback, rewrite, freeMinutes, at,
+//                    plan?: { forPlan, verdict, feedback, when, then } }   on Lock in
+//   rescue         { forWin, note, step, count, at, dismissed }   on "Off track?" from Home
 // Pure (`generate` is injected), so all of it can be checked in plain node.
 
 import { computeDailyScore, shiftDateKey } from './scoreUtils';
@@ -14,12 +17,15 @@ import { computeFreeGaps } from './dayPlanner';
 import { getYesterdayCommitment } from './homeUtils';
 import { getImproveHistory } from './logPatterns';
 import { isTop, todayQueue } from './taskUtils';
-import { getMorningPatterns, getPatternLines, lowerFirst, morningIfThen, WIN_RESULT_LABELS, PLAN_HELD_LABELS } from './morningJournal';
+import {
+  getMorningPatterns, getPatternLines, lowerFirst, morningIfThen, cleanMoment, cleanPlan, WIN_RESULT_LABELS, PLAN_HELD_LABELS,
+} from './morningJournal';
 
 const HISTORY_DAYS = 14;
 const MAX_TASKS = 10;
 export const RESCUE_MINUTES = 10;
 export const WIN_VERDICTS = ['clear', 'vague', 'too_big'];
+export const IF_THEN_OPTIONS = 3;
 
 const STR = (description) => ({ type: 'STRING', description });
 
@@ -30,10 +36,15 @@ const toText = (value, max) => {
 const parse = (raw) => (typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {});
 const noEndPunctuation = (s) => s.replace(/[\s.,;:!]+$/, '').trim();
 
-// The UI puts these right after "Today is a win if I…", "If … gets in the way" and "I will…".
+// The UI puts these right after "Today is a win if I…", "If…" and "I will…".
 const asWin = (text) => lowerFirst(noEndPunctuation(text.replace(/^(today is a win if\s+)?(i\s+)?/i, '')));
-const asObstacle = (text) => lowerFirst(noEndPunctuation(text.replace(/^(if|when)\s+/i, '').replace(/\s+gets? in the way[.!]?$/i, '')));
-const asPlan = (text) => lowerFirst(noEndPunctuation(text.replace(/^i\s+will\s+/i, '')));
+const asMoment = (text) => lowerFirst(cleanMoment(text));
+const asPlan = (text) => lowerFirst(cleanPlan(text));
+const toMinutes = (hhmm) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(typeof hhmm === 'string' ? hhmm.trim() : '');
+  return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+const pad = (n) => String(n).padStart(2, '0');
 
 /** Minutes still free today, from the same rules Plan My Day schedules with. */
 export const freeMinutesLeft = (state, dateKey, now = new Date()) => computeFreeGaps({
@@ -61,11 +72,9 @@ export const COACH_SCHEMA = {
   properties: {
     read: STR('2 sentences, max 45 words: what today calls for, based on how they woke up and how their recent days went. Cite something real (a number, a repeat, last night\'s promise). If the data says to go smaller today, say so.'),
     winOptions: { type: 'ARRAY', items: STR('Reads right after "Today is a win if I". Lowercase start, starts with a verb, checkable tonight with a yes or no, max 12 words.'), description: '3 different options, using the real names of their tasks, goals or blocks.' },
-    obstacle: STR('The thing most likely to knock them off track today, from their own history. A short noun phrase that reads in "If ___ gets in the way". Max 8 words.'),
-    plan: STR('What they will do when it happens. Reads after "I will". Lowercase start, a concrete action they can do on the spot, max 14 words.'),
   },
-  required: ['read', 'winOptions', 'obstacle', 'plan'],
-  propertyOrdering: ['read', 'winOptions', 'obstacle', 'plan'],
+  required: ['read', 'winOptions'],
+  propertyOrdering: ['read', 'winOptions'],
 };
 
 export const buildCoachSystemPrompt = (name) => `You are ${name}'s coach inside their self-improvement app "APEX". They're writing their morning journal. Help them choose a day they will actually keep. They make the final call.
@@ -77,7 +86,6 @@ RULES:
 - countedPatterns are exact counts: quote them as they are, and never claim a pattern they don't show. With little history, say less and lean on today's data.
 - Size today to how they woke up: short sleep or low rest means a smaller win. If recent wins keep ending "Not today", suggest something they can finish.
 - Prefer wins that move their focus goal, this week's priority or their North Star.
-- The obstacle should come from what actually got in the way (ifThenResult, improve notes), not a generic one. If a plan keeps failing, offer a different plan.
 - Speak to them as "you". Plain text, no markdown, no emojis.`;
 
 /** What the model sees: how they woke up, how recent mornings went, and what's on today. */
@@ -139,7 +147,7 @@ export const normalizeCoach = (raw) => {
     .slice(0, 3);
   const read = toText(data.read, 320);
   if (!read) throw new Error('The coach’s read came back empty. Try again.');
-  return { read, winOptions, obstacle: asObstacle(toText(data.obstacle, 70)), plan: asPlan(toText(data.plan, 120)) };
+  return { read, winOptions };
 };
 
 export const generateMorningCoach = async ({ state, dateKey, weekPriority, logReviews, generate, now = new Date() }) => {
@@ -150,6 +158,97 @@ export const generateMorningCoach = async ({ state, dateKey, weekPriority, logRe
     schema: COACH_SCHEMA,
   });
   return { ...normalizeCoach(response.text), generatedAt: now.getTime() };
+};
+
+// ─── Part 1b: if-then options for today's win ─────────────────────────────────
+
+const IF_THEN_ITEM = {
+  type: 'OBJECT',
+  properties: {
+    when: STR('The moment it happens. Reads right after "If" and before ", I will". A cue they will notice as it happens: a time, place, feeling or urge, e.g. "I open my phone between blocks" or "it\'s 3pm and I feel the slump". A clause with a verb, never a bare noun. Lowercase start (except "I"), max 14 words.'),
+    then: STR('Reads right after "I will". One small action they can do on the spot, in under 2 minutes, that gets them back to today\'s win. Lowercase start, max 14 words.'),
+    at: STR('24h "HH:MM" when this moment is most likely today, read from their calendar and history, or "" when it can come at any time.'),
+  },
+  required: ['when', 'then', 'at'],
+  propertyOrdering: ['when', 'then', 'at'],
+};
+
+export const IF_THEN_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    options: { type: 'ARRAY', items: IF_THEN_ITEM, description: `${IF_THEN_OPTIONS} if-then plans, each about a different thing that could knock them off today's win.` },
+  },
+  required: ['options'],
+};
+
+export const buildIfThenSystemPrompt = (name) => `You write if-then plans for ${name} in their self-improvement app "APEX". They just set today's win in their morning journal. Each plan names the moment they're most likely to slip and the one thing they'll do right then, so they don't have to decide in the moment.
+
+RULES:
+- Each plan reads as one sentence: "If <when>, I will <then>." Write only the two halves.
+- <when> is a moment they'll notice as it happens (a time, a place, a feeling, an urge), not a vague state like "I get distracted" or a bare noun like "my phone".
+- <then> is tiny and physical: something they can do right there in under 2 minutes that points them back at today's win. Not "try harder", "stay focused" or "be disciplined".
+- Make the ${IF_THEN_OPTIONS} plans about different threats (say, distraction, low energy, not starting), most likely first.
+- Build from their history: a moment that keeps showing up in recentPlans or improve notes comes first. A plan that "Held" can come back; one that "Broke" needs a different <then>. Size it to how they woke up.
+- Use real names from their win, tasks and calendar. Use only the data given; never invent facts or times. Give <at> only when the calendar or their history points to one.
+- Speak as them ("I"). Plain text, no markdown, no emojis.`;
+
+/** What the model sees for the if-then options: today's win, what's on today, and how past plans went. */
+export const buildIfThenContext = (state, dateKey, win, now = new Date()) => {
+  const logs = state.logs || {};
+  const health = state.healthLog?.[dateKey] || {};
+  const recentPlans = Array.from({ length: HISTORY_DAYS }, (_, i) => shiftDateKey(dateKey, i - HISTORY_DAYS))
+    .map((date) => {
+      const m = logs[date]?.morning;
+      const ifThen = morningIfThen(m);
+      if (!ifThen) return null;
+      return { date, ifThen, ...(m.planHeld ? { result: PLAN_HELD_LABELS[m.planHeld] } : {}), ...(m.result ? { winResult: WIN_RESULT_LABELS[m.result] } : {}) };
+    })
+    .filter(Boolean);
+  return {
+    now: `${dateKey} ${now.toTimeString().slice(0, 5)} (${now.toLocaleDateString('en-US', { weekday: 'long' })})`,
+    todayIsAWinIfI: win.trim(),
+    wokeUp: {
+      ...(health.sleepHours != null ? { sleepHours: Math.round(health.sleepHours * 10) / 10 } : {}),
+      ...(logs[dateKey]?.morning?.energy > 0 ? { restedOutOf5: logs[dateKey].morning.energy } : {}),
+    },
+    recentPlans,
+    countedPatterns: getPatternLines(getMorningPatterns(logs, state.healthLog, dateKey)),
+    recentImproveNotes: getImproveHistory(logs, dateKey),
+    calendarToday: calendarToday(state, dateKey),
+    freeMinutesLeftToday: freeMinutesLeft(state, dateKey, now),
+    tasksToday: tasksToday(state, dateKey),
+    focusGoal: focusGoalContext(state),
+    knownAboutThem: (state.assistantMemory || []).slice(0, 10).map((m) => m.text),
+  };
+};
+
+/** Validates the options: both halves present, no repeats, and a time only when it's still ahead today. */
+export const normalizeIfThens = (raw, now = new Date()) => {
+  const data = parse(raw);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const seen = new Set();
+  const options = (Array.isArray(data.options) ? data.options : [])
+    .map((o) => {
+      const when = asMoment(toText(o?.when, 120));
+      const then = asPlan(toText(o?.then, 120));
+      const mins = toMinutes(o?.at);
+      return { when, then, at: mins != null && mins > nowMin ? `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}` : '' };
+    })
+    .filter((o) => o.when && o.then && !seen.has(o.when.toLowerCase()) && seen.add(o.when.toLowerCase()))
+    .slice(0, IF_THEN_OPTIONS);
+  if (!options.length) throw new Error('No if-then plans came back. Try again.');
+  return options;
+};
+
+export const generateIfThenOptions = async ({ state, dateKey, win, generate, now = new Date() }) => {
+  if (!win?.trim()) throw new Error('Set today’s win first.');
+  const response = await generate({
+    systemPrompt: buildIfThenSystemPrompt(state.user?.name || 'the user'),
+    contents: [{ role: 'user', parts: [{ text: `Write my if-then plans for today, as JSON:\n${JSON.stringify(buildIfThenContext(state, dateKey, win, now))}` }] }],
+    schema: IF_THEN_SCHEMA,
+    thinking: false, // they're looking at the step, waiting on it
+  });
+  return { forWin: win.trim(), options: normalizeIfThens(response.text, now), at: now.getTime() };
 };
 
 // ─── Part 2: the win check ────────────────────────────────────────────────────
@@ -165,12 +264,28 @@ export const WIN_CHECK_SCHEMA = {
   propertyOrdering: ['verdict', 'feedback', 'rewrite'],
 };
 
-export const buildWinCheckSystemPrompt = (name) => `You check ${name}'s one goal for today before they lock it in. Tonight they will be asked "Did you?", so it has to be answerable.
+const PLAN_CHECK_PROPS = {
+  planVerdict: { type: 'STRING', enum: ['clear', 'vague'], description: '"clear": the If is a moment they\'d notice as it happens and the I will is a concrete action they can do right then. "vague": either half isn\'t.' },
+  planFeedback: STR('Empty when clear. Otherwise 1 sentence, max 22 words, saying which half is vague and why.'),
+  planWhen: STR('Empty when clear. Otherwise their If made into a moment they\'d notice. Reads right after "If", lowercase start (except "I"), max 14 words.'),
+  planThen: STR('Empty when clear. Otherwise their I will made into one small action they can do on the spot. Reads right after "I will", lowercase start, max 14 words.'),
+};
+
+/** The win check's schema; with a plan to check, it also checks the if-then. */
+export const winCheckSchema = (withPlan) => (withPlan ? {
+  ...WIN_CHECK_SCHEMA,
+  properties: { ...WIN_CHECK_SCHEMA.properties, ...PLAN_CHECK_PROPS },
+  required: [...WIN_CHECK_SCHEMA.required, ...Object.keys(PLAN_CHECK_PROPS)],
+  propertyOrdering: [...WIN_CHECK_SCHEMA.propertyOrdering, ...Object.keys(PLAN_CHECK_PROPS)],
+} : WIN_CHECK_SCHEMA);
+
+export const buildWinCheckSystemPrompt = (name, withPlan = false) => `You check ${name}'s one goal for today before they lock it in. Tonight they will be asked "Did you?", so it has to be answerable.${withPlan ? ' You also check the if-then plan they wrote for the moment they\'re most likely to slip ("If <when>, I will <then>").' : ''}
 
 RULES:
 - Default to "clear". Only push back on a real problem. Don't polish wording that already works.
 - Never swap their goal for a different one. Keep their words where you can.
-- Call it too_big only when it plainly can't fit in freeMinutesLeftToday, given the blocks in calendarToday.
+- Call it too_big only when it plainly can't fit in freeMinutesLeftToday, given the blocks in calendarToday.${withPlan ? `
+- The plan is vague when the If isn't a moment they'd notice as it happens ("I get distracted", "things come up") or the I will isn't a concrete action ("try harder", "stay focused"). A rewrite keeps their situation and their idea, just sharper. Never swap in a different threat.` : ''}
 - Use only the data given. Speak to them as "you". Plain text, no markdown, no emojis.`;
 
 /** Validates the model's JSON. A verdict without a real alternative counts as clear: there's nothing to offer. */
@@ -185,16 +300,43 @@ export const normalizeWinCheck = (raw, win) => {
   return { verdict: data.verdict, feedback, rewrite };
 };
 
-export const generateWinCheck = async ({ state, dateKey, win, generate, now = new Date() }) => {
+/** The if-then half of the check. Only a real, different rewrite counts as vague. */
+export const normalizePlanCheck = (raw, plan) => {
+  const data = parse(raw);
+  const forPlan = morningIfThen({ ifMoment: true, obstacle: plan.when, plan: plan.then });
+  const when = asMoment(toText(data.planWhen, 120));
+  const then = asPlan(toText(data.planThen, 120));
+  const feedback = toText(data.planFeedback, 180);
+  const rewritten = morningIfThen({ ifMoment: true, obstacle: when, plan: then });
+  if (data.planVerdict !== 'vague' || !feedback || !rewritten || rewritten.toLowerCase() === forPlan.toLowerCase()) {
+    return { forPlan, verdict: 'clear', feedback: '', when: '', then: '' };
+  }
+  return { forPlan, verdict: 'vague', feedback, when, then };
+};
+
+/** `plan` ({ when, then }) is the if-then they wrote themselves; leave it out to check only the win. */
+export const generateWinCheck = async ({ state, dateKey, win, plan = null, generate, now = new Date() }) => {
+  const withPlan = !!(plan?.when?.trim() && plan?.then?.trim());
   const freeMinutes = freeMinutesLeft(state, dateKey, now);
-  const context = { todayIsAWinIfI: win.trim(), calendarToday: calendarToday(state, dateKey), freeMinutesLeftToday: freeMinutes };
+  const context = {
+    todayIsAWinIfI: win.trim(),
+    ...(withPlan ? { ifThenPlan: { when: cleanMoment(plan.when), then: cleanPlan(plan.then) } } : {}),
+    calendarToday: calendarToday(state, dateKey),
+    freeMinutesLeftToday: freeMinutes,
+  };
   const response = await generate({
-    systemPrompt: buildWinCheckSystemPrompt(state.user?.name || 'the user'),
-    contents: [{ role: 'user', parts: [{ text: `Check my win for today, as JSON:\n${JSON.stringify(context)}` }] }],
-    schema: WIN_CHECK_SCHEMA,
+    systemPrompt: buildWinCheckSystemPrompt(state.user?.name || 'the user', withPlan),
+    contents: [{ role: 'user', parts: [{ text: `Check my ${withPlan ? 'win and if-then plan' : 'win'} for today, as JSON:\n${JSON.stringify(context)}` }] }],
+    schema: winCheckSchema(withPlan),
     thinking: false, // a small, well-specified job, and they're waiting on it
   });
-  return { forWin: win.trim(), ...normalizeWinCheck(response.text, win), freeMinutes, at: now.getTime() };
+  return {
+    forWin: win.trim(),
+    ...normalizeWinCheck(response.text, win),
+    ...(withPlan ? { plan: normalizePlanCheck(response.text, plan) } : {}),
+    freeMinutes,
+    at: now.getTime(),
+  };
 };
 
 // ─── Part 3: back on track ────────────────────────────────────────────────────

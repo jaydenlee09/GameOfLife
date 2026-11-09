@@ -146,6 +146,11 @@
   transition: border-color var(--duration) var(--ease);
 }
 
+.wp-plan { background: var(--bg-elevated-1); border-color: var(--separator); }
+.wp-plan .wp-brief-text { color: var(--text-secondary); }
+.wp-plan-at { color: var(--text-tertiary); white-space: nowrap; }
+/* Never clamp the plan, even where the phone layout clamps the brief line. */
+.wp-layout .wp-plan .wp-brief-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .wp-win-row { display: flex; align-items: stretch; gap: 8px; }
 .wp-win-row .wp-win { flex: 1; min-width: 0; }
 .wp-today-win { display: flex; flex-direction: column; gap: 8px; }

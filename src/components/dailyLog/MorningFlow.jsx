@@ -3,13 +3,15 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check, ChevronLeft, ChevronRight, Sun, Moon, BatteryCharging, Handshake, Flag, Star, Plus,
   Target, ShieldAlert, Compass, CalendarPlus, CalendarCheck, Play, Pencil, Lock, CheckSquare, Sparkles, LoaderCircle,
+  Bell, X, RotateCcw, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { Block } from './CloseDayFlow';
 import { CoachRead, WinCheckCard } from './MorningCoach';
 import { SleepInput, EnergyPicker, ENERGY_LABELS } from './HealthQuick';
 import {
   MORNING_STEP_KEYS, MORNING_STEP_META, getMorningStatus, getMorningStart,
-  getWinSuggestions, OBSTACLE_SUGGESTIONS, morningIfThen, getMorningPatterns, getPatternLines,
+  getWinSuggestions, MOMENT_SUGGESTIONS, morningIfThen, getMorningPatterns, getPatternLines,
+  formatRemindAt, getPastPlans, isPickedPlan,
 } from '../../utils/morningJournal';
 import { getYesterdayCommitment } from '../../utils/homeUtils';
 import { expandEventsForDates } from '../../utils/calendarUtils';
@@ -150,34 +152,121 @@ const FocusStep = ({ morning, setMorning, suggestions, todos, setTodos, todayKey
   </>
 );
 
-const LockInStep = ({ morning, setMorning, northStar }) => {
+/** One tappable "If …, I will …" plan. Picking it fills both halves (and the reminder, when it has a time). */
+const IfThenOption = ({ option, icon, picked, onPick }) => (
+  <button type="button" className={`cd-chip mj-ifthen-opt${picked ? ' is-picked' : ''}`} aria-pressed={picked} onClick={onPick}>
+    {picked ? <Check size={13} /> : icon}
+    <span className="mj-ifthen-text">
+      <span className="mj-ifthen-key">If</span> {option.when}, <span className="mj-ifthen-key">I will</span> {option.then}.
+      {option.at && <span className="mj-ifthen-at"><Bell size={11} /> {formatRemindAt(option.at)}</span>}
+    </span>
+  </button>
+);
+
+const LockInStep = ({ morning, setMorning, northStar, ifThens, pastPlans }) => {
   const vision = northStar?.vision?.trim();
-  const coachPlan = !morning.obstacle?.trim() && !morning.plan?.trim() ? morningIfThen(morning.coach) : '';
+  const ifThen = morningIfThen(morning);
+  const remind = formatRemindAt(morning.remindAt);
+  const pick = (option, withTime) => setMorning({
+    obstacle: option.when,
+    plan: option.then,
+    ifMoment: true,
+    ...(withTime ? { remindAt: option.at || '' } : {}),
+  });
+  const picked = (option) => isPickedPlan(morning, [option]);
+  const showAi = ifThens.loading || ifThens.error || ifThens.options.length > 0;
+
   return (
     <>
-      <Block Icon={ShieldAlert} title="What could knock you off track?" hint="Plan it now" area="obstacle">
-        {coachPlan && (
-          <button type="button" className="cd-chip mj-coach-plan" onClick={() => setMorning({ obstacle: morning.coach.obstacle, plan: morning.coach.plan })}>
-            <Sparkles size={13} /> <span>{coachPlan}</span>
-          </button>
+      <Block Icon={ShieldAlert} title="What could knock you off track?" hint="Decide now, not in the moment" area="obstacle">
+        {showAi && (
+          <div className="mj-ifthen-group">
+            <span className="mj-group-label"><Sparkles size={12} /> Plans for today’s win</span>
+            {ifThens.loading && ifThens.options.length === 0 && (
+              <p className="mj-ifthen-wait"><LoaderCircle size={14} className="log-review-spin" /> Writing plans around your win…</p>
+            )}
+            {ifThens.error && !ifThens.loading && (
+              <p className="li-error mj-ifthen-error" role="alert">
+                <AlertTriangle size={13} /> <span>{ifThens.error}</span>
+                <button type="button" className="li-link" onClick={ifThens.onRetry}><RefreshCw size={12} /> Try again</button>
+              </p>
+            )}
+            {ifThens.options.length > 0 && (
+              <div className="cd-chips">
+                {ifThens.options.map((o) => (
+                  <IfThenOption key={o.when} option={o} icon={<Sparkles size={13} />} picked={picked(o)} onPick={() => pick(o, true)} />
+                ))}
+              </div>
+            )}
+          </div>
         )}
+
+        {pastPlans.length > 0 && (
+          <div className="mj-ifthen-group">
+            <span className="mj-group-label"><RotateCcw size={12} /> Held before</span>
+            <div className="cd-chips">
+              {pastPlans.map((o) => (
+                <IfThenOption key={`${o.when}|${o.then}`} option={o} icon={<RotateCcw size={13} />} picked={picked(o)} onPick={() => pick(o, false)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(showAi || pastPlans.length > 0) && <span className="mj-group-label mj-own-label"><Pencil size={12} /> Or write your own</span>}
         <div className="cd-ifthen">
           <label className="cd-ifthen-row">
             <span>If</span>
-            <input type="text" className="cd-input" value={morning.obstacle || ''} placeholder="my phone pulls me in" onChange={(e) => setMorning({ obstacle: e.target.value })} autoFocus={!morning.obstacle && FINE_POINTER} />
+            <input
+              type="text"
+              className="cd-input"
+              value={morning.obstacle || ''}
+              placeholder="I pick up my phone between blocks"
+              onChange={(e) => setMorning({ obstacle: e.target.value, ifMoment: true })}
+              autoFocus={!morning.obstacle && FINE_POINTER && !showAi}
+            />
           </label>
           {!morning.obstacle?.trim() && (
             <div className="mj-pills">
-              {OBSTACLE_SUGGESTIONS.map((text) => (
-                <button key={text} type="button" className="mj-pill" onClick={() => setMorning({ obstacle: text })}>{text}</button>
+              {MOMENT_SUGGESTIONS.map((text) => (
+                <button key={text} type="button" className="mj-pill" onClick={() => setMorning({ obstacle: text, ifMoment: true })}>{text}</button>
               ))}
             </div>
           )}
           <label className="cd-ifthen-row">
             <span>I will</span>
-            <input type="text" className="cd-input" value={morning.plan || ''} placeholder="put it in another room for an hour" onChange={(e) => setMorning({ plan: e.target.value })} />
+            <input
+              type="text"
+              className="cd-input"
+              value={morning.plan || ''}
+              placeholder="put it in the other room and start a 10-min timer"
+              onChange={(e) => setMorning({ plan: e.target.value, ifMoment: true })}
+            />
           </label>
         </div>
+
+        {ifThen && (
+          <div className="mj-remind">
+            <label className="mj-remind-row">
+              <Bell size={14} />
+              <span>Remind me at</span>
+              <input
+                type="time"
+                className="cd-input mj-remind-time"
+                value={morning.remindAt || ''}
+                onChange={(e) => setMorning({ remindAt: e.target.value })}
+                aria-label="Remind me of this plan at"
+              />
+              {morning.remindAt && (
+                <button type="button" className="mj-remind-clear" onClick={() => setMorning({ remindAt: '' })} aria-label="No reminder">
+                  <X size={14} />
+                </button>
+              )}
+            </label>
+            <span className="hq-hint mj-hint">
+              {remind ? `At ${remind} you’ll get a push: “${ifThen}.”` : 'Pick the time it’s most likely to happen. Needs notifications on.'}
+            </span>
+          </div>
+        )}
       </Block>
 
       <Block Icon={Compass} title="Today I’ll be someone who…" area="identity">
@@ -212,6 +301,9 @@ const LockedIn = ({ morning, todayKey, todos, plannedToday, onPlanDay, onStartFo
       {(ifThen || morning.identity?.trim()) && (
         <Block Icon={Lock} title="Your plan" area="mplan">
           {ifThen && <p className="cd-quote cd-quote--small">{ifThen}.</p>}
+          {ifThen && formatRemindAt(morning.remindAt) && (
+            <p className="hq-hint mj-remind-note"><Bell size={12} /> Reminder at {formatRemindAt(morning.remindAt)}</p>
+          )}
           {morning.identity?.trim() && <p className="cd-quote cd-quote--small">Today I’m someone who {morning.identity.trim()}.</p>}
         </Block>
       )}
@@ -283,7 +375,35 @@ const MorningFlow = ({
     runCoach();
   };
 
-  // Lock in checks the win first. Leaving the step or tapping "Lock in now" drops the reply.
+  // If-then options for today's win: once per win, when you reach Lock in.
+  const win = morning.win?.trim() || '';
+  const pastPlans = useMemo(() => getPastPlans(logs, todayKey), [logs, todayKey]);
+  const ifThenOptions = morning.ifThenOptions?.forWin === win ? morning.ifThenOptions.options || [] : [];
+  const [ifThenRun, setIfThenRun] = useState({ loadingFor: null, errorFor: null, error: null });
+  const ifThenTried = useRef(null);
+  const runIfThens = useCallback(async (forWin) => {
+    setIfThenRun({ loadingFor: forWin, errorFor: null, error: null });
+    const result = await ai.ifThens(todayKey, forWin);
+    if (result.ok) saveMorning(todayKey, { ifThenOptions: result.ifThens });
+    setIfThenRun((r) => (r.loadingFor === forWin
+      ? { loadingFor: null, errorFor: result.ok ? null : forWin, error: result.ok ? null : result.error }
+      : r));
+  }, [ai, saveMorning, todayKey]);
+  const ifThensDue = !!ai?.ifThens && !!win && step === 'lockIn' && morning.ifThenOptions?.forWin !== win;
+  useEffect(() => {
+    if (!ifThensDue || ifThenTried.current === win) return;
+    ifThenTried.current = win;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- shows the loading line while the reply is on its way
+    runIfThens(win);
+  }, [ifThensDue, win, runIfThens]);
+  const ifThens = {
+    options: ifThenOptions,
+    loading: ifThenRun.loadingFor === win && !!win,
+    error: ifThenRun.errorFor === win && ifThenOptions.length === 0 ? ifThenRun.error : null,
+    onRetry: () => runIfThens(win),
+  };
+
+  // Lock in checks the win first (and a plan you wrote yourself). Leaving the step or tapping "Lock in now" drops the reply.
   const [checking, setChecking] = useState(false);
   const [check, setCheck] = useState(null);
   const checkRun = useRef(0);
@@ -303,23 +423,48 @@ const MorningFlow = ({
     goTo('locked');
   };
   const lockIn = async () => {
-    const win = morning.win.trim();
-    if (!ai || morning.winCheck?.forWin === win) {
+    const ifThen = morningIfThen(morning);
+    // A plan you picked (AI option or one that held before) was already shaped; only your own gets checked.
+    const ownPlan = morning.ifMoment && ifThen && !isPickedPlan(morning, [...ifThenOptions, ...pastPlans])
+      ? { when: morning.obstacle, then: morning.plan }
+      : null;
+    const winChecked = morning.winCheck?.forWin === win;
+    const planChecked = !ownPlan || morning.winCheck?.plan?.forPlan === ifThen;
+    if (!ai || (winChecked && planChecked)) {
       finishLock();
       return;
     }
     checkRun.current += 1;
     const run = checkRun.current;
     setChecking(true);
-    const result = await ai.checkWin(todayKey, win);
+    const result = await ai.checkWin(todayKey, win, ownPlan);
     if (run !== checkRun.current) return;
     setChecking(false);
-    if (!result.ok || result.check.verdict === 'clear') {
-      finishLock(result.ok ? { winCheck: result.check } : undefined);
+    if (!result.ok) {
+      finishLock();
       return;
     }
-    saveMorning(todayKey, { winCheck: result.check });
-    setCheck(result.check);
+    // A win you already kept as-is isn't questioned again just because the plan changed.
+    const next = winChecked ? { ...morning.winCheck, plan: result.check.plan } : result.check;
+    if (next.verdict === 'clear' && next.plan?.verdict !== 'vague') {
+      finishLock({ winCheck: next });
+      return;
+    }
+    saveMorning(todayKey, { winCheck: next });
+    setCheck(next);
+  };
+  const applyRewrite = () => {
+    let winCheck = check;
+    const fields = {};
+    if (check.verdict !== 'clear') {
+      fields.win = check.rewrite;
+      winCheck = { ...winCheck, forWin: check.rewrite };
+    }
+    if (check.plan?.verdict === 'vague') {
+      Object.assign(fields, { obstacle: check.plan.when, plan: check.plan.then, ifMoment: true });
+      winCheck = { ...winCheck, plan: { ...check.plan, forPlan: morningIfThen({ ifMoment: true, obstacle: check.plan.when, plan: check.plan.then }) } };
+    }
+    finishLock({ ...fields, winCheck });
   };
 
   const motionProps = {
@@ -386,13 +531,13 @@ const MorningFlow = ({
                 />
               )}
               {step === 'lockIn' && (
-                <LockInStep morning={morning} setMorning={setMorning} northStar={northStar} />
+                <LockInStep morning={morning} setMorning={setMorning} northStar={northStar} ifThens={ifThens} pastPlans={pastPlans} />
               )}
 
               {check ? (
                 <WinCheckCard
                   check={check}
-                  onUseRewrite={() => finishLock({ win: check.rewrite, winCheck: { ...check, forWin: check.rewrite } })}
+                  onUseRewrite={applyRewrite}
                   onKeep={() => finishLock()}
                 />
               ) : (

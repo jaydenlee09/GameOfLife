@@ -1466,7 +1466,63 @@
 .mj-patterns svg { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
 .mj-read .mj-patterns { padding-top: 0.55rem; border-top: 1px solid var(--separator); }
 .mj-identity-read { margin: 0.7rem 0 0; }
-.mj-coach-plan { margin-bottom: 0.7rem; }
+/* Lock in: if-then plans to pick from, your own, and when to be reminded */
+.mj-ifthen-group { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.9rem; }
+.mj-group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.mj-group-label svg { color: var(--accent); }
+.mj-own-label { margin-bottom: 0.5rem; }
+.mj-ifthen-opt { line-height: 1.4; }
+.mj-ifthen-opt.is-picked {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent-wash);
+}
+.mj-ifthen-text { min-width: 0; }
+.mj-ifthen-key { font-weight: 700; color: var(--accent); }
+.mj-ifthen-at {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--separator);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.cd-chip .mj-ifthen-at svg { margin-top: 0; color: var(--text-tertiary); }
+.mj-ifthen-wait { display: flex; align-items: center; gap: 0.45rem; margin: 0; font-size: 0.88rem; color: var(--text-tertiary); }
+.mj-ifthen-error { margin: 0; }
+
+.mj-remind { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--separator); }
+.mj-remind-row { display: flex; align-items: center; gap: 0.55rem; font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); }
+.mj-remind-row > svg { flex-shrink: 0; color: var(--accent); }
+.mj-remind-time { width: auto; min-width: 8.5rem; flex: 0 1 auto; }
+.mj-remind-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.mj-remind-clear:hover { color: var(--text-primary); background: var(--bg-elevated-2); }
+.mj-remind-note { display: flex; margin-top: 0.35rem; }
 .mj-plan-check { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--separator); }
 .mj-plan-seg .cd-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (min-width: 560px) { .mj-plan-seg .cd-seg { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

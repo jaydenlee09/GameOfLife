@@ -7,6 +7,7 @@ import WidgetSettings from './WidgetSettings';
 const TYPE_ROWS = [
   { type: 'morning', label: 'Morning brief', hint: "Your assistant's plan for the day", timeKey: 'morning' },
   { type: 'win', label: 'Today’s win check', hint: 'Midday, if you locked in a win this morning', timeKey: 'win' },
+  { type: 'ifthen', label: 'If-then reminder', hint: 'Your plan, at the time you picked in the morning journal' },
   { type: 'commitment', label: 'Commitment check', hint: "If today's commitment isn't marked yet", timeKey: 'commitment' },
   { type: 'evening', label: 'Daily Log reminder', hint: "If today's log is empty or not submitted", timeKey: 'evening' },
   { type: 'streak', label: 'Streak at risk', hint: 'If your score or a habit streak will break tonight', timeKey: 'streak', min: '18:00' },

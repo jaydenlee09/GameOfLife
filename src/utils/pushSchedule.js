@@ -16,14 +16,14 @@ import { getFocusGoals, getGoalEvents, QUIET_GOAL_DAYS } from './goalUtils';
 import { getResetDue } from './weeklyReset';
 import { morningIfThen } from './morningJournal';
 
-export const PUSH_TYPES = ['morning', 'win', 'evening', 'streak', 'blocks', 'checkins', 'commitment', 'goals', 'weekly'];
+export const PUSH_TYPES = ['morning', 'win', 'ifthen', 'evening', 'streak', 'blocks', 'checkins', 'commitment', 'goals', 'weekly'];
 
 export const DEFAULT_PUSH_SETTINGS = {
   enabled: false,
   timezone: null,
   appUrl: null,
   tokens: [],                  // [{ token, platform, addedAt }]
-  types: { morning: true, win: true, evening: true, streak: true, blocks: true, checkins: true, commitment: true, goals: true, weekly: true },
+  types: { morning: true, win: true, ifthen: true, evening: true, streak: true, blocks: true, checkins: true, commitment: true, goals: true, weekly: true },
   times: { morning: '07:30', win: '12:30', commitment: '13:00', evening: '20:30', streak: '21:00', goals: '18:00', weekly: '19:00' },
   blockLeadMinutes: 20,        // generous: GitHub Actions ticks often run late
   testRequestedAt: null,       // set by "Send a test"; the next tick sends one
@@ -36,6 +36,9 @@ const GOAL_QUIET_EVERY = 3;
 // A late tick that lands just after a block started still says so, rather than
 // silently skipping it.
 const BLOCK_GRACE_MINUTES = 5;
+// The if-then reminder goes out at the time picked in the morning journal; a tick
+// later than this skips it (the moment has passed; Home still shows the plan).
+const IFTHEN_WINDOW_MINUTES = 60;
 // "Did you do it?" goes out once a block has ended, while it's still fresh; a tick
 // later than this skips it (the Calendar and Home still ask).
 const CHECKIN_WINDOW_MINUTES = 60;
@@ -117,6 +120,15 @@ export const decidePushes = (now, rawSettings, state, pushState = {}) => {
       body: `Today is a win if you ${morningEntry.win.trim()}.${ifThen ? ` ${ifThen}.` : ''} Off track? Tap for one next step.`,
       page: 'welcome',
     });
+  }
+
+  // The if-then, at the time they said the moment is most likely. Not once
+  // tonight's Look back has asked whether it held.
+  const remindMin = toMinutes(morningEntry?.remindAt);
+  const planLine = morningIfThen(morningEntry);
+  if (on('ifthen') && remindMin != null && nowMin >= remindMin && nowMin < remindMin + IFTHEN_WINDOW_MINUTES
+    && fresh(`ifthen_${today}`) && morningEntry?.doneAt && planLine && !morningEntry.planHeld) {
+    pushes.push({ id: `ifthen_${today}`, type: 'ifthen', title: 'Your plan for this moment', body: `${planLine}.`, page: 'welcome' });
   }
 
   // Streak / habit / commitment pushes reuse the in-app nudge rules verbatim, so a
