@@ -1,15 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './TasksPage.css';
-import { Star, Play, ChevronDown, History, CheckCircle2, Sun, CalendarDays, Layers } from 'lucide-react';
+import { Star, Play, ChevronDown, History, CheckCircle2, Sun, CalendarDays, Layers, Pencil } from 'lucide-react';
 import TaskRow from './tasks/TaskRow';
 import TaskDetail from './tasks/TaskDetail';
 import QuickAdd from './tasks/QuickAdd';
+import TagManager from './tasks/TagManager';
 import { completeTask } from '../utils/completionUtils';
 import { getActiveGoals } from '../utils/goalUtils';
 import {
   TOP_LIMIT, todayKey, bucketTasks, countTaskCompletions, isOnToday, bringToTodayFields, whenFields,
   makeTask, migrateLegacyTomorrow, upcomingKey, dayLabel, periodLabel, TIMEFRAME_LABELS, shiftDateKey,
 } from '../utils/taskUtils';
+import {
+  knownTags, tagKey, tagsOf, hasTag, canonicalTag, resolveTags, filterBuckets, nextTagColor,
+  addTagTo, recolorTagIn, renameTagIn, removeTagFrom, renameTagOnTasks, removeTagFromTasks,
+} from '../utils/taskTags';
 
 // The Daily Score gives full task points at 3 finished tasks (scoreUtils).
 const DAILY_TARGET = 3;
@@ -129,7 +134,9 @@ const Glance = ({ view, buckets, today, onSelect, onView }) => {
 };
 
 // ─── Tasks Page ───────────────────────────────────────────────────────────────
-const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onStartFocus }) => {
+const TasksPage = ({
+  todos, setTodos, onLogActivity, xpLog = [], goals = [], onStartFocus, taskTags = [], setTaskTags,
+}) => {
   const today = todayKey();
   const wide = useMediaQuery(WIDE_QUERY);
   const [view, setView] = useState('today');
@@ -137,6 +144,8 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
   const [doneOpen, setDoneOpen] = useState(false);
   const [pendingId, setPendingId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [tagFilter, setTagFilter] = useState(null);
+  const [managingTags, setManagingTags] = useState(false);
   const pendingRef = useRef(null); // { id, done, timer } — a completion waiting out its Undo window
   const toastTimer = useRef(null);
   const addInputRef = useRef(null);
@@ -151,6 +160,14 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
   const goalTitles = useMemo(() => Object.fromEntries((goals || []).map((g) => [String(g.id), g.title])), [goals]);
   const selectedTask = selectedId != null ? todos.find((t) => t.id === selectedId) || null : null;
   const topFull = buckets.top.length >= TOP_LIMIT;
+
+  // ── Tags ──
+  const tagList = useMemo(() => knownTags(taskTags, todos), [taskTags, todos]);
+  const tagColors = useMemo(() => new Map(tagList.map((t) => [tagKey(t.name), t.color])), [tagList]);
+  const tagColorOf = useCallback((name) => tagColors.get(tagKey(name)) || 'var(--text-tertiary)', [tagColors]);
+  // A filter on a tag that no longer exists (deleted here or on another device) shows everything.
+  const activeTag = tagFilter ? tagList.find((t) => tagKey(t.name) === tagKey(tagFilter))?.name || null : null;
+  const shown = useMemo(() => filterBuckets(buckets, activeTag), [buckets, activeTag]);
 
   // ── Feedback ──
   const showToast = useCallback((next, ms = 2600) => {
@@ -201,10 +218,17 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
   // ── Edits ──
   const patch = (id, fields) => setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)));
 
-  const add = ({ text, when, top, goalId }) => {
-    const task = { ...makeTask({ text, when, top: top && !topFull }, today), ...(goalId != null ? { goalId } : {}) };
+  const add = ({ text, when, top, goalId, tags }) => {
+    const picked = resolveTags(tags, taskTags, todos);
+    const task = {
+      ...makeTask({ text, when, top: top && !topFull }, today),
+      ...(goalId != null ? { goalId } : {}),
+      ...(picked.length ? { tags: picked } : {}),
+    };
     setTodos((prev) => [...prev, task]);
-    if (viewOf(task, today) !== view) {
+    if (activeTag && !hasTag(task, activeTag)) {
+      showToast({ text: `Added without the ${activeTag} tag`, sub: `${text}. Tap All to see it.` });
+    } else if (viewOf(task, today) !== view) {
       const where = task.timeFrame === 'today' ? (task.scheduledDate ? dayLabel(task.scheduledDate, today) : 'Today') : TIMEFRAME_LABELS[task.timeFrame];
       showToast({ text: `Added to ${where}`, sub: text });
     }
@@ -244,33 +268,85 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
     patch(task.id, { ...(isOnToday(task, today) ? {} : bringToTodayFields(task, today)), topDate: today, topAt: Date.now() });
   };
 
+  // ── Tag edits (the list lives on the user, the names on each task) ──
+  // Returns the tag's spelling so pickers can select it right away.
+  const createTag = (name) => {
+    const canonical = canonicalTag(name, taskTags, todos);
+    if (canonical && !tagList.some((t) => tagKey(t.name) === tagKey(canonical))) {
+      // Pick a color no visible tag has (unlisted tags show a hashed swatch too).
+      const color = nextTagColor(tagList);
+      setTaskTags((prev) => addTagTo(prev, canonical, color));
+    }
+    return canonical;
+  };
+
+  const recolorTag = (name, color) => setTaskTags((prev) => recolorTagIn(prev, name, color));
+
+  const renameTag = (from, to) => {
+    setTodos((prev) => renameTagOnTasks(prev, from, to));
+    setTaskTags((prev) => renameTagIn(prev, from, to));
+    if (tagFilter && tagKey(tagFilter) === tagKey(from)) setTagFilter(to);
+  };
+
+  const deleteTag = (name) => {
+    const index = taskTags.findIndex((t) => tagKey(t?.name) === tagKey(name));
+    const entry = index >= 0 ? taskTags[index] : null;
+    const ids = new Set(todos.filter((t) => hasTag(t, name)).map((t) => t.id));
+    setTodos((prev) => removeTagFromTasks(prev, name));
+    setTaskTags((prev) => removeTagFrom(prev, name));
+    if (tagFilter && tagKey(tagFilter) === tagKey(name)) setTagFilter(null);
+    showToast({
+      text: 'Tag deleted',
+      sub: ids.size ? `${name}, removed from ${ids.size} task${ids.size === 1 ? '' : 's'}` : name,
+      undo: () => {
+        if (entry) {
+          setTaskTags((prev) => (prev.some((t) => tagKey(t?.name) === tagKey(name)) ? prev
+            : [...prev.slice(0, index), entry, ...prev.slice(index)]));
+        }
+        setTodos((prev) => prev.map((t) => (ids.has(t.id) && !hasTag(t, name) ? { ...t, tags: [...tagsOf(t), name] } : t)));
+      },
+    }, UNDO_MS);
+  };
+
+  const filterByTag = (name) => setTagFilter((f) => (f && tagKey(f) === tagKey(name) ? null : name));
+
   // ── Keyboard: N focuses the add bar, Esc closes details ──
   useEffect(() => {
     const onKey = (e) => {
       const tag = e.target.tagName;
+      if (managingTags) return; // the tag editor handles its own keys
       if (e.key === 'Escape' && selectedId != null && tag !== 'INPUT' && tag !== 'TEXTAREA') { setSelectedId(null); return; }
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.altKey || e.metaKey || e.ctrlKey) return;
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); addInputRef.current?.focus(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedId]);
+  }, [selectedId, managingTags]);
 
   // The phone sheet owns the scroll while it's open.
   const sheetOpen = !wide && !!selectedTask;
+  const lockScroll = sheetOpen || managingTags;
   useEffect(() => {
-    if (!sheetOpen) return undefined;
+    if (!lockScroll) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
-  }, [sheetOpen]);
+  }, [lockScroll]);
 
   // ── Derived ──
   const doneCount = countTaskCompletions(xpLog, today) + (pendingId != null ? 1 : 0);
   const queue = [...buckets.top, ...buckets.carried, ...buckets.today];
   const next = queue.find((t) => t.id !== pendingId) || null;
-  const laterTotal = LATER_ORDER.reduce((n, k) => n + buckets.later[k].length, 0);
-  const counts = { today: queue.length, upcoming: buckets.upcoming.length, later: laterTotal };
+  const shownQueue = [...shown.top, ...shown.carried, ...shown.today];
+  const laterTotal = LATER_ORDER.reduce((n, k) => n + shown.later[k].length, 0);
+  const counts = { today: shownQueue.length, upcoming: shown.upcoming.length, later: laterTotal };
+
+  const filterEmpty = (where) => (
+    <p className="tk-empty">
+      No tasks tagged <strong>{activeTag}</strong> {where}.{' '}
+      <button type="button" className="tk-link-btn" onClick={() => setTagFilter(null)}>Show all tasks</button>
+    </p>
+  );
 
   const select = (task) => setSelectedId((id) => (id === task.id && wide ? null : task.id));
 
@@ -288,25 +364,29 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
       onToday={bringToToday}
       onTomorrow={(t) => move(t, 'tomorrow')}
       onDrop={remove}
+      tagColorOf={tagColorOf}
+      onTagClick={filterByTag}
       {...extra}
     />
   );
 
   const renderToday = () => {
-    const hasOpen = queue.length > 0;
+    const hasOpen = shownQueue.length > 0;
     return (
       <>
         <TodayHero doneCount={doneCount} next={next} openCount={queue.length} onSelect={select} onStartFocus={onStartFocus} />
 
-        {(hasOpen || buckets.top.length > 0) && (
+        {activeTag && !hasOpen && !shown.doneToday.length && filterEmpty('on today')}
+
+        {(activeTag ? shown.top.length > 0 : hasOpen || buckets.top.length > 0) && (
           <Section
             title="Top 3"
             icon={<Star size={14} fill="currentColor" />}
             count={`${buckets.top.length}/${TOP_LIMIT}`}
             tone="top"
           >
-            {buckets.top.map((t) => row(t, { showTimeframe: true }))}
-            {buckets.top.length < TOP_LIMIT && (
+            {shown.top.map((t) => row(t, { showTimeframe: true }))}
+            {!activeTag && buckets.top.length < TOP_LIMIT && (
               <p className="tk-slot">
                 {buckets.top.length === 0
                   ? 'Tap the star on the 1–3 tasks that must happen today.'
@@ -316,31 +396,31 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
           </Section>
         )}
 
-        {buckets.carried.length > 0 && (
+        {shown.carried.length > 0 && (
           <Section
             title="Carried over"
             icon={<History size={14} />}
-            count={buckets.carried.length}
+            count={shown.carried.length}
             hint="Still here from earlier days. Keep it, push it, or drop it."
             tone="carried"
           >
-            {buckets.carried.map((t) => row(t, { variant: 'carried' }))}
+            {shown.carried.map((t) => row(t, { variant: 'carried' }))}
           </Section>
         )}
 
-        {buckets.today.length > 0 && (
-          <Section title={buckets.top.length || buckets.carried.length ? 'Also today' : 'Today'} count={buckets.today.length}>
-            {buckets.today.map((t) => row(t, { showTimeframe: true }))}
+        {shown.today.length > 0 && (
+          <Section title={shown.top.length || shown.carried.length ? 'Also today' : 'Today'} count={shown.today.length}>
+            {shown.today.map((t) => row(t, { showTimeframe: true }))}
           </Section>
         )}
 
-        {buckets.doneToday.length > 0 && (
+        {shown.doneToday.length > 0 && (
           <section className="tk-section tk-section--done">
             <button type="button" className="tk-done-toggle" aria-expanded={doneOpen} onClick={() => setDoneOpen((o) => !o)}>
-              <CheckCircle2 size={14} /> Done today <span className="tk-section-count">{buckets.doneToday.length}</span>
+              <CheckCircle2 size={14} /> Done today <span className="tk-section-count">{shown.doneToday.length}</span>
               <ChevronDown size={15} className={`tk-done-chev${doneOpen ? ' tk-done-chev--open' : ''}`} />
             </button>
-            {doneOpen && <div className="tk-list">{buckets.doneToday.map((t) => row(t))}</div>}
+            {doneOpen && <div className="tk-list">{shown.doneToday.map((t) => row(t))}</div>}
           </section>
         )}
       </>
@@ -348,11 +428,12 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
   };
 
   const renderUpcoming = () => {
-    if (!buckets.upcoming.length) {
+    if (!shown.upcoming.length) {
+      if (activeTag) return filterEmpty('coming up');
       return <p className="tk-empty">Nothing scheduled ahead. Pick <strong>Tomorrow</strong> or <strong>Pick day</strong> when you add a task.</p>;
     }
     const byDay = [];
-    for (const t of buckets.upcoming) {
+    for (const t of shown.upcoming) {
       const key = upcomingKey(t) || today;
       const last = byDay[byDay.length - 1];
       if (last && last.key === key) last.tasks.push(t);
@@ -367,11 +448,12 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
 
   const renderLater = () => {
     if (!laterTotal) {
+      if (activeTag) return filterEmpty('in Later');
       return <p className="tk-empty">No longer-term tasks. Add one with <strong>This week</strong>, <strong>This month</strong> or <strong>This year</strong>. When it's time, tap <strong>Today</strong> to pull it onto today's list.</p>;
     }
-    return LATER_ORDER.filter((k) => buckets.later[k].length).map((k) => (
-      <Section key={k} title={TIMEFRAME_LABELS[k]} count={buckets.later[k].length} hint={periodLabel(k, today)}>
-        {buckets.later[k].map((t) => row(t, { variant: 'ahead' }))}
+    return LATER_ORDER.filter((k) => shown.later[k].length).map((k) => (
+      <Section key={k} title={TIMEFRAME_LABELS[k]} count={shown.later[k].length} hint={periodLabel(k, today)}>
+        {shown.later[k].map((t) => row(t, { variant: 'ahead' }))}
       </Section>
     ));
   };
@@ -393,6 +475,9 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
       onClose={() => setSelectedId(null)}
       onLogActivity={onLogActivity}
       onToast={showToast}
+      tagList={tagList}
+      onCreateTag={createTag}
+      onManageTags={() => setManagingTags(true)}
     />
   );
 
@@ -427,7 +512,52 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
             })}
           </nav>
 
-          <QuickAdd today={today} defaultWhen={DEFAULT_WHEN[view]} topFull={topFull} goals={activeGoals} onAdd={add} inputRef={addInputRef} />
+          {tagList.length > 0 && (
+            <div className="tk-tagbar" role="group" aria-label="Show tasks with tag">
+              <button
+                type="button"
+                className={`tk-tagf${!activeTag ? ' tk-tagf--on' : ''}`}
+                aria-pressed={!activeTag}
+                onClick={() => setTagFilter(null)}
+              >
+                All
+              </button>
+              {tagList.map((t) => {
+                const on = !!activeTag && tagKey(activeTag) === tagKey(t.name);
+                return (
+                  <button
+                    key={t.name}
+                    type="button"
+                    className={`tk-tagf tk-tagf--tag${on ? ' tk-tagf--on' : ''}`}
+                    style={{ '--tag': t.color }}
+                    aria-pressed={on}
+                    onClick={() => filterByTag(t.name)}
+                  >
+                    <span className="tk-tag-dot" aria-hidden="true" />
+                    <span className="tk-chip-clip">{t.name}</span>
+                    {t.count > 0 && <span className="tk-tagf-count">{t.count}</span>}
+                  </button>
+                );
+              })}
+              <button type="button" className="tk-tagf tk-tagf--edit" onClick={() => setManagingTags(true)} aria-label="Edit tags">
+                <Pencil size={12} /> Edit
+              </button>
+            </div>
+          )}
+
+          <QuickAdd
+            today={today}
+            defaultWhen={DEFAULT_WHEN[view]}
+            topFull={topFull}
+            goals={activeGoals}
+            onAdd={add}
+            inputRef={addInputRef}
+            tagList={tagList}
+            tagColorOf={tagColorOf}
+            filterTag={activeTag}
+            onCreateTag={createTag}
+            onManageTags={() => setManagingTags(true)}
+          />
 
           <div className="tk-view">
             {view === 'today' && renderToday()}
@@ -451,6 +581,17 @@ const TasksPage = ({ todos, setTodos, onLogActivity, xpLog = [], goals = [], onS
             {detail}
           </div>
         </div>
+      )}
+
+      {managingTags && (
+        <TagManager
+          tags={tagList}
+          onCreate={createTag}
+          onRename={renameTag}
+          onRecolor={recolorTag}
+          onDelete={deleteTag}
+          onClose={() => setManagingTags(false)}
+        />
       )}
 
       {toast && (

@@ -1249,6 +1249,311 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* ─── Tags ───────────────────────────────────────────────────────────────── */
+/* Each tag element sets --tag to its color; washes are mixed from it. */
+.tk-tag-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tag, var(--text-tertiary));
+}
+
+.tk-chip--tag {
+  border: none;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--tag) 16%, transparent);
+}
+
+button.tk-chip--tag { cursor: pointer; }
+button.tk-chip--tag:hover { color: var(--text-primary); background: color-mix(in srgb, var(--tag) 26%, transparent); }
+
+/* Filter bar under the tabs */
+.tk-tagbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -0.25rem 0 -0.15rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tk-tagbar::-webkit-scrollbar { display: none; }
+
+.tk-tagf {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 30px;
+  padding: 0 0.7rem;
+  box-sizing: border-box;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+.tk-tagf:hover:not(.tk-tagf--on) { color: var(--text-primary); border-color: var(--separator-strong); }
+
+.tk-tagf--on {
+  background: var(--accent-wash);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: var(--accent);
+}
+
+.tk-tagf--tag.tk-tagf--on {
+  background: color-mix(in srgb, var(--tag) 18%, transparent);
+  border-color: color-mix(in srgb, var(--tag) 60%, transparent);
+  color: var(--text-primary);
+}
+
+.tk-tagf-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.tk-tagf--edit { color: var(--text-tertiary); border-style: dashed; }
+
+/* Quick add's tag chip + its picker row */
+.tk-when--tag.tk-when--on {
+  background: color-mix(in srgb, var(--tag) 16%, transparent);
+  border-color: color-mix(in srgb, var(--tag) 55%, transparent);
+  color: var(--text-primary);
+}
+
+.tk-when--tag .tk-chip-clip { max-width: 14ch; }
+
+.tk-add-tags {
+  margin: 0.5rem 0.25rem 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--separator);
+}
+
+/* Picker: every tag as a toggle + a "new tag" box */
+.tk-tagpick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tk-tagpick-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tk-tag-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  height: 30px;
+  padding: 0 0.7rem;
+  box-sizing: border-box;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+.tk-tag-opt:hover:not(:disabled):not(.tk-tag-opt--on) { color: var(--text-primary); border-color: var(--separator-strong); }
+
+.tk-tag-opt--on {
+  background: color-mix(in srgb, var(--tag) 18%, transparent);
+  border-color: color-mix(in srgb, var(--tag) 60%, transparent);
+  color: var(--text-primary);
+}
+
+.tk-tag-opt--on svg { color: var(--tag); }
+.tk-tag-opt:disabled { opacity: 0.4; cursor: default; }
+
+.tk-tagpick-new {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0 0.35rem 0 0.6rem;
+  border: 1px dashed var(--separator-strong);
+  border-radius: 10px;
+  color: var(--text-tertiary);
+}
+
+.tk-tagpick-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.tk-tagpick-input::placeholder { color: var(--text-tertiary); }
+.tk-tagpick-input:disabled { cursor: default; }
+
+.tk-link-btn {
+  flex-shrink: 0;
+  padding: 0.25rem 0.35rem;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tk-link-btn:hover { text-decoration: underline; }
+
+/* Tag editor: centered dialog on wide screens, bottom sheet on phones */
+.tk-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 9150; /* above the task sheet (9100), below the Undo toast (9200) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.tk-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 460px;
+  max-height: 80svh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 1rem;
+  background: var(--bg-elevated-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  animation: tk-sheet-in 0.24s var(--ease);
+}
+
+.tk-modal .tk-detail-bar-label { display: inline-flex; align-items: center; gap: 0.35rem; }
+.tk-modal .tk-field-note { margin: 0; }
+
+.tk-tagman-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tk-tagman-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.6rem;
+  border: 1px solid var(--separator);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tk-tagman-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.tk-tagman-color {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform var(--duration) var(--ease);
+}
+
+.tk-tagman-color:hover { transform: scale(1.1); }
+.tk-tagman-color[aria-expanded='true'] { border-color: #fff; }
+
+.tk-tagman-name { flex: 1; min-width: 0; height: 36px; }
+
+.tk-tagman-count {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.tk-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 0.2rem;
+}
+
+.tk-swatch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+
+.tk-swatch:hover { transform: scale(1.12); }
+.tk-swatch--on { border-color: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3); }
+
+.tk-swatch--any {
+  overflow: hidden;
+  border: 2px dashed var(--separator-strong);
+  background: var(--bg-elevated-2);
+  color: var(--text-tertiary);
+}
+
+.tk-swatch--any.tk-swatch--on { border-style: solid; border-color: #fff; }
+.tk-swatch--any input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.tk-swatch--any:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 768px) {
+  .tk-modal-wrap { align-items: flex-end; padding: 0; }
+  .tk-modal {
+    max-width: 600px;
+    max-height: 88svh;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: none;
+  }
+}
+
 /* ─── Wide: list + side panel ────────────────────────────────────────────── */
 @media (min-width: 1100px) {
   .tk-layout {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star, Check, Target, ListChecks, History, ArrowUpRight, CalendarClock } from 'lucide-react';
 import { carriedLabel, dueLabel, TIMEFRAME_LABELS, isDayTask } from '../../utils/taskUtils';
+import { tagsOf } from '../../utils/taskTags';
 
 // One task. Tapping the circle completes it, the star puts it in the Top 3, and
 // anywhere else opens its details. `variant` adds the section's own actions:
@@ -8,8 +9,9 @@ import { carriedLabel, dueLabel, TIMEFRAME_LABELS, isDayTask } from '../../utils
 //   ahead    → a "Do today" pill (Upcoming and Later)
 const TaskRow = ({
   task, today, variant, pending, selected, goalTitle, showTimeframe, dayHint,
-  onComplete, onToggleTop, onSelect, onToday, onTomorrow, onDrop,
+  onComplete, onToggleTop, onSelect, onToday, onTomorrow, onDrop, tagColorOf, onTagClick,
 }) => {
+  const tags = tagColorOf ? tagsOf(task) : [];
   const done = task.completed || pending;
   const due = done ? null : dueLabel(task, today);
   const carried = variant === 'carried' ? carriedLabel(task, today) : null;
@@ -47,6 +49,22 @@ const TaskRow = ({
           {showTimeframe && !isDayTask(task) && <span className="tk-chip">{TIMEFRAME_LABELS[task.timeFrame]}</span>}
           {subtasks.length > 0 && <span className="tk-chip"><ListChecks size={11} />{subDone}/{subtasks.length}</span>}
           {goalTitle && <span className="tk-chip tk-chip--goal"><Target size={11} /><span className="tk-chip-clip">{goalTitle}</span></span>}
+          {tags.map((name) => (onTagClick ? (
+            <button
+              key={name}
+              type="button"
+              className="tk-chip tk-chip--tag"
+              style={{ '--tag': tagColorOf(name) }}
+              title={`Show only ${name}`}
+              onClick={(e) => { e.stopPropagation(); onTagClick(name); }}
+            >
+              <span className="tk-tag-dot" aria-hidden="true" /><span className="tk-chip-clip">{name}</span>
+            </button>
+          ) : (
+            <span key={name} className="tk-chip tk-chip--tag" style={{ '--tag': tagColorOf(name) }}>
+              <span className="tk-tag-dot" aria-hidden="true" /><span className="tk-chip-clip">{name}</span>
+            </span>
+          )))}
         </div>
       </div>
 

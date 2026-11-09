@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Star, Trash2, X, Play, Check, CalendarDays, Target, Plus } from 'lucide-react';
+import { Star, Trash2, X, Play, Check, CalendarDays, Target, Plus, Tag } from 'lucide-react';
+import TagPicker from './TagPicker';
+import { tagsOf, toggleTagIn } from '../../utils/taskTags';
 import {
   dayLabel, whenOf, isDayTask, createdAtOf, dateKeyOf,
 } from '../../utils/taskUtils';
@@ -24,7 +26,7 @@ const WHEN_CHIPS = [
 // parent mounts it with key={task.id}, so drafts reset when the task changes.
 const TaskDetail = ({
   task, today, goals, topFull, pending, onPatch, onMove, onComplete, onDelete, onToggleTop, onStartFocus, onClose,
-  onLogActivity, onToast,
+  onLogActivity, onToast, tagList, onCreateTag, onManageTags,
 }) => {
   const [title, setTitle] = useState(task.text);
   const [newSubtask, setNewSubtask] = useState('');
@@ -177,6 +179,19 @@ const TaskDetail = ({
             {goalOptions.map((g) => <option key={g.id} value={String(g.id)}>{g.title}</option>)}
           </select>
           {goal && <p className="tk-field-note tk-field-note--sub">Finishing this counts toward the goal.</p>}
+        </section>
+      )}
+
+      {tagList && (
+        <section className="tk-field">
+          <h4 className="tk-field-label"><Tag size={12} /> Tags</h4>
+          <TagPicker
+            tags={tagList}
+            selected={tagsOf(task)}
+            onToggle={(name) => onPatch({ tags: toggleTagIn(tagsOf(task), name) })}
+            onCreate={onCreateTag}
+            onManage={onManageTags}
+          />
         </section>
       )}
 

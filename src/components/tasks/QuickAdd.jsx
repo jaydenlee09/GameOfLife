@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Star, CalendarDays, ArrowUp, Target } from 'lucide-react';
+import { Plus, Star, CalendarDays, ArrowUp, Target, Tag } from 'lucide-react';
 import { dayLabel } from '../../utils/taskUtils';
+import { tagKey, toggleTagIn } from '../../utils/taskTags';
+import TagPicker from './TagPicker';
 
 const WHEN_CHIPS = [
   { value: 'today', label: 'Today' },
@@ -14,7 +16,21 @@ const WHEN_CHIPS = [
 // Type, press Enter, done. Everything else is optional and remembered between
 // adds (so a run of "today" tasks is just typing), except the star. The goal
 // chip links the task to a goal, so finishing it counts as progress there.
-const QuickAdd = ({ today, defaultWhen, topFull, goals = [], onAdd, inputRef }) => {
+// Tags are remembered between adds too; filtering the page by a tag pre-picks it,
+// so a new task doesn't vanish from the filtered list.
+const QuickAdd = ({
+  today, defaultWhen, topFull, goals = [], onAdd, inputRef, tagList, tagColorOf, filterTag = null, onCreateTag, onManageTags,
+}) => {
+  const [pickedTags, setPickedTags] = useState(() => (filterTag ? [filterTag] : []));
+  const [lastFilter, setLastFilter] = useState(filterTag);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  if (filterTag !== lastFilter) {
+    setLastFilter(filterTag);
+    setPickedTags(filterTag ? [filterTag] : []);
+  }
+  // A tag deleted elsewhere drops out of the picked list.
+  const liveTags = tagList ? pickedTags.filter((n) => tagList.some((t) => tagKey(t.name) === tagKey(n))) : [];
+  if (liveTags.length !== pickedTags.length) setPickedTags(liveTags);
   const [text, setText] = useState('');
   const [when, setWhen] = useState(defaultWhen);
   const [pickedDay, setPickedDay] = useState('');
@@ -37,7 +53,8 @@ const QuickAdd = ({ today, defaultWhen, topFull, goals = [], onAdd, inputRef }) 
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
-    onAdd({ text: trimmed, when: resolvedWhen, top: top && canStar, goalId: goal ? goal.id : null });
+    onAdd({ text: trimmed, when: resolvedWhen, top: top && canStar, goalId: goal ? goal.id : null, tags: pickedTags });
+    setTagsOpen(false);
     setText('');
     setTop(false);
   };
@@ -106,6 +123,21 @@ const QuickAdd = ({ today, defaultWhen, topFull, goals = [], onAdd, inputRef }) 
           <Star size={12} fill={top && canStar ? 'currentColor' : 'none'} /> Top 3
         </button>
 
+        {tagList && (
+          <button
+            type="button"
+            className={`tk-when tk-when--tag${pickedTags.length ? ' tk-when--on' : ''}`}
+            style={pickedTags.length ? { '--tag': tagColorOf(pickedTags[0]) } : undefined}
+            aria-expanded={tagsOpen}
+            title={pickedTags.length ? `Tags: ${pickedTags.join(', ')}` : 'Add tags'}
+            onClick={() => setTagsOpen((o) => !o)}
+          >
+            {pickedTags.length ? <span className="tk-tag-dot" aria-hidden="true" /> : <Tag size={12} />}
+            <span className="tk-chip-clip">{pickedTags.length ? pickedTags[0] : 'Tag'}</span>
+            {pickedTags.length > 1 && <span>+{pickedTags.length - 1}</span>}
+          </button>
+        )}
+
         {goals.length > 0 && (
           <label className={`tk-when tk-when--goal${goal ? ' tk-when--on' : ''}`} title={goal ? `For ${goal.title}` : 'Link to a goal'}>
             <Target size={12} /> <span className="tk-chip-clip">{goal ? goal.title : 'Goal'}</span>
@@ -121,6 +153,19 @@ const QuickAdd = ({ today, defaultWhen, topFull, goals = [], onAdd, inputRef }) 
           </label>
         )}
       </div>
+
+      {tagList && tagsOpen && (
+        <div className="tk-add-tags">
+          <TagPicker
+            tags={tagList}
+            selected={pickedTags}
+            onToggle={(name) => setPickedTags((prev) => toggleTagIn(prev, name))}
+            onCreate={onCreateTag}
+            onManage={onManageTags}
+            autoFocus={tagList.length === 0}
+          />
+        </div>
+      )}
     </form>
   );
 };

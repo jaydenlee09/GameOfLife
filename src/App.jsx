@@ -909,6 +909,12 @@ function App() {
     setFocusModeOpen(true);
   }, []);
 
+  // Task tag list (names + colors), see utils/taskTags. Each task holds its tag names.
+  const setTaskTags = useCallback((update) => setUser(prev => {
+    const current = Array.isArray(prev.taskTags) ? prev.taskTags : [];
+    return { ...prev, taskTags: typeof update === 'function' ? update(current) : update };
+  }), []);
+
   const startFocusOnTask = useCallback((task) => {
     setFocusLaunch({ taskId: task.id, intent: '' });
     setFocusModeOpen(true);
@@ -1222,6 +1228,8 @@ function App() {
             xpLog={xpLog}
             goals={goals}
             onStartFocus={startFocusOnTask}
+            taskTags={Array.isArray(user.taskTags) ? user.taskTags : []}
+            setTaskTags={setTaskTags}
           />
         );
       case 'daily-log':

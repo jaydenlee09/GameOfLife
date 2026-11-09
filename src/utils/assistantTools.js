@@ -25,6 +25,7 @@ import { getGoalProgress, getGoalActivity, getGoalStatus, getGoalPace, paceLabel
 import { ACHIEVEMENTS } from './achievementsMeta';
 import { CATEGORY_IDS, CATEGORY_GUIDE, aiCategoryFields } from './blockCategories';
 import { carriedDays, isTop } from './taskUtils';
+import { tagsOf, resolveTags, knownTags, TAGS_PER_TASK } from './taskTags';
 import { describeMorning } from './morningJournal';
 
 // How the user said a block went, when it wasn't simply done ("partly", "skipped: Distracted").
@@ -214,9 +215,10 @@ const WEEKDAYS = ARR({ type: 'INTEGER' }, "For weekly recurrence: weekdays 0-6 (
 const READ_TOOLS = [
   {
     name: 'get_tasks',
-    description: 'List tasks with their ids, timeframe and notes. Use before editing or deleting a task.',
+    description: 'List tasks with their ids, timeframe, tags and notes, plus every tag the user has. Use before editing or deleting a task.',
     parameters: OBJ({ include_completed: B('Also include completed tasks (default false).') }),
     run: (args, { state }) => ({
+      allTags: knownTags(state.user?.taskTags, state.todos).map((t) => t.name),
       tasks: (state.todos || [])
         .filter((t) => args?.include_completed || !t.completed)
         .map((t) => ({
@@ -230,6 +232,7 @@ const READ_TOOLS = [
           ...(carriedDays(t) > 0 ? { carriedOverDays: carriedDays(t) } : {}),
           ...(t.notes ? { notes: t.notes } : {}),
           ...(t.goalId != null ? { goalId: String(t.goalId) } : {}),
+          ...(tagsOf(t).length ? { tags: tagsOf(t) } : {}),
           ...(t.subtasks?.length ? { subtasks: `${t.subtasks.filter((s) => s.completed).length}/${t.subtasks.length} done` } : {}),
         })),
     }),
@@ -494,6 +497,7 @@ const AUTO_TOOLS = [
       timeFrame: E(VALID_TIMEFRAMES, 'When it is due (default today).'),
       notes: S('Optional extra detail.'),
       goalId: S('Optional id of the goal this task moves forward.'),
+      tags: ARR(S('Tag name'), `Optional tags (max ${TAGS_PER_TASK}). Prefer the user's existing tags (get_tasks allTags); only invent a new one when none fits.`),
     }, ['text']),
     prepare: (args, { state }) => {
       const text = toTrimmedString(args?.text);
@@ -502,6 +506,7 @@ const AUTO_TOOLS = [
       // "Tomorrow" is a today-task scheduled for tomorrow (how the Tasks page stores it).
       const timeFrame = asked === 'tomorrow' ? 'today' : asked;
       const goal = has(args, 'goalId') && toTrimmedString(String(args.goalId)) ? findGoal(state, args.goalId) : null;
+      const tags = resolveTags(args?.tags, state.user?.taskTags, state.todos);
       const item = {
         id: makeNumericId(),
         text,
@@ -513,6 +518,7 @@ const AUTO_TOOLS = [
         createdAt: Date.now(),
         ...(asked === 'tomorrow' ? { scheduledDate: getLocalDateKey(1) } : {}),
         ...(goal ? { goalId: goal.id } : {}),
+        ...(tags.length ? { tags } : {}),
       };
       return {
         op: { collection: 'todos', kind: 'insert', item },
@@ -705,12 +711,13 @@ const AUTO_TOOLS = [
 const CONFIRM_TOOLS = [
   {
     name: 'update_task',
-    description: 'Edit a task (text, timeframe, notes). Needs the user\'s approval.',
+    description: 'Edit a task (text, timeframe, notes, tags). Needs the user\'s approval.',
     parameters: OBJ({
       taskId: S('Task id from get_tasks.'),
       text: S('New text.'),
       timeFrame: E(VALID_TIMEFRAMES, 'New timeframe.'),
       notes: S('New notes.'),
+      tags: ARR(S('Tag name'), `The task's full new tag list (replaces the old one; [] clears it). Prefer existing tags.`),
     }, ['taskId']),
     prepare: (args, { state }) => {
       const task = findTask(state, args?.taskId);
@@ -735,6 +742,14 @@ const CONFIRM_TOOLS = [
       if (has(args, 'notes') && toTrimmedString(args.notes) !== (task.notes || '')) {
         fields.notes = toTrimmedString(args.notes);
         changes.push('update notes');
+      }
+      if (Array.isArray(args?.tags)) {
+        const tags = resolveTags(args.tags, state.user?.taskTags, state.todos);
+        const before = tagsOf(task);
+        if (tags.join('\n').toLowerCase() !== before.join('\n').toLowerCase()) {
+          fields.tags = tags;
+          changes.push(tags.length ? `tags: ${tags.join(', ')}` : 'remove tags');
+        }
       }
       if (!changes.length) throw new Error('Nothing to change.');
       const previous = Object.fromEntries(Object.keys(fields).map((key) => [key, task[key]]));

@@ -3,6 +3,7 @@ import { toDateKey, expandEventsForDates, isInstanceCompleted, getBlockOutcome }
 import { getHabitStreak } from './habitUtils';
 import { getActiveGoals, describeGoal } from './goalUtils';
 import { carriedDays, isTop, todayQueue } from './taskUtils';
+import { tagsOf } from './taskTags';
 import { getActivePlan } from './weeklyReset';
 import { TOOL_DECLARATIONS, getTool, applyOpToState } from './assistantTools';
 import { describeMorning } from './morningJournal';
@@ -47,6 +48,7 @@ const summarizeTasks = (todos) => {
       carriedDays(t, today) > 0 && `carried over ${carriedDays(t, today)}d`,
       t.scheduledDate > today && `scheduled ${t.scheduledDate}`,
       t.dueDate && `due ${t.dueDate}`,
+      tagsOf(t).length && `tags: ${tagsOf(t).join(', ')}`,
     ].filter(Boolean);
     return `- [${t.id}] ${t.text} (${t.timeFrame}${tags.length ? `; ${tags.join('; ')}` : ''})`;
   };

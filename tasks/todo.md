@@ -1,5 +1,24 @@
 # Todo
 
+## Done, uncommitted (2026-11-09): Task tags with colors
+
+Problem (user): attach tags to tasks to organize them, and change a tag's color.
+Decisions (user, Q&A): filter bar (not grouping); tags from quick add + task details; My Assistant reads + sets tags.
+- [x] utils/taskTags.js (pure): tasks hold tag NAMES (`task.tags`, case-insensitive, max 5, 24 chars); the list +
+      colors live on `user.taskTags = [{ name, color }]`. A name only found on tasks still works with a stable hashed
+      swatch. Rename (merges on collision, keeps color), delete, recolor, filterBuckets.
+- [x] Tasks page: filter bar under the tabs (All / tags with open counts / Edit), filters every view + tab counts,
+      "No tasks tagged X" empty state; tapping a tag chip on a row filters too. Hero/Top 3 limit stay unfiltered.
+- [x] QuickAdd Tag chip + inline picker (remembered between adds; the active filter tag is pre-picked).
+      TaskDetail Tags field. TagManager dialog (phone: bottom sheet): swatches + any color, rename, delete with Undo.
+- [x] Assistant: get_tasks returns tags + allTags; create_task/update_task take `tags` (resolved to existing spelling);
+      system prompt task lines show tags.
+- Verified: node checks (taskTags + assistant tools), lint 0 on all touched files (App.jsx only pre-existing persist
+  warnings), build, harness UI at 1300 + 375: filter, add-while-filtered, create/reuse tag, details toggle,
+  recolor, rename, delete + Undo, Escape, empty state, no overflow, no console errors.
+- Fixed while testing: leading spaces before `#` weren't stripped; a new tag could get the same color as an
+  unlisted tag (now picks a color no visible tag uses).
+
 ## Done, uncommitted (2026-10-26): Morning journal, "Start your day"
 
 Problem (user): wants a morning journal on the site to set the day up for success, with last night's sleep
