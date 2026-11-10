@@ -163,7 +163,69 @@ const IfThenOption = ({ option, icon, picked, onPick }) => (
   </button>
 );
 
-const LockInStep = ({ morning, setMorning, northStar, ifThens, pastPlans }) => {
+/**
+ * AI actions that prove "Today I'll be someone who…", each one tap from being a
+ * task for today. Shown only while they match the line as it's written now.
+ */
+const IdentitySteps = ({ morning, todos, setTodos, todayKey, run }) => {
+  const identity = morning.identity?.trim() || '';
+  if (!run || !identity) return null;
+  const steps = morning.identitySteps?.forIdentity === identity ? morning.identitySteps.steps || [] : [];
+  const isAdded = (step) => todos.some((t) => t.text?.trim().toLowerCase() === step.text.toLowerCase());
+  const add = (step) => {
+    if (isAdded(step)) return;
+    setTodos((prev) => [...prev, makeTask({ text: step.text }, todayKey)]);
+  };
+
+  if (!steps.length) {
+    return (
+      <div className="mj-id-steps">
+        {run.loading ? (
+          <p className="mj-ifthen-wait"><LoaderCircle size={14} className="log-review-spin" /> Turning it into actions…</p>
+        ) : (
+          <button type="button" className="cd-btn mj-id-run" onClick={run.onRun}><Sparkles size={14} /> Turn it into actions</button>
+        )}
+        {run.error && !run.loading && (
+          <p className="li-error mj-ifthen-error" role="alert"><AlertTriangle size={13} /> <span>{run.error}</span></p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mj-id-steps">
+      <span className="mj-group-label"><Sparkles size={12} /> Prove it today</span>
+      <ul className="mj-id-list">
+        {steps.map((step) => {
+          const added = isAdded(step);
+          return (
+            <li key={step.text} className="mj-id-step">
+              <span className="mj-id-text">
+                {step.text}
+                {step.minutes && <span className="mj-id-min">{step.minutes} min</span>}
+              </span>
+              <button
+                type="button"
+                className={`cd-chip mj-id-add${added ? ' is-added' : ''}`}
+                onClick={() => add(step)}
+                disabled={added}
+                aria-label={added ? `${step.text} is on today’s tasks` : `Add “${step.text}” to today’s tasks`}
+              >
+                {added ? <><Check size={13} /> Added</> : <><Plus size={13} /> Add to today</>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <button type="button" className="li-link mj-id-again" onClick={run.onRun} disabled={run.loading}>
+        {run.loading ? <LoaderCircle size={12} className="log-review-spin" /> : <RefreshCw size={12} />} Other ideas
+      </button>
+      {run.error && !run.loading && <p className="li-error mj-ifthen-error" role="alert"><AlertTriangle size={13} /> <span>{run.error}</span></p>}
+    </div>
+  );
+};
+
+const LockInStep = ({ morning, setMorning, northStar, ifThens, pastPlans, todos, setTodos, todayKey, identityRun }) => {
   const vision = northStar?.vision?.trim();
   const ifThen = morningIfThen(morning);
   const remind = formatRemindAt(morning.remindAt);
@@ -278,12 +340,13 @@ const LockInStep = ({ morning, setMorning, northStar, ifThens, pastPlans }) => {
           placeholder="does the hard thing first"
           onChange={(e) => setMorning({ identity: e.target.value })}
         />
+        <IdentitySteps morning={morning} todos={todos} setTodos={setTodos} todayKey={todayKey} run={identityRun} />
       </Block>
     </>
   );
 };
 
-const LockedIn = ({ morning, todayKey, todos, plannedToday, onPlanDay, onStartFocus, onNavigate, onEdit }) => {
+const LockedIn = ({ morning, todayKey, todos, setTodos, identityRun, plannedToday, onPlanDay, onStartFocus, onNavigate, onEdit }) => {
   const top = todos.filter((t) => !t.completed && t.topDate === todayKey);
   const ifThen = morningIfThen(morning);
   return (
@@ -305,6 +368,9 @@ const LockedIn = ({ morning, todayKey, todos, plannedToday, onPlanDay, onStartFo
             <p className="hq-hint mj-remind-note"><Bell size={12} /> Reminder at {formatRemindAt(morning.remindAt)}</p>
           )}
           {morning.identity?.trim() && <p className="cd-quote cd-quote--small">Today I’m someone who {morning.identity.trim()}.</p>}
+          {morning.identitySteps?.forIdentity === morning.identity?.trim() && (
+            <IdentitySteps morning={morning} todos={todos} setTodos={setTodos} todayKey={todayKey} run={identityRun} />
+          )}
         </Block>
       )}
 
@@ -402,6 +468,23 @@ const MorningFlow = ({
     error: ifThenRun.errorFor === win && ifThenOptions.length === 0 ? ifThenRun.error : null,
     onRetry: () => runIfThens(win),
   };
+
+  // Actions for "Today I'll be someone who…": only on a tap, since the line is typed.
+  const identity = morning.identity?.trim() || '';
+  const [identityRunState, setIdentityRunState] = useState({ loadingFor: null, errorFor: null, error: null });
+  const runIdentitySteps = useCallback(async (forIdentity) => {
+    setIdentityRunState({ loadingFor: forIdentity, errorFor: null, error: null });
+    const result = await ai.identitySteps(todayKey, forIdentity);
+    if (result.ok) saveMorning(todayKey, { identitySteps: result.identitySteps });
+    setIdentityRunState((r) => (r.loadingFor === forIdentity
+      ? { loadingFor: null, errorFor: result.ok ? null : forIdentity, error: result.ok ? null : result.error }
+      : r));
+  }, [ai, saveMorning, todayKey]);
+  const identityRun = ai?.identitySteps ? {
+    loading: !!identity && identityRunState.loadingFor === identity,
+    error: identityRunState.errorFor === identity ? identityRunState.error : null,
+    onRun: () => identity && runIdentitySteps(identity),
+  } : null;
 
   // Lock in checks the win first (and a plan you wrote yourself). Leaving the step or tapping "Lock in now" drops the reply.
   const [checking, setChecking] = useState(false);
@@ -506,6 +589,8 @@ const MorningFlow = ({
               morning={morning}
               todayKey={todayKey}
               todos={todos}
+              setTodos={setTodos}
+              identityRun={identityRun}
               plannedToday={plannedToday}
               onPlanDay={onPlanDay}
               onStartFocus={onStartFocus}
@@ -531,7 +616,17 @@ const MorningFlow = ({
                 />
               )}
               {step === 'lockIn' && (
-                <LockInStep morning={morning} setMorning={setMorning} northStar={northStar} ifThens={ifThens} pastPlans={pastPlans} />
+                <LockInStep
+                  morning={morning}
+                  setMorning={setMorning}
+                  northStar={northStar}
+                  ifThens={ifThens}
+                  pastPlans={pastPlans}
+                  todos={todos}
+                  setTodos={setTodos}
+                  todayKey={todayKey}
+                  identityRun={identityRun}
+                />
               )}
 
               {check ? (

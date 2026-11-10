@@ -5,6 +5,7 @@
 //   coach          { read, winOptions, generatedAt }   once per morning (older ones also
 //                  carry obstacle/plan, which nothing reads any more)
 //   ifThenOptions  { forWin, options: [{ when, then, at }], at }   on reaching Lock in, per win
+//   identitySteps  { forIdentity, steps: [{ text, minutes }], at }   on tapping "Turn it into actions"
 //   winCheck       { forWin, verdict, feedback, rewrite, freeMinutes, at,
 //                    plan?: { forPlan, verdict, feedback, when, then } }   on Lock in
 //   rescue         { forWin, note, step, count, at, dismissed }   on "Off track?" from Home
@@ -249,6 +250,98 @@ export const generateIfThenOptions = async ({ state, dateKey, win, generate, now
     thinking: false, // they're looking at the step, waiting on it
   });
   return { forWin: win.trim(), options: normalizeIfThens(response.text, now), at: now.getTime() };
+};
+
+// ─── Part 1c: proof for "Today I'll be someone who…" ─────────────────────────
+// Turns the identity line into a few small things to do today that prove it,
+// each one tap from becoming a task. Saved as `morning.identitySteps`.
+
+export const IDENTITY_STEPS = 3;
+
+export const IDENTITY_STEPS_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    steps: {
+      type: 'ARRAY',
+      description: `${IDENTITY_STEPS} small actions for today, each a different way to act like this person.`,
+      items: {
+        type: 'OBJECT',
+        properties: {
+          text: STR('The action as a task title, verb first, max 12 words, e.g. "Write 200 words of the essay before opening email".'),
+          minutes: { type: 'INTEGER', description: 'Roughly how many minutes it takes (1-60).' },
+        },
+        required: ['text', 'minutes'],
+        propertyOrdering: ['text', 'minutes'],
+      },
+    },
+  },
+  required: ['steps'],
+};
+
+export const buildIdentityStepsSystemPrompt = (name) => `${name} wrote "Today I'll be someone who…" in their morning journal in their self-improvement app "APEX". Turn that line into ${IDENTITY_STEPS} small actions they can do today that prove it to themselves. Each one becomes a task on today's list.
+
+RULES:
+- Each action is concrete and checkable tonight: a clear start, a clear done. Not "be more focused", "stay positive" or "try hard".
+- Small: 1 to 30 minutes each, sized to how rested they woke up and the free time left today. At most one may run up to 60 minutes.
+- Tie them to today: their win, tasks, calendar and focus goal, using the real names. Don't repeat a task already on today's list word for word; build on it instead (a first step, a when, a way to start).
+- Make the ${IDENTITY_STEPS} different from each other (say, one early in the day, one at a hard moment, one that helps someone or their body).
+- Use only the data given; never invent facts, people or times.
+- Write them as task titles, verb first, no "I". Plain text, no markdown, no emojis.`;
+
+/** What the model sees: the identity line, today's win, and what today already holds. */
+export const buildIdentityStepsContext = (state, dateKey, identity, now = new Date()) => {
+  const logs = state.logs || {};
+  const morning = logs[dateKey]?.morning || {};
+  const health = state.healthLog?.[dateKey] || {};
+  const vision = state.user?.northStar?.vision?.trim();
+  return {
+    now: `${dateKey} ${now.toTimeString().slice(0, 5)} (${now.toLocaleDateString('en-US', { weekday: 'long' })})`,
+    todayIllBeSomeoneWho: identity.trim(),
+    ...(trimText(morning.win) ? { todayIsAWinIfI: trimText(morning.win) } : {}),
+    ...(morningIfThen(morning) ? { ifThenPlan: morningIfThen(morning) } : {}),
+    ...(vision ? { becoming: vision } : {}),
+    wokeUp: {
+      ...(health.sleepHours != null ? { sleepHours: Math.round(health.sleepHours * 10) / 10 } : {}),
+      ...(morning.energy > 0 ? { restedOutOf5: morning.energy } : {}),
+    },
+    calendarToday: calendarToday(state, dateKey),
+    freeMinutesLeftToday: freeMinutesLeft(state, dateKey, now),
+    tasksToday: tasksToday(state, dateKey),
+    focusGoal: focusGoalContext(state),
+    knownAboutThem: (state.assistantMemory || []).slice(0, 10).map((m) => m.text),
+  };
+};
+
+const trimText = (s) => (typeof s === 'string' ? s.trim() : '');
+const asTaskTitle = (text) => {
+  const t = noEndPunctuation(text.replace(/^(i\s+will\s+|i'll\s+|i\s+)/i, ''));
+  return t ? t[0].toUpperCase() + t.slice(1) : '';
+};
+
+/** Validates the steps: a title, no repeats, minutes clamped to 1-60. */
+export const normalizeIdentitySteps = (raw) => {
+  const data = parse(raw);
+  const seen = new Set();
+  const steps = (Array.isArray(data.steps) ? data.steps : [])
+    .map((s) => {
+      const minutes = Math.round(Number(s?.minutes));
+      return { text: asTaskTitle(toText(s?.text, 100)), minutes: Number.isFinite(minutes) ? Math.min(60, Math.max(1, minutes)) : null };
+    })
+    .filter((s) => s.text && !seen.has(s.text.toLowerCase()) && seen.add(s.text.toLowerCase()))
+    .slice(0, IDENTITY_STEPS);
+  if (!steps.length) throw new Error('No steps came back. Try again.');
+  return steps;
+};
+
+export const generateIdentitySteps = async ({ state, dateKey, identity, generate, now = new Date() }) => {
+  if (!identity?.trim()) throw new Error('Finish the sentence first.');
+  const response = await generate({
+    systemPrompt: buildIdentityStepsSystemPrompt(state.user?.name || 'the user'),
+    contents: [{ role: 'user', parts: [{ text: `Turn this into actions for today, as JSON:\n${JSON.stringify(buildIdentityStepsContext(state, dateKey, identity, now))}` }] }],
+    schema: IDENTITY_STEPS_SCHEMA,
+    thinking: false, // they tapped and are waiting on it
+  });
+  return { forIdentity: identity.trim(), steps: normalizeIdentitySteps(response.text), at: now.getTime() };
 };
 
 // ─── Part 2: the win check ────────────────────────────────────────────────────

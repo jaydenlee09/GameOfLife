@@ -1079,13 +1079,14 @@ function App() {
   const [briefLoading, setBriefLoading] = useState(false);
   // The morning coach (morningCoach.js). Saves merge into the latest entry, because
   // a reply can land after you've typed more: the journal's own copy would be stale.
-  const { coachMorning, suggestIfThens, checkWin, backOnTrack } = assistant;
+  const { coachMorning, suggestIfThens, suggestIdentitySteps, checkWin, backOnTrack } = assistant;
   const morningAi = useMemo(() => (hasAssistantApiKey() ? {
     coach: (dateKey, opts) => coachMorning({ dateKey, weekPriority: currentWeekPriority, logReviews }, opts),
     ifThens: (dateKey, win) => suggestIfThens({ dateKey, win }),
+    identitySteps: (dateKey, identity) => suggestIdentitySteps({ dateKey, identity }),
     checkWin: (dateKey, win, plan) => checkWin({ dateKey, win, plan }),
     backOnTrack: (dateKey) => backOnTrack({ dateKey }),
-  } : null), [coachMorning, suggestIfThens, checkWin, backOnTrack, currentWeekPriority, logReviews]);
+  } : null), [coachMorning, suggestIfThens, suggestIdentitySteps, checkWin, backOnTrack, currentWeekPriority, logReviews]);
   const saveMorning = useCallback((dateKey, fields) => {
     setLogs(prev => ({ ...prev, [dateKey]: { ...prev[dateKey], morning: { ...prev[dateKey]?.morning, ...fields } } }));
   }, []);

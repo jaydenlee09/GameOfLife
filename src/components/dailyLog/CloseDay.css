@@ -1466,6 +1466,29 @@
 .mj-patterns svg { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
 .mj-read .mj-patterns { padding-top: 0.55rem; border-top: 1px solid var(--separator); }
 .mj-identity-read { margin: 0.7rem 0 0; }
+/* Lock in: actions that prove "Today I'll be someone who…" */
+.mj-id-steps { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin-top: 0.75rem; }
+.mj-id-run { font-size: 0.85rem; }
+.mj-id-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; width: 100%; }
+.mj-id-step {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--separator);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+.mj-id-text { flex: 1; min-width: 0; font-size: 0.88rem; line-height: 1.4; color: var(--text-primary); overflow-wrap: anywhere; }
+.mj-id-min { margin-left: 0.45rem; font-size: 0.72rem; font-weight: 600; color: var(--text-tertiary); white-space: nowrap; }
+.mj-id-add { flex-shrink: 0; width: auto; align-items: center; padding: 0.4rem 0.7rem; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.mj-id-add svg { margin-top: 0; }
+.mj-id-add.is-added { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-wash); opacity: 1; cursor: default; }
+.mj-id-again { font-size: 0.78rem; }
+@media (max-width: 480px) {
+  .mj-id-step { flex-wrap: wrap; }
+  .mj-id-add { margin-left: auto; }
+}
 /* Lock in: if-then plans to pick from, your own, and when to be reminded */
 .mj-ifthen-group { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.9rem; }
 .mj-group-label {

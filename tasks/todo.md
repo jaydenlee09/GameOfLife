@@ -1,5 +1,20 @@
 # Todo
 
+## Done, uncommitted (2026-11-09): AI actions for "Today I'll be someone who…"
+
+Problem (user): add AI actionable steps/tasks for the morning journal's identity line.
+- [x] morningCoach: `generateIdentitySteps` (3 small checkable actions, task-title form, minutes 1-60, tied to
+      win/tasks/calendar/energy/North Star), saved as `morning.identitySteps = { forIdentity, steps, at }`.
+- [x] useAssistant `suggestIdentitySteps` → App `morningAi.identitySteps`.
+- [x] MorningFlow: "Turn it into actions" under the identity input (on tap only, the line is typed); "Prove it today"
+      list with per-step "Add to today" (plain today task, not starred; "Added" when a task with that text exists),
+      "Other ideas", error + retry. Steps hide when the line is edited. Locked-in card shows them too.
+- Verified: node checks (normalizer: dedupe, "I will" strip, clamp, empty throws; context; fake generate), build,
+  lint (json) = HEAD (37), harness UI desktop + 375: generate, add (no duplicate on 2nd tap), other ideas,
+  edit hides stale steps with no AI call, error → retry, Locked-in card, no h-scroll.
+- Fixed while testing: shared `.cd-chip` is width:100%, squeezed step text to 0px; chip now width:auto in rows.
+- Not verified: real Gemini output (fake model only).
+
 ## Done, uncommitted (2026-11-09): Morning "What could knock you off track?" + if-then reminders
 
 Problem (user): the Lock in step's if-then and its AI suggestion are weak; the AI suggestion isn't in
