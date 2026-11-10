@@ -33,7 +33,7 @@ export const checkInBlock = (ev, status, { reason = null, now = Date.now() } = {
   const date = ev._instanceDate || ev.date;
   const recurring = ev.recurrence && ev.recurrence !== 'none';
   return {
-    award: pay > 0 ? { amount: pay, source: 'calendar', label: ev.title } : null,
+    award: pay > 0 ? { amount: pay, source: ev._noPhone ? 'nophone' : 'calendar', label: ev.title } : null,
     xp: pay,
     taskId: status === 'done' ? ev.plan?.taskId ?? null : null,
     update: (events) => events.map((e) => {
@@ -47,6 +47,22 @@ export const checkInBlock = (ev, status, { reason = null, now = Date.now() } = {
       };
     }),
   };
+};
+
+/**
+ * Take back a Skipped answer (e.g. "I picked it up" tapped by mistake), so the block
+ * is unanswered again. Only skipped can be undone: it paid nothing and closed nothing.
+ */
+export const undoSkippedBlock = (ev) => {
+  if (getBlockOutcome(ev)?.status !== 'skipped') return null;
+  const date = ev._instanceDate || ev.date;
+  const recurring = ev.recurrence && ev.recurrence !== 'none';
+  return (events) => events.map((e) => {
+    if (e.id !== ev.id) return e;
+    if (!recurring) { const { outcome: _drop, ...rest } = e; return rest; }
+    const { [date]: _gone, ...outcomes } = e.outcomes || {};
+    return { ...e, outcomes };
+  });
 };
 
 /** Marking a block done (the grid's check, the focus debrief). Returns null if already done. */

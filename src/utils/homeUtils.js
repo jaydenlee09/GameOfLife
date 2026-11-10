@@ -120,7 +120,7 @@ const round1 = (n) => Math.round(n * 10) / 10;
  * `page` is where the action happens; null when it's on Home itself.
  */
 export const getNextMove = (inputs, now) => {
-  const { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents } = inputs;
+  const { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks } = inputs;
   const todayKey = toDateKey(now);
   const weights = scoreWeights(todayKey);
   const pts = (key) => (weights[key] || 0) / 10; // a part's full value, in score points
@@ -140,10 +140,11 @@ export const getNextMove = (inputs, now) => {
   }
   if (tasksDone < 3) moves.push({ key: 'tasks', text: 'Finish a task', gain: round1(pts('tasks') / 3), page: null });
   if (weights.plan) {
-    const kept = getPlanKept(calendarEvents, todayKey);
-    const pending = getPendingCheckIns(calendarEvents, now).filter((ev) => ev._instanceDate === todayKey);
+    const kept = getPlanKept(calendarEvents, todayKey, noPhoneBlocks);
+    const pending = getPendingCheckIns(calendarEvents, now, noPhoneBlocks).filter((ev) => ev._instanceDate === todayKey);
     if (pending.length) {
-      moves.push({ key: 'plan', text: `Check in on “${pending[0].title}”`, gain: round1(pts('plan') / kept.total), page: 'calendar' });
+      const text = pending[0]._noPhone ? 'Check in on your no-phone block' : `Check in on “${pending[0].title}”`;
+      moves.push({ key: 'plan', text, gain: round1(pts('plan') / kept.total), page: pending[0]._noPhone ? null : 'calendar' });
     } else if (!kept.total && getDayMode(now) !== 'evening') {
       moves.push({ key: 'plan', text: 'Put a time block on today’s calendar', gain: round1(pts('plan')), page: 'calendar' });
     }

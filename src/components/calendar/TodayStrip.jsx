@@ -14,10 +14,10 @@ const fmtMins = (mins) => {
  * time planned, blocks done, what's on now, and the oldest block still waiting for
  * a check-in (today's, or yesterday's while it still counts).
  */
-export default function TodayStrip({ calendarEvents, nowMs, onCheckIn, onStartFocus, onPlanDay }) {
+export default function TodayStrip({ calendarEvents, noPhoneBlocks = [], nowMs, onCheckIn, onStartFocus, onPlanDay }) {
   const now = new Date(nowMs);
-  const day = getPlanDay(calendarEvents, now);
-  const pending = getPendingCheckIns(calendarEvents, now);
+  const day = getPlanDay(calendarEvents, now, noPhoneBlocks);
+  const pending = getPendingCheckIns(calendarEvents, now, noPhoneBlocks);
   const first = pending[0] || null;
   const { kept, current, next } = day;
   const planWeight = scoreWeights(day.dateKey).plan || 0;
@@ -29,7 +29,7 @@ export default function TodayStrip({ calendarEvents, nowMs, onCheckIn, onStartFo
           <span className="cts-day">Today</span>
           {kept.total ? (
             <>
-              <span className="cts-stat"><Clock size={12} /> {fmtMins(day.plannedMins)} planned</span>
+              {day.plannedMins > 0 && <span className="cts-stat"><Clock size={12} /> {fmtMins(day.plannedMins)} planned</span>}
               <span className="cts-stat cts-stat--kept">
                 <CalendarCheck size={12} /> {kept.done}/{kept.total} done{kept.partly ? ` · ${kept.partly} partly` : ''}
               </span>

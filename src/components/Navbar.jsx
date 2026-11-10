@@ -307,7 +307,7 @@ const Navbar = ({
   }, [collapsed]);
 
   const hints = useMemo(
-    () => getNavHints({ todos, calendarEvents: scoreInputs.calendarEvents, logs: scoreInputs.logs, logReviews, weeklyReviews }, now),
+    () => getNavHints({ todos, calendarEvents: scoreInputs.calendarEvents, noPhoneBlocks: scoreInputs.noPhoneBlocks, logs: scoreInputs.logs, logReviews, weeklyReviews }, now),
     [todos, scoreInputs, logReviews, weeklyReviews, now]
   );
   const { move } = useMemo(() => getNextMove(scoreInputs, now), [scoreInputs, now]);

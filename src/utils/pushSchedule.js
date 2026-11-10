@@ -9,7 +9,7 @@
 // if the log was filled at 8:29pm).
 
 import { computeNudges } from './assistantTriggers';
-import { expandEventsForDates, isInstanceCompleted, getBlockStatus, blockRange } from './calendarUtils';
+import { expandEventsForDates, expandNoPhoneForDates, isInstanceCompleted, getBlockStatus, blockRange, NOPHONE_PLAN_START } from './calendarUtils';
 import { shiftDateKey } from './scoreUtils';
 import { isTop, todayQueue } from './taskUtils';
 import { getFocusGoals, getGoalEvents, QUIET_GOAL_DAYS } from './goalUtils';
@@ -226,6 +226,15 @@ export const decidePushes = (now, rawSettings, state, pushState = {}) => {
       const id = `checkin_${ev.id}_${today}_${fmt(ev.endHour, ev.endMin)}`;
       if (!fresh(id)) return;
       pushes.push({ id, type: 'checkins', title: `Did you do ${ev.title}?`, body: `${blockRange(ev)} just ended. Tap to check in: done, partly or skipped.`, page: 'calendar' });
+    });
+    // No-phone blocks: same window, answered on Home.
+    if (today >= NOPHONE_PLAN_START) expandNoPhoneForDates(state.noPhoneBlocks, [today]).forEach((ev) => {
+      const sinceEnd = nowMin - (ev.endHour * 60 + ev.endMin);
+      if (sinceEnd < 0 || sinceEnd >= CHECKIN_WINDOW_MINUTES) return;
+      if (getBlockStatus(ev, now.getTime()) !== 'missed') return;
+      const id = `npcheckin_${ev.id}_${today}_${fmt(ev.endHour, ev.endMin)}`;
+      if (!fresh(id)) return;
+      pushes.push({ id, type: 'checkins', title: 'Did you stay off your phone?', body: `Your no-phone block (${blockRange(ev)}) just ended. Tap to check in.`, page: 'welcome' });
     });
   }
 

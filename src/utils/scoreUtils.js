@@ -60,7 +60,7 @@ const formatHours = (h) => {
 };
 
 // Score for a single day. `inputs` is any object carrying { habits, xpLog, logs,
-// commitmentArchive, healthLog, calendarEvents } (app state works as is; missing ones
+// commitmentArchive, healthLog, calendarEvents, noPhoneBlocks } (app state works as is; missing ones
 // count as empty). `dateKey` defaults to today; pass a past key to score history.
 export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
   if (!inputs || Array.isArray(inputs)) throw new TypeError('computeDailyScore takes an inputs object');
@@ -70,6 +70,7 @@ export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
   const commitmentArchive = inputs.commitmentArchive || [];
   const healthLog = inputs.healthLog || {};
   const calendarEvents = inputs.calendarEvents || [];
+  const noPhoneBlocks = inputs.noPhoneBlocks || [];
   const prevKey = shiftDateKey(dateKey, -1);
   const weights = scoreWeights(dateKey);
 
@@ -82,8 +83,8 @@ export const computeDailyScore = (inputs, dateKey = getLocalDateKey(0)) => {
   const tasksDone   = countTaskCompletions(xpLog, dateKey);
   const taskScore   = Math.min(tasksDone / 3, 1) * 10;
 
-  // Plan kept: share of the day's time blocks done (partly = half). No blocks = 0.
-  const kept        = weights.plan ? getPlanKept(calendarEvents, dateKey) : null;
+  // Plan kept: share of the day's time blocks (and no-phone blocks) kept (partly = half). No blocks = 0.
+  const kept        = weights.plan ? getPlanKept(calendarEvents, dateKey, noPhoneBlocks) : null;
   const planScore   = kept?.total ? (kept.credit / kept.total) * 10 : 0;
 
   // Sleep: logged and 9h or more = full score

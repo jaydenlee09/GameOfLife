@@ -744,11 +744,13 @@ const DayClosed = ({ entry, todayKey, score, streak, review, reviewingDate, revi
 
 // ─── Flow ─────────────────────────────────────────────────────────────────────
 
+const NO_BLOCKS = [];
+
 const CloseDayFlow = ({
   todayKey, entry, updateField, updateArrayField, logs, logReviews, commitmentArchive,
   onResolveCommitment, onCommitmentLocked, habits, onToggleHabitDay, habitHandlers,
   healthLog, setHealthLog, foodLog, setFoodLog, foodPoints, setFoodPoints,
-  goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, improveHandlers, onNavigate,
+  goals, setGoals, todos, pomodoroSessions, northStar, logPatterns, xpLog, calendarEvents, noPhoneBlocks = NO_BLOCKS, reviewingDate, onSubmitLog, onOpenAssistant, lessonHandlers, improveHandlers, onNavigate,
   experiment, modeSwitch,
 }) => {
   const reduceMotion = useReducedMotion();
@@ -789,11 +791,11 @@ const CloseDayFlow = ({
   const habitLeak = useMemo(() => getHabitLeak(habits, todayKey), [habits, todayKey]);
   const suggestions = getCommitmentSuggestions({ entry, goals, now, flags });
 
-  const scoreInputs = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents };
+  const scoreInputs = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks };
   const { score, breakdown } = computeDailyScore(scoreInputs, todayKey);
   const streak = useMemo(
-    () => computeStreak({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
-    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents]
+    () => computeStreak({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks }),
+    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks]
   );
 
   const review = logReviews[todayKey] || null;
@@ -808,7 +810,7 @@ const CloseDayFlow = ({
     screentimeLogged: healthLog[todayKey]?.screentimeHours != null,
     commitmentStatus: commitment.status,
     tonightLocked: commitmentLocked,
-    planPending: getPendingCheckIns(calendarEvents, now).filter((ev) => ev._instanceDate === todayKey).length,
+    planPending: getPendingCheckIns(calendarEvents, now, noPhoneBlocks).filter((ev) => ev._instanceDate === todayKey).length,
   });
   const fixScore = (fix) => {
     if (fix.page) onNavigate?.(fix.page);

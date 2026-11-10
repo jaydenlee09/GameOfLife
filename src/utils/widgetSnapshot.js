@@ -54,6 +54,7 @@ export const buildWidgetSnapshot = (state, now) => {
     commitmentArchive: state.commitmentArchive || [],
     healthLog: state.healthLog || {},
     calendarEvents: state.calendarEvents || [],
+    noPhoneBlocks: state.noPhoneBlocks || [],
   };
   const { score } = computeDailyScore(scoreInputs, todayKey);
   const streak = computeStreak(scoreInputs);

@@ -280,9 +280,9 @@ const PlayerDashboard = ({
   const handleSaveClick = () => { onUpdateName(nameInput); setIsEditing(false); };
   const handleKeyDown   = (e) => { if (e.key === 'Enter') handleSaveClick(); };
 
-  const data = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions, todos, goals };
+  const data = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks, pomodoroSessions, todos, goals };
   /* eslint-disable react-hooks/exhaustive-deps */
-  const deps = [habits, xpLog.length, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions.length, todos.length, goals];
+  const deps = [habits, xpLog.length, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks, pomodoroSessions.length, todos.length, goals];
   const verdict = useMemo(() => getWeekVerdict(data), deps);
   const leaks   = useMemo(() => getScoreLeaks(data), deps);
   const deltas  = useMemo(() => getWeekDeltas(data), deps);
@@ -305,7 +305,7 @@ const PlayerDashboard = ({
 
         {xpStatus && <LevelCard xpStatus={xpStatus} xpSeries={xpSeries} />}
 
-        <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} calendarEvents={calendarEvents} />
+        <TrendChart habits={habits} xpLog={xpLog} logs={logs} commitmentArchive={commitmentArchive} healthLog={healthLog} calendarEvents={calendarEvents} noPhoneBlocks={noPhoneBlocks} />
 
         <WeekDeltas deltas={deltas} />
       </div>

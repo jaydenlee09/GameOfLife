@@ -7,7 +7,7 @@ import { getLocalDateKey, shiftDateKey } from '../../utils/scoreUtils';
 import { getHabitCompletionsInLastNDays } from '../../utils/habitUtils';
 import { getBestHabitStreak } from '../../utils/achievementsMeta';
 import { getFocusGoals, getGoalActivity, getGoalStatus } from '../../utils/goalUtils';
-import { expandEventsForDates, isInstanceCompleted } from '../../utils/calendarUtils';
+import { expandEventsForDates, getBlockOutcome } from '../../utils/calendarUtils';
 import { getScreentimeStatus } from '../../utils/healthUtils';
 
 const STATUS_COLORS = { good: '#30d158', warn: '#ff9f0a', bad: '#ff453a', neutral: '#8e8e93' };
@@ -87,7 +87,7 @@ const ConnectedFeatureTiles = ({
 
   // No-Phone — blocks honored vs. scheduled over the last 7 days.
   const noPhoneInstances = expandEventsForDates(noPhoneBlocks, last7Keys);
-  const noPhoneHonored = noPhoneInstances.filter(isInstanceCompleted).length;
+  const noPhoneHonored = noPhoneInstances.filter((b) => getBlockOutcome(b)?.status === 'done').length;
   const noPhoneRate = noPhoneInstances.length > 0 ? Math.round((noPhoneHonored / noPhoneInstances.length) * 100) : null;
   const noPhoneStatus = noPhoneRate == null ? 'neutral' : noPhoneRate >= 80 ? 'good' : noPhoneRate >= 50 ? 'warn' : 'bad';
 

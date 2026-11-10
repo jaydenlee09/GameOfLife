@@ -258,7 +258,8 @@ const READ_TOOLS = [
       const noPhone = expandEventsForDates(state.noPhoneBlocks || [], keys).sort(byStart).map((b) => ({
         date: b._instanceDate,
         time: `${fmtTime(b.startHour, b.startMin)}-${fmtTime(b.endHour, b.endMin)}`,
-        honored: !!isInstanceCompleted(b),
+        honored: getBlockOutcome(b)?.status === 'done',
+        ...(checkInOf(b) ? { checkIn: checkInOf(b) } : {}),
       }));
       const reminders = keys.flatMap((key) => (state.calendarDayEvents?.[key] || [])
         .map((r) => ({ date: key, title: r.title, ...(r.time ? { time: r.time } : {}) })));

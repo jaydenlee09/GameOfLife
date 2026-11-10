@@ -23,14 +23,14 @@ const fmtTime = (h, m) => new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US',
  * Small status hints for sidebar links, only where something needs you:
  * { [page]: { text?, tone?: 'alert' | 'live', dot?: true } }.
  */
-export const getNavHints = ({ todos, calendarEvents, logs, logReviews, weeklyReviews }, now) => {
+export const getNavHints = ({ todos, calendarEvents, noPhoneBlocks, logs, logReviews, weeklyReviews }, now) => {
   const hints = {};
   const todayKey = toDateKey(now);
 
   const left = todayQueue(todos || [], todayKey).length;
   if (left > 0) hints.tasks = { text: `${left} left` };
 
-  const plan = getPlanDay(calendarEvents || [], now);
+  const plan = getPlanDay(calendarEvents || [], now, noPhoneBlocks || []);
   if (plan.missed > 0) hints.calendar = { text: `${plan.missed} to check in`, tone: 'alert' };
   else if (plan.current) hints.calendar = { text: 'now', tone: 'live' };
   else if (plan.next) hints.calendar = { text: fmtTime(plan.next.startHour, plan.next.startMin) };

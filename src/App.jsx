@@ -38,7 +38,7 @@ import BrainDumpPage from './components/BrainDumpPage'
 import FocusMode from './components/FocusMode'
 import DayPlanner from './components/DayPlanner'
 import { getTool, applySliceOp } from './utils/assistantTools'
-import { checkInBlock, completeTask, findBlockInstance } from './utils/completionUtils'
+import { checkInBlock, completeTask, findBlockInstance, undoSkippedBlock } from './utils/completionUtils'
 import { pruneDoneTasks } from './utils/taskUtils'
 import { ALT_PAGE_KEYS, IS_MAC, shortcutKeyOf } from './utils/navUtils'
 import { computeAchievementData, checkAchievements, ACHIEVEMENTS } from './utils/achievementsMeta'
@@ -359,8 +359,8 @@ function App() {
   // habit writes `habits[i].history[dateKey]` and leaves the array length alone, so
   // a length-keyed memo would leave a stale score on screen until the next reload.
   const scoreInputs = useMemo(
-    () => ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
-    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents]
+    () => ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks }),
+    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks]
   );
   const todayKey = useTodayKey();
   const dailyScore = useMemo(() => computeDailyScore(scoreInputs, todayKey), [scoreInputs, todayKey]);
@@ -377,9 +377,9 @@ function App() {
   // Navbar recompute it independently) so the transition-detection effect below and
   // every display of it can never silently drift apart.
   const rankStatus = useMemo(
-    () => computeRankStatus({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }),
+    () => computeRankStatus({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog, calendarEvents]
+    [habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog, calendarEvents, noPhoneBlocks]
   );
 
   // ─── XP: the Daily Score, banked ──────────────────────────────────────────────
@@ -944,14 +944,20 @@ function App() {
   }, []);
 
   // Every block check-in (Calendar, Home, focus debrief) lands here: same XP rules
-  // everywhere, and a task block marked done completes its task too.
+  // everywhere, and a task block marked done completes its task too. No-phone block
+  // instances (`_noPhone`) check in the same way but live in their own list.
   const checkInBlockInstance = (ev, status, reason = null) => {
     const res = checkInBlock(ev, status, { reason });
     if (!res) return null;
     if (res.award) logActivity(res.award.amount, res.award);
+    if (ev._noPhone) { setNoPhoneBlocks(res.update); return res.xp; }
     setCalendarEvents(res.update);
     if (res.taskId != null) completeTaskById(res.taskId);
     return res.xp;
+  };
+  const undoNoPhoneSlip = (ev) => {
+    const update = undoSkippedBlock(ev);
+    if (update) setNoPhoneBlocks(update);
   };
   const completeBlockById = (blockId, dateKey) =>
     checkInBlockInstance(findBlockInstance(calendarEvents, blockId, dateKey), 'done');
@@ -1138,9 +1144,9 @@ function App() {
 
   const nudges = useMemo(
     () => (syncSettled
-      ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, weeklyReviews }, assistantCheckins)
+      ? computeNudges(new Date(clockTick), { habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, noPhoneBlocks, weeklyReviews }, assistantCheckins)
       : []),
-    [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, weeklyReviews, assistantCheckins]
+    [syncSettled, clockTick, habits, xpLog, logs, commitmentArchive, healthLog, goals, todos, pomodoroSessions, calendarEvents, noPhoneBlocks, weeklyReviews, assistantCheckins]
   );
   // A nudge that only sends you to the page you're already on is pointless, and the
   // Daily Log's Look back step already asks about yesterday's commitment.
@@ -1191,6 +1197,7 @@ function App() {
             onStartFocus={() => setFocusModeOpen(true)}
             onStartFocusBlock={startFocusFromBlock}
             onCheckInBlock={checkInBlockInstance}
+            onUndoNoPhoneSlip={undoNoPhoneSlip}
             morningAi={morningAi}
             onSaveMorning={saveMorning}
             onStartFocusStep={startFocusOnStep}
@@ -1244,6 +1251,7 @@ function App() {
             onResolveCommitment={handleArchiveCommitmentResolve}
             xpLog={xpLog}
             calendarEvents={calendarEvents}
+            noPhoneBlocks={noPhoneBlocks}
             goals={goals}
             setGoals={setGoals}
             todos={todos}
@@ -1353,6 +1361,7 @@ function App() {
             goals={goals}
             healthLog={healthLog}
             calendarEvents={calendarEvents}
+            noPhoneBlocks={noPhoneBlocks}
             setGoals={setGoals}
             setTodos={setTodos}
             onLogActivity={logActivity}

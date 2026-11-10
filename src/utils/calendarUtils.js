@@ -113,6 +113,26 @@ export const PLAN_KEPT_START = '2026-10-17';
 
 export const SKIP_REASONS = ['Distracted', 'Ran over', 'Low energy', 'Plans changed', 'Forgot'];
 
+// ─── No-phone blocks in the plan ─────────────────────────────────────────────
+// No-phone blocks get the same check-in as time blocks (done = kept off the phone,
+// partly = mostly, skipped = slipped) stored in the same fields, and count toward
+// "Plan kept" from this day on. Earlier days keep the score they had.
+export const NOPHONE_PLAN_START = '2026-11-09';
+export const NOPHONE_SLIP_REASONS = ['Needed it', 'Notification', 'Bored', 'Habit', 'Forgot'];
+// What "I picked it up" on Home records while the block is still running.
+export const NOPHONE_LIVE_SLIP = 'Picked it up';
+
+/** No-phone block instances, tagged `_noPhone` and titled, so check-in code can tell them apart. */
+export const expandNoPhoneForDates = (noPhoneBlocks, dateKeys) =>
+  expandEventsForDates(noPhoneBlocks || [], dateKeys)
+    .map((b) => ({ ...b, _noPhone: true, title: b.label?.trim() || 'No Phone' }));
+
+// Time blocks plus the no-phone blocks that count toward the plan.
+const planInstances = (calendarEvents, noPhoneBlocks, dateKeys) => [
+  ...expandEventsForDates(calendarEvents || [], dateKeys),
+  ...expandNoPhoneForDates(noPhoneBlocks, dateKeys).filter((b) => b._instanceDate >= NOPHONE_PLAN_START),
+];
+
 // Share of a block that counts as kept.
 export const PLAN_CREDIT = { done: 1, partly: 0.5, skipped: 0 };
 
@@ -122,7 +142,9 @@ const isOneOff = (ev) => ev.recurrence === 'none' || !ev.recurrence;
 export const getBlockOutcome = (ev) => {
   const stored = isOneOff(ev) ? ev.outcome : ev.outcomes?.[ev._instanceDate];
   if (stored?.status) return stored;
-  return isInstanceCompleted(ev) ? { status: 'done' } : null;
+  // No-phone blocks "honored" before check-ins existed read as done.
+  const honored = isOneOff(ev) ? ev.honored : ev.honoredDates?.includes(ev._instanceDate);
+  return isInstanceCompleted(ev) || honored ? { status: 'done' } : null;
 };
 
 const instanceMs = (ev, h, m) => {
@@ -146,10 +168,11 @@ export const getBlockStatus = (ev, nowMs) => {
 
 /**
  * How well a day's plan was kept: every time block that day (recurring included)
- * counts; done = 1, partly = 0.5. `reasons` tallies why blocks were skipped.
+ * counts, and so does every no-phone block from NOPHONE_PLAN_START; done = 1,
+ * partly = 0.5. `reasons` tallies why blocks were skipped.
  */
-export const getPlanKept = (calendarEvents, dateKey) => {
-  const blocks = expandEventsForDates(calendarEvents || [], [dateKey]);
+export const getPlanKept = (calendarEvents, dateKey, noPhoneBlocks = []) => {
+  const blocks = planInstances(calendarEvents, noPhoneBlocks, [dateKey]);
   const out = { total: blocks.length, done: 0, partly: 0, skipped: 0, credit: 0, reasons: {} };
   for (const ev of blocks) {
     const outcome = getBlockOutcome(ev);
@@ -166,11 +189,11 @@ export const getPlanKept = (calendarEvents, dateKey) => {
  * (yesterday's still count toward yesterday's score until you answer them). Days
  * before check-ins existed are never asked about.
  */
-export const getPendingCheckIns = (calendarEvents, now) => {
+export const getPendingCheckIns = (calendarEvents, now, noPhoneBlocks = []) => {
   const nowMs = now.getTime();
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  return expandEventsForDates(calendarEvents || [], [toDateKey(yesterday), toDateKey(now)])
+  return planInstances(calendarEvents, noPhoneBlocks, [toDateKey(yesterday), toDateKey(now)])
     .filter((ev) => ev._instanceDate >= PLAN_KEPT_START && getBlockStatus(ev, nowMs) === 'missed')
     .sort((a, b) => blockEndMs(a) - blockEndMs(b));
 };
@@ -179,8 +202,9 @@ export const getPendingCheckIns = (calendarEvents, now) => {
  * Today at a glance, for the Calendar's Today strip: today's blocks in time order
  * with their status, planned minutes, how well the plan is kept, and the block on
  * now / up next (answered blocks are skipped, so marking one done early moves on).
+ * No-phone blocks count in `kept` and `missed` only; they're not something to focus on.
  */
-export const getPlanDay = (calendarEvents, now) => {
+export const getPlanDay = (calendarEvents, now, noPhoneBlocks = []) => {
   const nowMs = now.getTime();
   const dateKey = toDateKey(now);
   const blocks = expandEventsForDates(calendarEvents || [], [dateKey])
@@ -190,11 +214,23 @@ export const getPlanDay = (calendarEvents, now) => {
     dateKey,
     blocks,
     plannedMins: blocks.reduce((sum, { ev }) => sum + (ev.endHour * 60 + ev.endMin) - (ev.startHour * 60 + ev.startMin), 0),
-    kept: getPlanKept(calendarEvents, dateKey),
-    missed: blocks.filter((b) => b.status === 'missed').length,
+    kept: getPlanKept(calendarEvents, dateKey, noPhoneBlocks),
+    missed: planInstances(calendarEvents, noPhoneBlocks, [dateKey]).filter((ev) => getBlockStatus(ev, nowMs) === 'missed').length,
     current: blocks.find((b) => b.status === 'now')?.ev || null,
     next: blocks.find((b) => b.status === 'upcoming')?.ev || null,
   };
+};
+
+/**
+ * The no-phone block running right now (today's instance), unanswered or slipped
+ * mid-block, or null. A block already kept (done/partly) is over as far as Home cares.
+ */
+export const getActiveNoPhone = (noPhoneBlocks, now) => {
+  const nowMs = now.getTime();
+  return expandNoPhoneForDates(noPhoneBlocks, [toDateKey(now)])
+    .filter((b) => blockStartMs(b) <= nowMs && nowMs < blockEndMs(b))
+    .filter((b) => { const s = getBlockOutcome(b)?.status; return !s || s === 'skipped'; })
+    .sort((a, b) => blockEndMs(b) - blockEndMs(a))[0] || null;
 };
 
 /** Ids of tasks that already have a block on any of `dateKeys` (a skipped block frees its task again). */

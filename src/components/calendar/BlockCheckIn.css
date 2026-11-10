@@ -37,3 +37,5 @@
   background: var(--bg-elevated-2); color: var(--text-secondary); font-family: inherit;
   font-size: 0.74rem; font-weight: 500; cursor: pointer; transition: all var(--duration) var(--ease);
 }
+
+.cci-title-icon { vertical-align: -2px; color: var(--accent); }

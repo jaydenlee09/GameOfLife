@@ -295,7 +295,7 @@ const dayName = (dateKey) => WEEKDAY_NAME[(dayOfWeek(dateKey) + 6) % 7];
 export const buildResetContext = (state, reviewKey, todayKey, now = new Date()) => {
   const data = {
     habits: state.habits || [], xpLog: state.xpLog || [], logs: state.logs || {},
-    commitmentArchive: state.commitmentArchive || [], healthLog: state.healthLog || {}, calendarEvents: state.calendarEvents || [],
+    commitmentArchive: state.commitmentArchive || [], healthLog: state.healthLog || {}, calendarEvents: state.calendarEvents || [], noPhoneBlocks: state.noPhoneBlocks || [],
     pomodoroSessions: state.pomodoroSessions || [], todos: state.todos || [], goals: state.goals || [],
   };
   const scores = getWeekScores(data, reviewKey, todayKey);

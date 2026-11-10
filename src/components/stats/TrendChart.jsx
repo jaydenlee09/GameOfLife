@@ -57,7 +57,7 @@ const MODES = {
 // One card, three day-by-day metrics (score / screentime / sleep) toggled via
 // a small pill switcher — never averaged, so a single bad day stays visible.
 // Score bars are stacked by Daily Score component, so a low day shows *why*.
-const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }) => {
+const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks }) => {
   const [mode, setMode] = useState('score');
   const cfg = MODES[mode];
 
@@ -65,7 +65,7 @@ const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog, calenda
     if (mode === 'score') {
       return Array.from({ length: 30 }, (_, i) => {
         const dateKey = getLocalDateKey(-(29 - i));
-        const { score, breakdown } = computeDailyScore({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents }, dateKey);
+        const { score, breakdown } = computeDailyScore({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks }, dateKey);
         const [, m, d] = dateKey.split('-').map(Number);
         const row = { dateKey, value: score, label: `${m}/${d}`, max: {} };
         // Each day uses its own weights; a part the day didn't have stacks as 0.
@@ -92,7 +92,7 @@ const TrendChart = ({ habits, xpLog, logs, commitmentArchive, healthLog, calenda
       return { dateKey, value: hours, label: `${m}/${d}`, color: getColor(hours) };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog, calendarEvents]);
+  }, [mode, habits.length, xpLog.length, Object.keys(logs).length, commitmentArchive.length, healthLog, calendarEvents, noPhoneBlocks]);
 
   return (
     <div className="dashboard-card trend-chart-card">

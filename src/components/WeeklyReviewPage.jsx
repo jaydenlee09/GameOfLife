@@ -62,7 +62,7 @@ const ThisWeekCard = ({ plan }) => (
 
 const WeeklyReviewPage = ({
   weeklyReviews = {}, setWeeklyReviews, todayKey, xpLog = [], xpSeries = [], pomodoroSessions = [], habits = [], todos = [], logs = {},
-  goals = [], healthLog = {}, calendarEvents = [], calendarDayEvents = {}, commitmentArchive = [], logReviews = {},
+  goals = [], healthLog = {}, calendarEvents = [], noPhoneBlocks = [], calendarDayEvents = {}, commitmentArchive = [], logReviews = {},
   setGoals, setTodos, onLogActivity, onRecalibrate, onDraft, onNavigate,
 }) => {
   const reviewKey = getReviewWeek(todayKey);
@@ -71,8 +71,8 @@ const WeeklyReviewPage = ({
   const review = weeklyReviews[reviewKey] || {};
 
   const data = useMemo(
-    () => ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions, todos, goals }),
-    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, pomodoroSessions, todos, goals]
+    () => ({ habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks, pomodoroSessions, todos, goals }),
+    [habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks, pomodoroSessions, todos, goals]
   );
   const xpByDay = useMemo(() => Object.fromEntries(xpSeries.map((d) => [d.dateKey, d.xp])), [xpSeries]);
   const weekXp = (monday) => getWeekDays(monday).reduce((sum, d) => sum + (xpByDay[d] || 0), 0);

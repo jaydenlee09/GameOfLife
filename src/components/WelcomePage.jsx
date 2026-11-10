@@ -4,7 +4,9 @@ import {
   Repeat, Moon, NotebookText, Handshake, Flame, X, Check, Hourglass, Sparkles, RotateCw, Star, CalendarCheck, FlaskConical, Smartphone, Sun, ShieldCheck,
 } from 'lucide-react';
 import './WelcomePage.css';
-import { toDateKey, fmtRemaining, getPendingCheckIns } from '../utils/calendarUtils';
+import {
+  toDateKey, fmtRemaining, getPendingCheckIns, getActiveNoPhone, getBlockOutcome, blockStartMs, blockEndMs, blockRange, NOPHONE_LIVE_SLIP,
+} from '../utils/calendarUtils';
 import BlockCheckIn from './calendar/BlockCheckIn';
 import { getGoalProgress, getFocusGoals, getGoalActivity, getGoalStatus, daysLeft } from '../utils/goalUtils';
 import { getHabitStreak } from '../utils/habitUtils';
@@ -138,14 +140,6 @@ function TodaysWin({ win, morning, todayKey, ai, onSave, onOpen, onStartFocusSte
 }
 
 // ── Now panel ────────────────────────────────────────────────────────────────
-function NoPhoneBadge({ until, nowMs }) {
-  return (
-    <span className="wp-now-badge">
-      <PhoneOff size={11} strokeWidth={2.5} /> No Phone{until ? ` · ${fmtRemaining(until, nowMs)} left` : ''}
-    </span>
-  );
-}
-
 function CloseTheDay({ steps, current, nowMs, onNavigate, onStartFocusBlock }) {
   const doneCount = steps.filter((s) => s.done).length;
   const allDone = doneCount === steps.length;
@@ -204,7 +198,7 @@ function StartTheDay({ morning, current, nowMs, onNavigate, onPlanDay, onStartFo
 
 function NowPanel({ mode, now, nextUp, closeSteps, morning, onNavigate, onPlanDay, onStartFocus, onStartFocusBlock }) {
   const nowMs = now.getTime();
-  const { current, next, nextIsToday, activeBlock, noPhoneActive, plannedToday } = nextUp;
+  const { current, next, nextIsToday, plannedToday } = nextUp;
 
   if (mode === 'evening') {
     return <CloseTheDay steps={closeSteps} current={current} nowMs={nowMs} onNavigate={onNavigate} onStartFocusBlock={onStartFocusBlock} />;
@@ -213,7 +207,6 @@ function NowPanel({ mode, now, nextUp, closeSteps, morning, onNavigate, onPlanDa
     return <StartTheDay morning={morning} current={current} nowMs={nowMs} onNavigate={onNavigate} onPlanDay={onPlanDay} onStartFocusBlock={onStartFocusBlock} />;
   }
 
-  const badge = noPhoneActive && <NoPhoneBadge until={activeBlock?.endMs} nowMs={nowMs} />;
   const tomorrowLine = next && !nextIsToday && (
     <p className="wp-now-then">Tomorrow: {next.label} at {fmtClock(next.startMs)}</p>
   );
@@ -221,7 +214,7 @@ function NowPanel({ mode, now, nextUp, closeSteps, morning, onNavigate, onPlanDa
   if (current) {
     return (
       <section className="wp-now wp-now--live" aria-label="Happening now">
-        <div className="wp-now-label">Happening now · ends in {fmtRemaining(current.endMs, nowMs)} {badge}</div>
+        <div className="wp-now-label">Happening now · ends in {fmtRemaining(current.endMs, nowMs)}</div>
         <h2 className="wp-now-title">{current.label}</h2>
         <p className="wp-now-meta">{fmtSpan(current)}</p>
         <div className="wp-now-actions">
@@ -240,7 +233,7 @@ function NowPanel({ mode, now, nextUp, closeSteps, morning, onNavigate, onPlanDa
     const soon = next.kind === 'event' && next.startMs - nowMs <= 15 * 60000;
     return (
       <section className="wp-now" aria-label="Next up">
-        <div className="wp-now-label">Next up · in {fmtRemaining(next.startMs, nowMs)} {badge}</div>
+        <div className="wp-now-label">Next up · in {fmtRemaining(next.startMs, nowMs)}</div>
         <h2 className="wp-now-title"><Icon size={20} strokeWidth={2.4} className="wp-now-title-icon" /> {next.label}</h2>
         <p className="wp-now-meta">{fmtSpan(next)}</p>
         <div className="wp-now-actions">
@@ -261,7 +254,7 @@ function NowPanel({ mode, now, nextUp, closeSteps, morning, onNavigate, onPlanDa
 
   return (
     <section className="wp-now wp-now--open" aria-label="Plan your day">
-      <div className="wp-now-label">{plannedToday ? 'Open time' : mode === 'morning' ? 'Start here' : 'Unplanned'} {badge}</div>
+      <div className="wp-now-label">{plannedToday ? 'Open time' : mode === 'morning' ? 'Start here' : 'Unplanned'}</div>
       <h2 className="wp-now-title">{plannedToday ? 'Nothing else scheduled today' : 'Today isn’t planned yet'}</h2>
       <p className="wp-now-meta">
         {plannedToday ? 'Plan the rest of the day, or start a focus session.' : 'Turn your tasks and goals into time blocks in one tap.'}
@@ -345,14 +338,14 @@ function ScoreCard({ scoreInputs, now, onNavigate }) {
 // ── Block check-in ───────────────────────────────────────────────────────────
 // The oldest block that ended without an answer (today's, or yesterday's while it
 // still counts). Answering here is the same check-in as on the Calendar.
-function CheckInCard({ calendarEvents, now, todayKey, onCheckInBlock, onNavigate }) {
-  const pending = getPendingCheckIns(calendarEvents, now);
+function CheckInCard({ calendarEvents, noPhoneBlocks, now, todayKey, onCheckInBlock, onNavigate }) {
+  const pending = getPendingCheckIns(calendarEvents, now, noPhoneBlocks);
   const ev = pending[0];
   if (!ev || !onCheckInBlock) return null;
   return (
-    <section className="wp-checkin" aria-label="Check in on a time block">
+    <section className={`wp-checkin${ev._noPhone ? ' wp-checkin--nophone' : ''}`} aria-label={ev._noPhone ? 'Check in on a no-phone block' : 'Check in on a time block'}>
       <BlockCheckIn
-        key={`${ev.id}-${ev._instanceDate}`}
+        key={`${ev._noPhone ? 'np' : 'ev'}-${ev.id}-${ev._instanceDate}`}
         ev={ev}
         dayLabel={ev._instanceDate === todayKey ? 'Ended' : 'Yesterday'}
         onAnswer={(status, reason) => onCheckInBlock(ev, status, reason)}
@@ -360,6 +353,43 @@ function CheckInCard({ calendarEvents, now, todayKey, onCheckInBlock, onNavigate
       {pending.length > 1 && (
         <button type="button" className="wp-checkin-more" onClick={() => onNavigate('calendar')}>
           +{pending.length - 1} more on the Calendar <ArrowRight size={12} />
+        </button>
+      )}
+    </section>
+  );
+}
+
+// ── No-phone block, live ─────────────────────────────────────────────────────
+// While a no-phone block runs: how long is left, and one tap to own up if you pick
+// the phone up (recorded as Slipped, with Undo). Kept blocks count toward Plan kept;
+// an unanswered one gets the check-in above once it ends.
+function NoPhoneCard({ noPhoneBlocks, now, onCheckInBlock, onUndoSlip }) {
+  const block = getActiveNoPhone(noPhoneBlocks, now);
+  if (!block || !onCheckInBlock) return null;
+  const nowMs = now.getTime();
+  const start = blockStartMs(block), end = blockEndMs(block);
+  const pct = Math.min(100, Math.max(0, ((nowMs - start) / (end - start)) * 100));
+  const slipped = getBlockOutcome(block)?.status === 'skipped';
+  const left = fmtRemaining(end, nowMs);
+  const label = block.title === 'No Phone' ? 'No phone' : block.title;
+
+  return (
+    <section className={`wp-nophone${slipped ? ' is-slipped' : ''}`} aria-label="No-phone block in progress">
+      <span className="wp-nophone-icon"><PhoneOff size={18} strokeWidth={2.3} /></span>
+      <div className="wp-nophone-body">
+        <div className="wp-nophone-when">{label} · {blockRange(block)}</div>
+        <div className="wp-nophone-title">
+          {slipped ? <>Slipped. Put it back down for the last {left}.</> : <>Phone down · {left} left</>}
+        </div>
+        <div className="wp-nophone-track" aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
+      </div>
+      {slipped ? (
+        <button type="button" className="wp-btn wp-btn--ghost wp-nophone-btn" onClick={() => onUndoSlip?.(block)}>
+          <RotateCw size={13} /> Undo
+        </button>
+      ) : (
+        <button type="button" className="wp-btn wp-btn--ghost wp-nophone-btn" onClick={() => onCheckInBlock(block, 'skipped', NOPHONE_LIVE_SLIP)}>
+          I picked it up
         </button>
       )}
     </section>
@@ -578,11 +608,12 @@ export default function WelcomePage({
   onSaveMorning,
   onStartFocusStep,
   onCheckInBlock,
+  onUndoNoPhoneSlip,
 }) {
   const now = useNow(30000);
   const todayKey = toDateKey(now);
   const mode = getDayMode(now);
-  const scoreInputs = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents };
+  const scoreInputs = { habits, xpLog, logs, commitmentArchive, healthLog, calendarEvents, noPhoneBlocks };
   const nextUp = getNextUp({ calendarEvents, noPhoneBlocks, calendarDayEvents, now });
   const todaysBrief = brief?.date === todayKey ? brief : null;
   const todayEntry = logs?.[todayKey];
@@ -600,7 +631,8 @@ export default function WelcomePage({
         {todaysWin
           ? <TodaysWin win={todaysWin} morning={todayEntry.morning} todayKey={todayKey} ai={morningAi} onSave={onSaveMorning} onOpen={() => onNavigate('daily-log')} onStartFocusStep={onStartFocusStep} />
           : <BriefLine brief={todaysBrief} loading={briefLoading} onRefresh={onRefreshBrief} />}
-        <CheckInCard calendarEvents={calendarEvents} now={now} todayKey={todayKey} onCheckInBlock={onCheckInBlock} onNavigate={onNavigate} />
+        <NoPhoneCard noPhoneBlocks={noPhoneBlocks} now={now} onCheckInBlock={onCheckInBlock} onUndoSlip={onUndoNoPhoneSlip} />
+        <CheckInCard calendarEvents={calendarEvents} noPhoneBlocks={noPhoneBlocks} now={now} todayKey={todayKey} onCheckInBlock={onCheckInBlock} onNavigate={onNavigate} />
 
         <div className="wp-grid">
           <NowPanel

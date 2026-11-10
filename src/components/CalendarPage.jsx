@@ -1,13 +1,12 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import './CalendarPage.css';
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, PhoneOff, Copy, Check, Circle, ListChecks, NotebookText, Repeat, Play, Sparkles, Palette, CalendarPlus, Target, ChevronDown } from 'lucide-react';
-import { xpForBlockMinutes } from '../utils/xpUtils';
 import EMOTIONS from '../utils/logMeta';
 import {
   toDateKey, buildDayEventTargetMs, fmtRemaining,
-  normalizeEvent, expandEventsForDates, isInstanceCompleted,
+  normalizeEvent, expandEventsForDates, expandNoPhoneForDates, isInstanceCompleted,
   cloneSubEvents, cloneBonusTasks, normalizeBonusTask,
-  getBlockStatus, getBlockOutcome, PLAN_KEPT_START, blockRange,
+  getBlockStatus, getBlockOutcome, PLAN_KEPT_START, blockRange, blockStartMs,
   blockKind, BLOCK_KIND_COLORS, BLOCK_KIND_LABELS,
 } from '../utils/calendarUtils';
 import {
@@ -618,23 +617,8 @@ export default function CalendarPage({
     setNoPhoneDeleteScope(null);
   };
 
-  // ─── No-Phone adherence: honoring a block is logged, so it's a tracked commitment ──
-  const isNoPhoneHonored = (block) => (block.recurrence==='none'||!block.recurrence)
-    ? !!block.honored
-    : (block.honoredDates||[]).includes(block._instanceDate);
-
-  const honorNoPhoneBlock = (block, e) => {
-    e.stopPropagation();
-    if (isNoPhoneHonored(block)) return;
-    // Logged with the block's length, like any other block.
-    const xp = Math.max(1, xpForBlockMinutes(minsEndFromEvent(block) - minsFromEvent(block)));
-    onLogActivity(xp, { source: 'nophone', label: block.label || 'No-phone time honored' });
-    if (block.recurrence==='none'||!block.recurrence) {
-      setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,honored:true}:b));
-    } else {
-      setNoPhoneBlocks(prev=>prev.map(b=>b.id===block.id?{...b,honoredDates:[...(b.honoredDates||[]),block._instanceDate]}:b));
-    }
-  };
+  // ─── No-Phone adherence: checked in like a time block (stayed off / mostly / slipped) ──
+  const NOPHONE_STATE = { done: 'Stayed off', partly: 'Mostly', skipped: 'Slipped' };
 
   // ─── No-Phone Drag-to-create ───────────────────────────────────────────────────
   const handleNoPhoneSlotMouseDown = (dateKey, slot) => {
@@ -1074,7 +1058,7 @@ export default function CalendarPage({
   const editingEvent = modal === 'edit' ? calendarEvents.find((ev) => ev.id === editingId) : null;
 
   // ─── Expand no-phone blocks (full-width bands, never column-packed) ───────────
-  const expandedNoPhone = expandEventsForDates(noPhoneBlocks, activeDateKeys);
+  const expandedNoPhone = expandNoPhoneForDates(noPhoneBlocks, activeDateKeys);
   const noPhoneByDate = {};
   for (const dk of activeDateKeys) noPhoneByDate[dk] = [];
   for (const block of expandedNoPhone) { if (noPhoneByDate[block._instanceDate]!==undefined) noPhoneByDate[block._instanceDate].push(block); }
@@ -1246,21 +1230,23 @@ export default function CalendarPage({
                   const startMin=minsFromEvent(block), endMin=minsEndFromEvent(block);
                   const top=(startMin/(24*60))*TOTAL_HEIGHT;
                   const height=Math.max(((endMin-startMin)/(24*60))*TOTAL_HEIGHT,8);
-                  const honored=isNoPhoneHonored(block);
+                  const npStatus=getBlockOutcome(block)?.status||null;
+                  const honored=npStatus==='done'||npStatus==='partly';
+                  const npStarted=nowMs>=blockStartMs(block); // nothing to answer before it starts
                   return (
                     <div
                       key={`np-${block.id}-${block._instanceDate}-${bi}`}
-                      className={`cal-nophone-band${honored?' cal-nophone-band--honored':''}`}
+                      className={`cal-nophone-band${honored?' cal-nophone-band--honored':''}${npStatus==='skipped'?' cal-nophone-band--slipped':''}`}
                       style={{top,height}}
                     >
                       <div className="cal-nophone-chip" onClick={(e)=>{e.stopPropagation();openNoPhoneEdit(block);}}>
                         <span className="cal-nophone-label"><PhoneOff size={10} strokeWidth={3} /> {block.label || 'No Phone'} {fmtTime(block.startHour,block.startMin)}–{fmtTime(block.endHour,block.endMin)}</span>
-                        <button
-                          className={`cal-nophone-honor${honored?' is-honored':''}`}
-                          onClick={(e)=>honorNoPhoneBlock(block,e)}
-                          title={honored?'Honored':'Mark honored'}
-                          aria-label="Mark honored"
-                        ><Check size={11} strokeWidth={3} /></button>
+                        {(npStarted||npStatus) && <button
+                          className={`cal-nophone-honor${honored?' is-honored':''}${npStatus==='skipped'?' is-slipped':''}`}
+                          onClick={(e)=>{ if (npStatus==='done') { e.stopPropagation(); return; } openCheckIn(block,e); }}
+                          title={npStatus?NOPHONE_STATE[npStatus]:'Check in'}
+                          aria-label={npStatus?`No-phone block: ${NOPHONE_STATE[npStatus]}`:'Check in on this no-phone block'}
+                        >{npStatus==='skipped'?<X size={11} strokeWidth={3} />:<Check size={11} strokeWidth={3} />}</button>}
                         <button className="cal-nophone-delete" onClick={(e)=>requestDeleteNoPhone(block,e)} title="Delete" aria-label="Delete">
                           <X size={11} strokeWidth={3} />
                         </button>
@@ -1853,6 +1839,7 @@ export default function CalendarPage({
         <div className="cal-main">
           <TodayStrip
             calendarEvents={calendarEvents}
+            noPhoneBlocks={noPhoneBlocks}
             nowMs={nowMs}
             onCheckIn={checkIn}
             onStartFocus={onStartFocus}

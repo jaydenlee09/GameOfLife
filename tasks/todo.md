@@ -1,5 +1,24 @@
 # Todo
 
+## Done, uncommitted (2026-11-09): No-phone blocks checked in like time blocks
+
+Problem (user): no-phone blocks feel irrelevant and get ignored; wants them checked off on Home like time blocks.
+Decisions (user, Q&A): count them in the existing 10% Plan kept (no weight change); Home shows a live card with "I picked it up".
+- [x] calendarUtils: `NOPHONE_PLAN_START = '2026-11-09'`, `expandNoPhoneForDates` (tags `_noPhone`, title = label),
+      getPlanKept / getPendingCheckIns / getPlanDay take an optional `noPhoneBlocks`; `getActiveNoPhone`; legacy
+      `honored`/`honoredDates` read as done in getBlockOutcome. Outcomes use the same `outcome(s)`/`completed(Dates)` fields.
+- [x] computeDailyScore reads `inputs.noPhoneBlocks`; every score-inputs object in App/Home/CloseDay/Weekly/Stats/
+      TrendChart/widget/weeklyReset now carries it (grep `healthLog, calendarEvents` to re-check).
+- [x] Home: live NoPhoneCard (time left, progress, "I picked it up" → Skipped "Picked it up", Undo); after it ends the
+      shared check-in card asks "Did you stay off your phone?" (Stayed off / Mostly / Slipped + reasons). Old badge removed.
+- [x] Calendar: honor button → same check-in (hidden before the block starts); TodayStrip counts them.
+- [x] Push: "Did you stay off your phone?" after a no-phone block ends (checkins type, opens Home).
+- [x] AI context: get_calendar + system prompt show stayed off / mostly / slipped.
+- Verified: node checks (plan kept, pending, slip/undo, recurring done, legacy honored, past scores unchanged, push),
+  build, lint json = HEAD, harness UI desktop + 375 (live card, slip, undo, check-in, reasons, Calendar, score 0.3 everywhere).
+- Note: ConnectedFeatureTiles (No-Phone % tile) is not rendered anywhere; its field fix is invisible.
+- Not verified: real push delivery (decidePushes output only).
+
 ## Done, uncommitted (2026-11-09): AI actions for "Today I'll be someone who…"
 
 Problem (user): add AI actionable steps/tasks for the morning journal's identity line.

@@ -1,5 +1,5 @@
 import { computeDailyScore, computeRankStatus, getLocalDateKey, shiftDateKey, STREAK_THRESHOLD } from './scoreUtils';
-import { toDateKey, expandEventsForDates, isInstanceCompleted, getBlockOutcome } from './calendarUtils';
+import { toDateKey, expandEventsForDates, getBlockOutcome } from './calendarUtils';
 import { getHabitStreak } from './habitUtils';
 import { getActiveGoals, describeGoal } from './goalUtils';
 import { carriedDays, isTop, todayQueue } from './taskUtils';
@@ -92,7 +92,8 @@ const summarizeCalendar = (calendarEvents, noPhoneBlocks, calendarDayEvents) => 
       .filter(b => b._instanceDate === dateKey)
       .sort(byStart)
       .forEach(b => {
-        const done = isInstanceCompleted(b) ? ' (honored)' : '';
+        const o = getBlockOutcome(b);
+        const done = !o ? '' : o.status === 'done' ? ' (stayed off)' : o.status === 'partly' ? ' (mostly stayed off)' : ` (slipped${o.reason ? `: ${o.reason}` : ''})`;
         lines.push(`  No Phone: ${fmtTime(b.startHour, b.startMin)}-${fmtTime(b.endHour, b.endMin)}${done}`);
       });
     (calendarDayEvents?.[dateKey] || [])
