@@ -1,5 +1,19 @@
 # Todo
 
+## Done, uncommitted (2026-11-11): Calendar tasks in the sidebar + drop a task into a block
+
+Problem (user): tasks showed as chips above the week grid; wanted them in the sidebar, and to put a task into an existing block.
+Decisions (user, Q&A): one "My tasks" sidebar list (all open tasks this week, placed ones show their block); assign by dragging onto a block.
+- [x] Removed the all-day task chip row above the Day/Week grid (+ its CSS). Month chips and the phone row (today, unslotted) unchanged.
+- [x] calendarUtils: bonus tasks keep `taskId`; `taskBlockInstances` (task id → block, from `plan.taskId` or a bonus `taskId`, skipped frees it); plannedTaskIds built on it.
+- [x] taskUtils: `getWeekTasks` ({ task, block } entries); getUnscheduledTasks removed (no callers left).
+- [x] TaskTray sidebar = "My tasks": placed tasks show "8am–9am · Block" (not draggable), others drag/Schedule as before.
+- [x] Drop a task on a block → linked block task (`task-<id>`); repeating block → that day split off as a one-off (like "edit this event").
+      Ticking it completes the real task via App completeTaskById (logged once as the task); done anywhere reads as done; no un-tick.
+- Verified: node check (getWeekTasks/planned/skip/taskId), build, lint = HEAD, harness UI 1280 (drop highlight, one-off + recurring drop,
+  tick → task done + score 0.0→0.7, second click no-op), 375 (phone row unchanged, no overflow).
+- Not verified: a real mouse drag (tested with dispatched DragEvents).
+
 ## Done, uncommitted (2026-11-09): No-phone blocks checked in like time blocks
 
 Problem (user): no-phone blocks feel irrelevant and get ignored; wants them checked off on Home like time blocks.

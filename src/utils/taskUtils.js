@@ -10,7 +10,7 @@
 //   dueDate        hard deadline
 //   createdAt / completedAt  ms timestamps (old tasks: id is Date.now() at creation)
 
-import { plannedTaskIds } from './calendarUtils';
+import { taskBlockInstances } from './calendarUtils';
 
 export const TOP_LIMIT = 3;
 // Finished tasks stay visible ("Done today") for a week, then get pruned.
@@ -312,10 +312,16 @@ export const migrateLegacyTomorrow = (todos, today = getLocalDateKey(0)) => {
  * the next six days as [{ dateKey, tasks }], each day-task on its own day and a
  * week/month/year task on its due date.
  */
-export const getUnscheduledTasks = (todos, calendarEvents, today = getLocalDateKey(0)) => {
+/**
+ * This week's open tasks for the Calendar sidebar, each with `block`: the block it
+ * already sits in this week (made from it, or dropped into it), or null. `top` and
+ * `rest` are today's (Top 3 first, carried-over included); `upcoming` groups the
+ * next six days by date.
+ */
+export const getWeekTasks = (todos, calendarEvents, today = getLocalDateKey(0)) => {
   const week = Array.from({ length: 7 }, (_, i) => shiftDateKey(today, i));
-  const planned = plannedTaskIds(calendarEvents, week);
-  const open = (t) => !planned.has(String(t.id));
+  const blocks = taskBlockInstances(calendarEvents, week);
+  const withBlock = (t) => ({ task: t, block: blocks.get(String(t.id)) || null });
   const b = bucketTasks(todos || [], today);
   const later = Object.values(b.later).flat();
   const upcoming = week.slice(1)
@@ -324,8 +330,9 @@ export const getUnscheduledTasks = (todos, calendarEvents, today = getLocalDateK
       tasks: [
         ...b.upcoming.filter((t) => upcomingKey(t) === dateKey),
         ...later.filter((t) => t.dueDate === dateKey),
-      ].filter(open),
+      ].map(withBlock),
     }))
     .filter((day) => day.tasks.length);
-  return { top: b.top.filter(open), rest: [...b.carried, ...b.today].filter(open), upcoming };
+  return { top: b.top.map(withBlock), rest: [...b.carried, ...b.today].map(withBlock), upcoming };
 };
+

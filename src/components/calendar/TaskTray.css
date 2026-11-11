@@ -1,4 +1,4 @@
-/* ─── Calendar: "Needs a time slot" tray ─────────────────────────────────────── */
+/* ─── Calendar: task list ("My tasks" sidebar / phone tray) ─────────────────────────────────────── */
 .ctt { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ctt svg { stroke: currentColor; fill: none; flex-shrink: 0; }
 .ctt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
@@ -10,6 +10,15 @@
 .ctt-item:active { cursor: grabbing; }
 .ctt-item--top { border-color: rgba(56,189,248,0.35); }
 .ctt-grip { color: var(--text-tertiary); }
+/* Already in a block: not draggable, shows when instead of Schedule. */
+.ctt-item--placed { cursor: default; background: transparent; }
+.ctt-placed-icon { color: var(--success); }
+.ctt-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ctt-item--placed .ctt-text { color: var(--text-secondary); }
+.ctt-sub {
+  font-size: 0.64rem; font-weight: 500; color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .ctt-star { color: var(--accent); }
 .ctt-text {
   flex: 1; min-width: 0; font-size: 0.74rem; font-weight: 500; color: var(--text-primary);
@@ -33,7 +42,7 @@
 .ctt-note--warn { color: var(--warning); }
 .ctt-empty { margin: 0 0 4px; font-size: 0.72rem; color: var(--text-tertiary); }
 @media (hover: hover) {
-  .ctt-item:hover { background: var(--bg-elevated-3); }
+  .ctt-item:not(.ctt-item--placed):hover { background: var(--bg-elevated-3); }
   .ctt-schedule:hover { background: var(--accent-wash); border-color: rgba(56,189,248,0.35); }
   .ctt-more:hover { color: var(--text-primary); }
 }

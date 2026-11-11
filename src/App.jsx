@@ -1313,6 +1313,7 @@ function App() {
             onPlanDay={openPlanner}
             onStartFocus={startFocusFromBlock}
             onCheckInBlock={checkInBlockInstance}
+            onCompleteTask={completeTaskById}
             planner={user.planner}
             categoryColors={user.categoryColors}
             onSaveCategoryColors={(categoryColors) => setUser(prev => ({ ...prev, categoryColors }))}

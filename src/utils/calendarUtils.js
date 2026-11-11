@@ -57,6 +57,8 @@ export const normalizeBonusTask = (task = {}, index = 0) => ({
   xpAmount: Number(task.xpAmount) || 10,
   completed: Boolean(task.completed),
   completedDates: Array.isArray(task.completedDates) ? [...task.completedDates] : [],
+  // A task from the Tasks list dropped into this block (ticking it completes that task).
+  ...(task.taskId != null ? { taskId: task.taskId } : {}),
 });
 export const cloneBonusTasks = (bonusTasks = []) => bonusTasks.map((task, index) => normalizeBonusTask(task, index));
 export const normalizeEvent = (ev = {}) => ({
@@ -233,9 +235,25 @@ export const getActiveNoPhone = (noPhoneBlocks, now) => {
     .sort((a, b) => blockEndMs(b) - blockEndMs(a))[0] || null;
 };
 
-/** Ids of tasks that already have a block on any of `dateKeys` (a skipped block frees its task again). */
-export const plannedTaskIds = (calendarEvents, dateKeys) => new Set(
-  expandEventsForDates(calendarEvents || [], dateKeys)
-    .filter((ev) => ev.plan?.taskId != null && getBlockOutcome(ev)?.status !== 'skipped')
-    .map((ev) => String(ev.plan.taskId)),
-);
+/**
+ * Each task's block on `dateKeys`: task id → the block instance (the earliest one).
+ * A task is in a block when the block was made from it (`plan.taskId`) or it was
+ * dropped into the block's task list (a bonus task's `taskId`). A skipped block
+ * frees its task again.
+ */
+export const taskBlockInstances = (calendarEvents, dateKeys) => {
+  const map = new Map();
+  const instances = expandEventsForDates(calendarEvents || [], dateKeys)
+    .filter((ev) => getBlockOutcome(ev)?.status !== 'skipped')
+    .sort((a, b) => a._instanceDate.localeCompare(b._instanceDate)
+      || (a.startHour * 60 + a.startMin) - (b.startHour * 60 + b.startMin));
+  for (const ev of instances) {
+    const ids = [ev.plan?.taskId, ...ev.bonusTasks.map((t) => t.taskId)].filter((id) => id != null);
+    for (const id of ids) if (!map.has(String(id))) map.set(String(id), ev);
+  }
+  return map;
+};
+
+/** Ids of tasks that already have a block on any of `dateKeys`. */
+export const plannedTaskIds = (calendarEvents, dateKeys) =>
+  new Set(taskBlockInstances(calendarEvents, dateKeys).keys());

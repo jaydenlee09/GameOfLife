@@ -16,7 +16,7 @@ import {
 import {
   findFreeSlot, getComingUp, templateCategoryLookup, getSlippedBlocks, handleSlippedBlock, rescheduledCopy, blockMinutes,
 } from '../utils/calendarSidebar';
-import { dayLabel, getUnscheduledTasks } from '../utils/taskUtils';
+import { dayLabel, getWeekTasks } from '../utils/taskUtils';
 import TodayStrip from './calendar/TodayStrip';
 import TaskTray from './calendar/TaskTray';
 import BlockCheckIn from './calendar/BlockCheckIn';
@@ -258,6 +258,7 @@ export default function CalendarPage({
   onPlanDay,
   onStartFocus,
   onCheckInBlock,
+  onCompleteTask,
   planner,
   categoryColors = {},
   onSaveCategoryColors,
@@ -303,6 +304,7 @@ export default function CalendarPage({
   const [checkInEv, setCheckInEv] = useState(null); // block whose "did you do it?" is open
   const [catColorsDraft, setCatColorsDraft] = useState(null); // app-wide category colors being edited (null = closed)
   const [draggingTask, setDraggingTask] = useState(null); // task dragged from the tray
+  const [dropBlockKey, setDropBlockKey] = useState(null); // block a dragged task would join
   const [hoverCard, setHoverCard] = useState(null); // { ev, rect } — detail card for a hovered time block
   const hoverTimerRef = useRef(null);
   const hoverAnchorRef = useRef(null); // the .cal-event element the card is glued to
@@ -673,6 +675,35 @@ export default function CalendarPage({
     return { ok: true, text: `Scheduled for ${day ? `${day}, ` : ''}${fmtTime(block.startHour, block.startMin)}.` };
   };
 
+  // A task dropped onto an existing block joins that block's task list, linked by
+  // `taskId`: ticking it there completes the real task (App's completeTaskById, which
+  // logs it like the Tasks page does). On a repeating block only that day gets it, so
+  // the instance is split off as a one-off, the same way editing "this event" does.
+  const addTaskToBlock = (ev, task) => {
+    const normalizedEvent = normalizeEvent(ev);
+    if (normalizedEvent.bonusTasks.some((t) => String(t.taskId) === String(task.id)) || String(ev.plan?.taskId) === String(task.id)) {
+      setSideNote({ where: 'task', ok: false, text: `Already in ${ev.title}.` });
+      return;
+    }
+    const linked = normalizeBonusTask({ id: `task-${task.id}`, title: (task.text || 'Task').trim().slice(0, 80), xpAmount: 0, taskId: task.id });
+    const recurring = normalizedEvent.recurrence && normalizedEvent.recurrence !== 'none';
+    if (recurring) {
+      const detached = buildDetachedInstanceEvent(ev, { id: Date.now() });
+      setCalendarEvents((prev) => [
+        ...prev.map((e) => (e.id === ev.id ? { ...e, _exceptDates: [...(e._exceptDates || []), ev._instanceDate] } : e)),
+        { ...detached, bonusTasks: [...detached.bonusTasks, linked] },
+      ]);
+    } else {
+      setCalendarEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, bonusTasks: [...(e.bonusTasks || []), linked] } : e)));
+    }
+    setSideNote({ where: 'task', ok: true, text: `Added to ${ev.title} (${dayLabel(ev._instanceDate, todayKey)}, ${fmtTime(ev.startHour, ev.startMin)}).` });
+  };
+
+  // A block task linked to a real task reads as done once that task is done anywhere.
+  const todoById = new Map(todos.map((t) => [String(t.id), t]));
+  const isTaskInBlockDone = (task, ev) =>
+    (task.taskId != null && Boolean(todoById.get(String(task.taskId))?.completed)) || isBonusTaskCompleted(task, ev);
+
   useEffect(() => {
     if (!sideNote) return undefined;
     const id = setTimeout(() => setSideNote(null), 4000);
@@ -723,8 +754,11 @@ export default function CalendarPage({
     const currentlyCompleted = isBonusTaskCompleted(normalizedTask, { ...normalizedEvent, _instanceDate: instanceDate });
     if (currentlyCompleted === shouldBeCompleted) return;
 
-    const xpDelta = shouldBeCompleted ? normalizedTask.xpAmount : -normalizedTask.xpAmount;
-    onLogActivity(xpDelta, { source: 'calendar', label: normalizedTask.title });
+    // A linked task is logged once, as the task itself (see toggleBonusTaskCompletion).
+    if (normalizedTask.taskId == null) {
+      const xpDelta = shouldBeCompleted ? normalizedTask.xpAmount : -normalizedTask.xpAmount;
+      onLogActivity(xpDelta, { source: 'calendar', label: normalizedTask.title });
+    }
 
     if (!isRecurring) {
       setCalendarEvents((prev) => prev.map((calendarEvent) => {
@@ -782,7 +816,12 @@ export default function CalendarPage({
     const normalizedEvent = normalizeEvent(ev);
     const normalizedTask = normalizeBonusTask(task);
     const instanceDate = normalizedEvent._instanceDate || normalizedEvent.date;
-    const done = isBonusTaskCompleted(normalizedTask, { ...normalizedEvent, _instanceDate: instanceDate });
+    const done = isTaskInBlockDone(normalizedTask, { ...normalizedEvent, _instanceDate: instanceDate });
+    if (normalizedTask.taskId != null) {
+      // A finished task stays finished, as on the Tasks page.
+      if (done) return;
+      onCompleteTask?.(normalizedTask.taskId);
+    }
     setBonusTaskCompletion({ ...normalizedEvent, _instanceDate: instanceDate }, normalizedTask, !done);
   };
 
@@ -805,6 +844,7 @@ export default function CalendarPage({
     e.preventDefault();
     e.dataTransfer.dropEffect = draggingEvent ? 'move' : 'copy';
     setDragOver({date, slot});
+    if (dropBlockKey) setDropBlockKey(null);
   };
 
   const handleSlotDrop = (e, date, slot) => {
@@ -862,7 +902,7 @@ export default function CalendarPage({
     handleDragEnd();
   };
 
-  const handleDragEnd = () => { setDragOver(null); setDraggingTemplate(null); setDraggingEvent(null); setDraggingTask(null); };
+  const handleDragEnd = () => { setDragOver(null); setDraggingTemplate(null); setDraggingEvent(null); setDraggingTask(null); setDropBlockKey(null); };
 
   // ─── Event Resize (drag top/bottom edge, snapped to 15-min increments) ───────
   const resizeSessionRef = useRef(null);
@@ -1066,8 +1106,8 @@ export default function CalendarPage({
   const tmplCategoryOf = templateCategoryLookup(calendarEvents);
   const slipped = getSlippedBlocks(calendarEvents, new Date(nowMs));
   const comingUp = getComingUp({ dayEvents: calendarDayEvents, goals, now: new Date(nowMs) });
-  const unslottedCount = (() => {
-    const { top, rest, upcoming } = getUnscheduledTasks(todos, calendarEvents, todayKey);
+  const weekTaskCount = (() => {
+    const { top, rest, upcoming } = getWeekTasks(todos, calendarEvents, todayKey);
     return top.length + rest.length + upcoming.reduce((n, day) => n + day.tasks.length, 0);
   })();
 
@@ -1160,33 +1200,6 @@ export default function CalendarPage({
           );
         })}
       </div>
-      {dates.some((d) => (todosByDate[toDateKey(d)] || []).length > 0) && (
-        <div className="cal-alldaytasks-row" style={{ gridTemplateColumns: `64px repeat(${dates.length}, minmax(0, 1fr))` }}>
-          <div className="cal-alldaytasks-gutter" />
-          {dates.map((d, i) => {
-            const dk = toDateKey(d);
-            const dayTasks = todosByDate[dk] || [];
-            return (
-              <div key={i} className="cal-alldaytasks-col">
-                {dayTasks.slice(0, 3).map((task) => (
-                  <div
-                    key={task.id}
-                    className="cal-month-chip cal-month-chip--task"
-                    style={{ '--chip-color': BLOCK_KIND_COLORS.task }}
-                    onClick={(e) => e.stopPropagation()}
-                    title={task.text}
-                  >
-                    {task.text}
-                  </div>
-                ))}
-                {dayTasks.length > 3 && (
-                  <div className="cal-month-more">+{dayTasks.length - 3} more</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
       <div className="cal-scroll-area" ref={gridRef}>
         <div className="cal-time-grid" style={{ height: TOTAL_HEIGHT, gridTemplateColumns: `64px repeat(${dates.length}, minmax(0, 1fr))` }}>
           <div className="cal-time-gutter">
@@ -1280,15 +1293,19 @@ export default function CalendarPage({
                   const dispEndH=Math.floor(endMin/60), dispEndM=endMin%60;
                   const showTime=height>30, showCheckIn=status==='missed'&&height>=48;
                   const blockTasks=(ev.bonusTasks||[]).map((task,taskIndex)=>normalizeBonusTask(task,taskIndex));
-                  const tasksDone=blockTasks.filter(task=>isBonusTaskCompleted(task,ev)).length;
+                  const tasksDone=blockTasks.filter(task=>isTaskInBlockDone(task,ev)).length;
                   const subEvents=ev.subEvents||[];
                   const {shownTasks,shownSteps}=fitBlockRows(height,{time:showTime,checkIn:showCheckIn,tasks:blockTasks.length,steps:subEvents.length});
+                  const blockKey=`${ev.id}-${ev._instanceDate}`;
                   return (
                     <div
                       key={`${ev.id}-${ev._instanceDate}-${ei}`}
-                      className={`cal-event cal-event--${status} ${isResizing?'cal-event--resizing':''}`}
+                      className={`cal-event cal-event--${status} ${isResizing?'cal-event--resizing':''} ${dropBlockKey===blockKey?'cal-event--droptarget':''}`}
                       style={{top,height,left,width,'--ev-color':color}}
                       draggable={!resizeSession}
+                      // A task from the sidebar dropped here joins this block's task list.
+                      onDragOver={(e)=>{ if(!draggingTask) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect='copy'; if(dropBlockKey!==blockKey) setDropBlockKey(blockKey); if(dragOver) setDragOver(null); }}
+                      onDrop={(e)=>{ if(!draggingTask) return; e.preventDefault(); e.stopPropagation(); addTaskToBlock(ev, draggingTask); handleDragEnd(); }}
                       onDragStart={(e)=>{cancelHoverCard();handleEventDragStart(e,ev);}}
                       onDragEnd={handleDragEnd}
                       onMouseEnter={(e)=>handleEventHoverEnter(e,ev)}
@@ -1329,14 +1346,14 @@ export default function CalendarPage({
                         {shownTasks>0&&(
                           <div className="cal-event-bonus-list">
                             {blockTasks.slice(0,shownTasks).map((normalizedTask)=>{
-                              const bonusDone = isBonusTaskCompleted(normalizedTask, ev);
+                              const bonusDone = isTaskInBlockDone(normalizedTask, ev);
                               return (
                                 <button
                                   key={normalizedTask.id}
                                   type="button"
                                   className={`cal-event-bonus ${bonusDone?'cal-event-bonus--done':''}`}
                                   onClick={(e)=>completeBonusTask(ev, normalizedTask, e)}
-                                  title={bonusDone ? `Uncheck task: ${normalizedTask.title}` : `Complete task: ${normalizedTask.title}`}
+                                  title={bonusDone ? (normalizedTask.taskId != null ? `Done: ${normalizedTask.title}` : `Uncheck task: ${normalizedTask.title}`) : `Complete task: ${normalizedTask.title}`}
                                 >
                                   <span className="cal-event-bonus-check">{bonusDone ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={3} />}</span>
                                   <span className="cal-event-bonus-label">{normalizedTask.title}</span>
@@ -1548,15 +1565,18 @@ export default function CalendarPage({
             </>
           )}
 
-          {renderSectionHeader('tasks', 'Needs a time slot', unslottedCount)}
-          {!collapsed.tasks && <TaskTray
+          {renderSectionHeader('tasks', 'My tasks', weekTaskCount)}
+          {!collapsed.tasks && <>
+          <TaskTray
             todos={todos}
             calendarEvents={calendarEvents}
             todayKey={todayKey}
             onDragStart={setDraggingTask}
             onDragEnd={handleDragEnd}
             onSchedule={scheduleTask}
-          />}
+          />
+          {renderSideNote('task')}
+          </>}
 
           <div className="cal-sidebar-divider" />
 
@@ -1702,7 +1722,7 @@ export default function CalendarPage({
             <div className="cal-hovercard-list">
               {bonusTasks.slice(0, 6).map((task, taskIndex) => {
                 const normalizedTask = normalizeBonusTask(task, taskIndex);
-                const bonusDone = isBonusTaskCompleted(normalizedTask, ev);
+                const bonusDone = isTaskInBlockDone(normalizedTask, ev);
                 return (
                   <span key={normalizedTask.id} className={`cal-hovercard-bonus ${bonusDone ? 'cal-hovercard-bonus--done' : ''}`}>
                     {bonusDone ? <Check size={10} strokeWidth={3} /> : <Circle size={10} strokeWidth={3} />}
@@ -1995,7 +2015,7 @@ export default function CalendarPage({
                       ? { ...normalizeEvent(editingEvent), _instanceDate: form.date }
                       : null;
                     const bonusDone = completionEvent
-                      ? isBonusTaskCompleted(normalizedTask, completionEvent)
+                      ? isTaskInBlockDone(normalizedTask, completionEvent)
                       : Boolean(normalizedTask.completed);
                     return (
                     <div key={normalizedTask.id ?? `bonus-task-${index}`} className={`cal-bonus-row ${bonusDone?'cal-bonus-row--done':''}`}>
@@ -2004,7 +2024,7 @@ export default function CalendarPage({
                           type="button"
                           className={`cal-bonus-check ${bonusDone?'cal-bonus-check--done':''}`}
                           onClick={()=>toggleBonusTaskCompletion(completionEvent, normalizedTask)}
-                          title={bonusDone ? `Uncheck ${normalizedTask.title}` : `Mark ${normalizedTask.title} complete`}
+                          title={bonusDone ? (normalizedTask.taskId != null ? `Done: ${normalizedTask.title}` : `Uncheck ${normalizedTask.title}`) : `Mark ${normalizedTask.title} complete`}
                         >
                           {bonusDone ? <Check size={12} /> : <Circle size={12} />}
                         </button>

@@ -294,22 +294,6 @@
 .cal-next-event-toggle:hover { background: var(--bg-elevated-2); color: var(--text-secondary); }
 .cal-next-event-toggle svg { display: block; }
 
-.cal-alldaytasks-row {
-  display: grid;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--separator);
-  background: var(--bg-base);
-}
-.cal-alldaytasks-gutter { border-right: 1px solid var(--separator); }
-.cal-alldaytasks-col {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: 4px 6px;
-  border-right: 1px solid var(--separator);
-}
-.cal-alldaytasks-col:last-child { border-right: none; }
 
 .cal-day-header { display: flex; flex-direction: column; align-items: center; padding: 8px 4px 6px; border-right: 1px solid var(--separator); gap: 2px; }
 .cal-day-header:last-child { border-right: none; }
@@ -630,6 +614,8 @@
 .cal-event-resize-handle:hover::after { opacity: 1; }
 .cal-event--resizing { z-index: 6; filter: brightness(1.2); box-shadow: 0 0 0 2px var(--ev-color, #38bdf8), var(--shadow-sm); }
 .cal-event--resizing .cal-event-actions { opacity: 0; }
+/* A sidebar task dragged over a block: dropping adds it to the block's tasks. */
+.cal-event--droptarget { z-index: 6; filter: brightness(1.15); box-shadow: 0 0 0 2px var(--accent), var(--shadow-sm); }
 .cal-event-btn { width: 18px; height: 18px; border-radius: 3px; border: none; background: transparent; color: var(--text-secondary); font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.1s; }
 .cal-event-btn svg { display: block; }
 .cal-event-complete:hover, .cal-event-complete--done { color: var(--success); background: var(--success-wash); }
