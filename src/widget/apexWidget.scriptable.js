@@ -411,10 +411,54 @@ const accessory = (w, s, now, family) => {
   } else if (family === 'accessoryInline') {
     text(w, `APEX ${s.score.value.toFixed(1)}${item ? ` · ${item.label} ${clock(current ? current.endMs : item.startMs)}` : ''}`, font.semi(12), Color.white());
   } else {
-    text(w, `${s.score.value.toFixed(1)} · ${goalText(s.score)}`, font.bold(13), Color.white());
-    if (item) text(w, `${current ? 'Now' : clock(item.startMs)} · ${item.label}`, font.med(12), Color.white());
-    else if (s.move) text(w, `Next: ${s.move.text}`, font.med(12), Color.white());
+    lockRectangular(w, s, nowMs);
   }
+};
+
+// Lock Screen rectangular (~160×72pt, 3 lines): score, what's on now, what's next.
+// Times are clock times, not countdowns, so they stay right between refreshes.
+const lockRectangular = (w, s, nowMs) => {
+  const white = Color.white();
+  const dim = new Color('#ffffff', 0.6);
+  const { current, noPhone, next, nextIsToday } = nowNext(s, nowMs);
+
+  const top = fullWidth(w);
+  top.centerAlignContent();
+  const img = top.addImage(ring(s.score.value, white, 18, { label: false, mono: true }));
+  img.imageSize = new Size(18, 18);
+  top.addSpacer(5);
+  text(top, s.score.value == null ? '–' : s.score.value.toFixed(1), font.bold(16), white);
+  top.addSpacer(6);
+  text(top, s.score.streak > 0 ? `${s.score.streak}d streak` : 'Daily Score', font.med(11), dim);
+  top.addSpacer();
+
+  // [label] [block name ……] [time] — the time sits in a fixed column so a long
+  // block name truncates instead of pushing the time off the edge.
+  const row = (label, name, time) => {
+    const r = fullWidth(w);
+    r.centerAlignContent();
+    const l = r.addStack();
+    l.size = new Size(32, 0);
+    text(l, label, font.bold(10), dim);
+    l.addSpacer();
+    text(r, name, font.semi(13), white);
+    r.addSpacer();
+    if (time) {
+      const t = r.addStack();
+      t.size = new Size(50, 0);
+      t.addSpacer();
+      text(t, time, font.med(11), dim);
+    }
+  };
+
+  w.addSpacer(2);
+  const on = current || noPhone;
+  if (on) row('NOW', current ? on.label : `No phone · ${on.label}`, `–${clock(on.endMs)}`);
+  else row('NOW', 'Open time', null);
+
+  if (next && nextIsToday) row('NEXT', next.label, clock(next.startMs));
+  else if (next) row('NEXT', `Tmrw · ${next.label}`, clock(next.startMs));
+  else row('NEXT', 'Nothing else today', null);
 };
 
 // ── Run ──────────────────────────────────────────────────────────────────────
@@ -423,8 +467,13 @@ const family = config.widgetFamily || 'large';
 const { snapshot, problem } = await load();
 const w = base(family);
 
-if (problem) {
+if (problem && family.startsWith('accessory')) {
+  // The Home Screen message card is too big for the Lock Screen.
+  text(w, 'APEX · open the app', font.semi(12), Color.white(), 2);
+} else if (problem) {
   message(w, problem, null);
+} else if (!snapshot && family.startsWith('accessory')) {
+  text(w, 'APEX · open the app', font.semi(12), Color.white(), 2);
 } else if (!snapshot) {
   message(w, 'Almost there', 'Open APEX once so it can fill in your widget.');
 } else if (snapshot.date !== dateKey(now)) {
