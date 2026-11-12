@@ -21,6 +21,7 @@
   right: 0;
   width: min(440px, 96vw);
   height: 100vh;
+  height: 100dvh; /* iOS: 100vh is taller than the visible area, hiding the bottom */
   background: var(--glass-sheen), color-mix(in srgb, var(--bg-elevated-1) 82%, transparent);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -123,7 +124,11 @@
 
 .assistant-drawer-messages {
   flex: 1;
+  min-height: 0; /* let the flex child shrink so it actually scrolls */
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 1rem;
   display: flex;
   flex-direction: column;
