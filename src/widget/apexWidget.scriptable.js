@@ -415,12 +415,13 @@ const accessory = (w, s, now, family) => {
   }
 };
 
-// Lock Screen rectangular (~160×72pt, 3 lines): score, what's on now, what's next.
-// Times are clock times, not countdowns, so they stay right between refreshes.
+// Lock Screen rectangular (~160×72pt, 3 lines): score, then the next block with
+// the full width to itself. The countdown sits beside the clock time because iOS
+// can refresh a few minutes late; the clock time is always right.
 const lockRectangular = (w, s, nowMs) => {
   const white = Color.white();
   const dim = new Color('#ffffff', 0.6);
-  const { current, noPhone, next, nextIsToday } = nowNext(s, nowMs);
+  const { next, nextIsToday } = nowNext(s, nowMs);
 
   const top = fullWidth(w);
   top.centerAlignContent();
@@ -432,33 +433,17 @@ const lockRectangular = (w, s, nowMs) => {
   text(top, s.score.streak > 0 ? `${s.score.streak}d streak` : 'Daily Score', font.med(11), dim);
   top.addSpacer();
 
-  // [label] [block name ……] [time] — the time sits in a fixed column so a long
-  // block name truncates instead of pushing the time off the edge.
-  const row = (label, name, time) => {
-    const r = fullWidth(w);
-    r.centerAlignContent();
-    const l = r.addStack();
-    l.size = new Size(32, 0);
-    text(l, label, font.bold(10), dim);
-    l.addSpacer();
-    text(r, name, font.semi(13), white);
-    r.addSpacer();
-    if (time) {
-      const t = r.addStack();
-      t.size = new Size(50, 0);
-      t.addSpacer();
-      text(t, time, font.med(11), dim);
-    }
+  w.addSpacer(3);
+  const startsIn = (ms) => {
+    const mins = Math.max(1, Math.ceil((ms - nowMs) / 60000));
+    const h = Math.floor(mins / 60);
+    return h === 0 ? `${mins} MIN` : mins % 60 ? `${h}H ${mins % 60}M` : `${h}H`;
   };
-
-  w.addSpacer(2);
-  const on = current || noPhone;
-  if (on) row('NOW', current ? on.label : `No phone · ${on.label}`, `–${clock(on.endMs)}`);
-  else row('NOW', 'Open time', null);
-
-  if (next && nextIsToday) row('NEXT', next.label, clock(next.startMs));
-  else if (next) row('NEXT', `Tmrw · ${next.label}`, clock(next.startMs));
-  else row('NEXT', 'Nothing else today', null);
+  const when = !next ? 'NEXT'
+    : nextIsToday ? `NEXT · IN ${startsIn(next.startMs)} · ${clock(next.startMs)}`
+      : `TOMORROW · ${clock(next.startMs)}`;
+  text(w, when, font.bold(10), dim);
+  text(w, next ? next.label : 'Nothing else today', font.semi(14), white);
 };
 
 // ── Run ──────────────────────────────────────────────────────────────────────
